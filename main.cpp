@@ -1074,6 +1074,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	pixelShaderBlob->Release();
 	vertexShaderBlob->Release();
 
+	wvpResource->Release();
+
 
 	//リリースリークチェック
 	IDXGIDebug1* debug;
@@ -1084,6 +1086,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
 		debug->Release();
 		materialResource->Release();
+
 	}
 
 	return 0;
