@@ -458,9 +458,10 @@ ID3D12Resource* CreateTextureResource(ID3D12Device* device, const DirectX::TexMe
 
 	//利用するHeapの設定。非常に特殊な運用。02_04exで一般的なケース版がある
 	D3D12_HEAP_PROPERTIES heapProperties{};
+
 	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;//細かい設定を行う
-	heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;//WriteBackポリシーでCPUアクセス可能
-	heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;//プロセッサの近くに配置
+	//heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;//WriteBackポリシーでCPUアクセス可能
+	//heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;//プロセッサの近くに配置
 
 	//Resourceの生成
 	ID3D12Resource* resource = nullptr;
@@ -823,6 +824,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	ID3D12Resource* textureResource = CreateTextureResource(device, metadata);
 	ID3D12Resource* intermediateResource = UploadTextureData(textureResource, mipImages, device, commandList);
+
 
 	//D3D12_DESCRIPTOR_HEAP_DESC rtvDescriptorHeapDesc{};
 	//rtvDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;//レンダーターゲットビュー用
@@ -1244,6 +1246,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	textureResource->Release();
 
+	fence->Release();
+
+	intermediateResource->Release();
 
 
 	fence->Release();
