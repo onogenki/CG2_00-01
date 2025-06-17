@@ -376,10 +376,6 @@ Matrix4x4 Inverse(const Matrix4x4& m)
 	return result;
 };
 
-void DrawSphere(const Sphere& sphere, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color)
-{
-}
-
 
 static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception)
 {
@@ -1121,122 +1117,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		IID_PPV_ARGS(&graphicsPipelineState));
 	assert(SUCCEEDED(hr));
 
-
-
-
-	const uint32_t kSubdivision = 16;//分割数
-	const uint32_t sphereVertexNum = kSubdivision * kSubdivision * 6;//頂点数
-
-	//Sphere用の頂点リソースを作る
-	ID3D12Resource* vertexResourceSphere = CreateBufferResources(device, sizeof(VertexData) * sphereVertexNum);
-
-	//Sphereバッファービューを作成
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSphere{};
-
-	//リソースの先端アドレスから使う
-	vertexBufferViewSphere.BufferLocation = vertexResourceSphere->GetGPUVirtualAddress();
-
-	//使用するリソースのサイズは頂点3つ分サイズ
-	vertexBufferViewSphere.SizeInBytes = sizeof(VertexData) * sphereVertexNum;
-
-	//1頂点当たりのサイズ
-	vertexBufferViewSphere.StrideInBytes = sizeof(VertexData);
-
-	//球体リソースサイズデータに書き込む
-	VertexData* vertexDataSphere = nullptr;
-
-	//書き込むためのアドレスを取得
-	vertexResourceSphere->Map(0, nullptr, reinterpret_cast<VOID**>(&vertexDataSphere));
-
-	//Sprite用のTransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	ID3D12Resource* transformationMatrixResourceSphere = CreateBufferResources(device, sizeof(Matrix4x4));
-
-	//データを書き込む
-	Matrix4x4* transformationMatrixDataSphere = nullptr;
-
-	//書き込むためのアドレスを取得
-	transformationMatrixResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSphere));
-
-	//単位行列を書き込んでおく
-	*transformationMatrixDataSphere = MakeIdentity4x4();
-
-
-
-
-	//経度分割1つ分の角度
-	const float kLonEvery = std::numbers::pi_v<float> *2.0f / float(kSubdivision);
-	//緯度分割1つ分のの角度
-	const float kLatEvery = std::numbers::pi_v<float> / float(kSubdivision);
-	//緯度の方向に分割
-	for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
-	{
-		float lat = std::numbers::pi_v<float> / 2.0f + kLatEvery + latIndex;
-		//経度の方向に分割しながら線を描く
-		for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex)
-		{
-			uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
-			float lon = lonIndex * kLonEvery;
-
-			VertexData VertA = {
-				{       //緯度   //経度
-					cosf(lat) * cos(lon),
-					sin(lat),
-					cos(lon) * sinf(lon),
-					1.0f
-				},
-				{                           //番号
-					float(lonIndex) / float(kSubdivision),
-					1.0f - float(latIndex) / float(kSubdivision)
-			}
-			};
-			VertexData VertB = {
-				{         //次の緯度
-				cos(lat + kLatEvery) * cos(lon),
-				sin(lat + kLatEvery),
-				cos(lat + kLatEvery) * sin(lon),
-				1.0f
-				},
-				{
-					float(lonIndex) / float(kSubdivision),
-					float(latIndex) + 1.0f / float(kSubdivision)
-					}
-			};
-			VertexData VertC = {
-				{                        //次の経度
-					cos(lat) * cos(lon + kLonEvery),
-					sin(lat),
-					cos(lat) * sin(lon * kLonEvery),
-					1.0f
-				},
-				{
-					float(lonIndex + 1.0f) / float(kSubdivision),
-					1.0f - float(latIndex) / float(kSubdivision)
-				}
-			};
-			VertexData VertD = {
-				{
-					cos(lat + kLatEvery) * cos(lon + kLonEvery),
-					sin(lat * kLatEvery),
-					cos(lat + kLatEvery) * sin(lon + kLonEvery),
-					1.0f
-				},
-				{
-					float(lonIndex + 1.0f) / float(kSubdivision),
-					1.0f - float(latIndex + 1.0f) / float(kSubdivision)
-				}
-			};
-			vertexDataSphere[start+0] = VertA;
-			vertexDataSphere[start+1] = VertB;
-			vertexDataSphere[start+2] = VertC;
-
-			vertexDataSphere[start+3] = VertB;
-			vertexDataSphere[start+4] = VertC;
-			vertexDataSphere[start+5] = VertD;
-		}
-	}
-
-
-
 	ID3D12Resource* vertexResource = CreateBufferResources(device, sizeof(VertexData) * 6);
 
 	//Sprite用のリソースを作る
@@ -1308,6 +1188,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//vertexData[5].position = { 0.5f,0.5f,0.0f,1.0f };
 
 
+	//Sprite用のTransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
+	ID3D12Resource* transformationMatrixResourceSprite = CreateBufferResources(device, sizeof(Matrix4x4));
+	//データを書き込む
+	Matrix4x4* transformationMatrixDataSprite = nullptr;
+	//書き込むためのアドレスを取得
+	transformationMatrixResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
+	//単位行列を書き込んでおく
+	*transformationMatrixDataSprite = MakeIdentity4x4();
+
+
 	//スプライト用の頂点リソースにデータを書き込む
 	VertexData* vertexDataSprite = nullptr;
 	//書き込むためのアドレスを取得
@@ -1335,14 +1225,121 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexDataSprite[5].position = { 640.0f,360.0f,0.0f,1.0f };
 	vertexDataSprite[5].texcoord = { 1.0f,1.0f };
 
-	//Sprite用のTransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	ID3D12Resource* transformationMatrixResourceSprite = CreateBufferResources(device, sizeof(Matrix4x4));
-	//データを書き込む
-	Matrix4x4* transformationMatrixDataSprite = nullptr;
+
+	const uint32_t kSubdivision = 16;//分割数
+	const uint32_t sphereVertexNum = kSubdivision * kSubdivision * 6;//頂点数
+
+	//Sphere用の頂点リソースを作る
+	ID3D12Resource* vertexResourceSphere = CreateBufferResources(device, sizeof(VertexData) * sphereVertexNum);
+
+	//Sphereバッファービューを作成
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSphere{};
+
+	//リソースの先端アドレスから使う
+	vertexBufferViewSphere.BufferLocation = vertexResourceSphere->GetGPUVirtualAddress();
+
+	//使用するリソースのサイズは頂点3つ分サイズ
+	vertexBufferViewSphere.SizeInBytes = sizeof(VertexData) * sphereVertexNum;
+
+	//1頂点当たりのサイズ
+	vertexBufferViewSphere.StrideInBytes = sizeof(VertexData);
+
+	//球体リソースサイズデータに書き込む
+	VertexData* vertexDataSphere = nullptr;
+
 	//書き込むためのアドレスを取得
-	transformationMatrixResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
+	vertexResourceSphere->Map(0, nullptr, reinterpret_cast<VOID**>(&vertexDataSphere));
+
+	//Sprite用のTransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
+	ID3D12Resource* transformationMatrixResourceSphere = CreateBufferResources(device, sizeof(Matrix4x4));
+
+	//データを書き込む
+	Matrix4x4* transformationMatrixDataSphere = nullptr;
+
+	//書き込むためのアドレスを取得
+	transformationMatrixResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSphere));
+
 	//単位行列を書き込んでおく
-	*transformationMatrixDataSprite = MakeIdentity4x4();
+	*transformationMatrixDataSphere = MakeIdentity4x4();
+
+
+	//経度分割1つ分の角度
+	const float kLonEvery = std::numbers::pi_v<float> * 2.0f / float(kSubdivision);
+	//緯度分割1つ分のの角度
+	const float kLatEvery = std::numbers::pi_v<float> / float(kSubdivision);
+	//緯度の方向に分割
+	for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
+	{
+		float lat = -std::numbers::pi_v<float> / 2.0f + kLatEvery * latIndex;
+		//経度の方向に分割しながら線を描く
+		for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex)
+		{
+			uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
+			float lon = lonIndex * kLonEvery;
+
+			VertexData VertA = {
+				{       //緯度   //経度
+					cosf(lat) * cos(lon),
+					sin(lat),
+					cos(lat) * sinf(lon),
+					1.0f
+				},
+				{                           //番号
+					float(lonIndex) / float(kSubdivision),
+					1.0f - float(latIndex) / float(kSubdivision)
+			}
+			};
+			VertexData VertB = {
+				{         //次の緯度
+				cos(lat + kLatEvery) * cos(lon),
+				sin(lat + kLatEvery),
+				cos(lat + kLatEvery) * sin(lon),
+				1.0f
+				},
+				{
+					float(lonIndex) / float(kSubdivision),
+					float(latIndex + 1.0f) / float(kSubdivision)
+					}
+			};
+			VertexData VertC = {
+				{                        //次の経度
+					cos(lat) * cos(lon + kLonEvery),
+					sin(lat),
+					cos(lat) * sin(lon + kLonEvery),
+					1.0f
+				},
+				{
+					float(lonIndex + 1.0f) / float(kSubdivision),
+					1.0f - float(latIndex) / float(kSubdivision)
+				}
+			};
+			VertexData VertD = {
+				{
+					cos(lat + kLatEvery) * cos(lon + kLonEvery),
+					sin(lat + kLatEvery),
+					cos(lat + kLatEvery) * sin(lon + kLonEvery),
+					1.0f
+				},
+				{
+					float(lonIndex + 1.0f) / float(kSubdivision),
+					1.0f - float(latIndex + 1.0f) / float(kSubdivision)
+				}
+			};
+			vertexDataSphere[start + 0] = VertA;
+			vertexDataSphere[start + 1] = VertC;
+			vertexDataSphere[start + 2] = VertB;
+
+			vertexDataSphere[start + 3] = VertB;
+			vertexDataSphere[start + 4] = VertC;
+			vertexDataSphere[start + 5] = VertD;
+		}
+	}
+
+
+
+
+
+
 
 
 	//ビューポート
@@ -1407,6 +1404,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui_ImplDX12_NewFrame();
 			ImGui_ImplWin32_NewFrame();
 			ImGui::NewFrame();
+
+
+			//ImGui::Begin("Setting");
+			//ImGui::ColorEdit4("Color", &(*materialData).x);
+			//ImGui::DragFloat3("TranslateSprite", &transformSprite.translate.x);
+			//ImGui::DragFloat3("CameraTransform", &cameraTransform.translate.x);
+			//ImGui::End();
+
+
 			//開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
 			ImGui::ShowDemoWindow();
 
@@ -1430,6 +1436,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::Render();
 			//これから書き込むバックバッファのインデックスを取得
 			UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
+
+			
 
 			//TransitionBarrierの設定
 			D3D12_RESOURCE_BARRIER barrier{};
@@ -1551,7 +1559,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 
-
 	CloseHandle(fenceEvent);
 	dxcUtils->Release();
 	dxcCompiler->Release();
@@ -1617,4 +1624,4 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	}
 
 	return 0;
-}
+}	
