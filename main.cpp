@@ -1447,7 +1447,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 
-
+	
+	
 
 
 	//経度分割1つ分の角度
