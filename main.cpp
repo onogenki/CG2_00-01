@@ -1301,9 +1301,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	transformationMatrixData->World = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 
 
+	ID3D12Resource* indexResourceSprite = CreateBufferResources(device, sizeof(uint32_t) * 6);
 
+	D3D12_INDEX_BUFFER_VIEW indexBufferViewSprite{};
+	//リソースの先頭のアドレスから使う
+	indexBufferViewSprite.BufferLocation = indexResourceSprite->GetGPUVirtualAddress();
+	//使用するリソースのサイズはインデックス6つ分のサイズ
+	indexBufferViewSprite.SizeInBytes = sizeof(uint32_t) * 6;
+	//インデックスはuint32_tとする
+	indexBufferViewSprite.Format = DXGI_FORMAT_R32_UINT;
 
-
+	uint32_t* indexDataSprite = nullptr;
+	indexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&indexDataSprite));
+	indexDataSprite[0] = 0;  indexDataSprite[1] = 1;   indexDataSprite[2] = 2;
+	indexDataSprite[3] = 1;  indexDataSprite[4] = 3;   indexDataSprite[5] = 2;
 
 
 
@@ -1685,7 +1696,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			//形状を設定。PSOに設定しているものととはまた別。同じものを設定すると考えておけば良い
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
+			//IBVを設定
+			commandList->IASetIndexBuffer(&indexBufferViewSprite);
 
 			//Sphereの描画。変更が必要なものだけ変更する
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);//VBVを設定
@@ -1712,6 +1724,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			//Sprite用意のTransformationMatrixCBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+			//描画!(DrawCall/ドローコール)6個のインデックスを使用し1つのインスタンスを描画。その他は当面0で良い
+			commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 			//SRVのDescriptorTableの先頭を設定。2はrootParameter[2]である
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
@@ -1813,6 +1827,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	vertexResourceSphere->Release();
 	transformationMatrixResourceSphere->Release();
+
+	indexResourceSprite->Release();
 
 	fence->Release();
 	rtvDescriptorHeap->Release();
