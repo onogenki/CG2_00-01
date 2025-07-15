@@ -14,6 +14,8 @@
 #include<dxcapi.h>
 #include<vector>
 #include <numbers>
+#include<sstream>
+
 
 #include "externals/DirectXTex/DirectXTex.h"
 #include"externals/DirectXTex/d3dx12.h"
@@ -84,6 +86,10 @@ struct DirectionalLight
 	Vector4 color;//ライトの色
 	Vector3 direction;//ライトの向き
 	float intensity;//輝度
+};
+
+struct ModelData {
+	std::vector<VertexData>vertices;
 };
 
 //単位行列の作成
@@ -735,6 +741,19 @@ ID3D12DescriptorHeap* CreateDescriptorHeap(
 	assert(SUCCEEDED(hr));
 
 	return descriptorHeap;
+
+}
+
+ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename)
+{
+	ModelData modelData;//構築するModelData
+	std::vector<Vector4>positions;//位置
+	std::vector<Vector3>normals;//法線
+	std::vector<Vector2>texcoords;//テクスチャ座標
+	std::string line;//ファイルから読んだ1行を格納する
+
+	std::ifstream file(directoryPath + "/" + filename);//ファイルを開く
+	assert(file.is_open());//とりあえず開けなかったら止める
 
 }
 
