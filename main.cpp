@@ -228,14 +228,14 @@ Matrix4x4 MakeTranslateMatrix(const Vector3& translate) {
 
 
 //拡大縮小・回転・平行移動行列を使ってアフィン変換行列を作る関数
-Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rot, const Vector3& translate) {
+Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Vector3& translate) {
 
 	// スケーリング行列の作成
 	Matrix4x4 matScale = MakeScaleMatrix(scale);
 
-	Matrix4x4 matRotX = MakeRotateXMatrix(rot.x);
-	Matrix4x4 matRotY = MakeRotateYMatrix(rot.y);
-	Matrix4x4 matRotZ = MakeRotateZMatrix(rot.z);
+	Matrix4x4 matRotX = MakeRotateXMatrix(rotate.x);
+	Matrix4x4 matRotY = MakeRotateYMatrix(rotate.y);
+	Matrix4x4 matRotZ = MakeRotateZMatrix(rotate.z);
 	// 回転行列の合成
 	Matrix4x4 matRot = Multiply(Multiply(matRotX, matRotY), matRotZ);
 
@@ -1310,11 +1310,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		IID_PPV_ARGS(&graphicsPipelineState));
 	assert(SUCCEEDED(hr));
 
-	//モデル読み込み
-	ModelData modelData = LoadObjFile("resources", "plane.obj");
-
 	//頂点リソースを作る
-	ID3D12Resource* vertexResource = CreateBufferResources(device, sizeof(VertexData) * modelData.vertices.size());
+	ID3D12Resource* vertexResource = CreateBufferResources(device, sizeof(VertexData) * 4);
 
 	//DSV用のヒープでディスクリプタの数は1。DSVはShader内で触れるものではないので、ShaderVisibleはfalse
 	ID3D12DescriptorHeap* dsvDescriptorHeap = CreateDescriptorHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
@@ -1328,7 +1325,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//リリースの先頭のアドレスから使う
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
 	//使用するリソースのサイズは頂点3つ分のサイズ
-	vertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * modelData.vertices.size());
+	vertexBufferView.SizeInBytes = sizeof(VertexData) * 4;
 	//1頂点あたりのサイズ
 	vertexBufferView.StrideInBytes = sizeof(VertexData);
 
@@ -1336,8 +1333,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	VertexData* vertexData = nullptr;
 	//書き込むためのアドレスを取得
 	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
-	//頂点データをリソースにコピー
-	std::memcpy(vertexData, modelData.vertices.data(), sizeof(VertexData)* modelData.vertices.size());
 
 	//1枚目の三角形
 	//左下
@@ -1485,61 +1480,66 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//緯度分割1つ分のの角度
 	const float kLatEvery = std::numbers::pi_v<float> / float(kSubdivision);
 
-	const uint32_t sphereVertexNum = (kSubdivision+1)*(kSubdivision+1);//頂点数
-	const uint32_t sphereIndexNum = (kSubdivision * kSubdivision) * 6;//インデックス数
+	//const uint32_t sphereVertexNum = (kSubdivision+1)*(kSubdivision+1);//頂点数
+	//const uint32_t sphereIndexNum = (kSubdivision * kSubdivision) * 6;//インデックス数
+	
+	//モデル読み込み
+	ModelData modelData = LoadObjFile("resources", "plane.obj");
+	
 	//Sphere用の頂点リソースを作る
-	ID3D12Resource* vertexResourceSphere = CreateBufferResources(device, sizeof(VertexData) * sphereVertexNum);
+	ID3D12Resource* vertexResourceObject = CreateBufferResources(device, sizeof(VertexData) * modelData.vertices.size());
 
 	//Sphereバッファビューを作成
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSphere{};
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewObj{};
 
 	//リソースの先端アドレスから使う
-	vertexBufferViewSphere.BufferLocation = vertexResourceSphere->GetGPUVirtualAddress();
+	vertexBufferViewObj.BufferLocation = vertexResourceObject->GetGPUVirtualAddress();
 
 	//使用するリソースのサイズは頂点3つ分サイズ
-	vertexBufferViewSphere.SizeInBytes = sizeof(VertexData) * sphereVertexNum;
+	vertexBufferViewObj.SizeInBytes = UINT(sizeof(VertexData) * modelData.vertices.size());
 
 	//1頂点当たりのサイズ
-	vertexBufferViewSphere.StrideInBytes = sizeof(VertexData);
+	vertexBufferViewObj.StrideInBytes = sizeof(VertexData);
 
 	//球体リソースサイズデータに書き込む
-	VertexData* vertexDataSphere = nullptr;
+	VertexData* vertexDataObj = nullptr;
 
 	//書き込むためのアドレスを取得
-	vertexResourceSphere->Map(0, nullptr, reinterpret_cast<VOID**>(&vertexDataSphere));
-
+	vertexResourceObject->Map(0, nullptr, reinterpret_cast<VOID**>(&vertexDataObj));
+	//頂点データをリソースにコピー
+	std::memcpy(vertexDataObj, modelData.vertices.data(), sizeof(VertexData)* modelData.vertices.size());
 
 	//緯度の方向に分割
-	for (uint32_t latIndex = 0; latIndex < (kSubdivision + 1); ++latIndex)
-	{
-		float lat = -std::numbers::pi_v<float> / 2.0f + kLatEvery * latIndex;
-		//経度の方向に分割しながら線を描く
-		for (uint32_t lonIndex = 0; lonIndex < (kSubdivision + 1); ++lonIndex)
-		{
-
-			float lon = lonIndex * kLonEvery;
-
-			VertexData VertA = {
-				{       //緯度   //経度
-					std::cosf(lat) * std::cos(lon),
-					std::sin(lat),
-					std::cos(lat) * std::sinf(lon),
-					1.0f
-				},
-				{                           //番号
-					float(lonIndex) / float(kSubdivision),
-					1.0f - float(latIndex) / float(kSubdivision)
-				},
-				{
-					std::cosf(lat) * std::cos(lon),
-					std::sin(lat),
-					std::cos(lat) * std::sinf(lon)
-				}
-			};
-			uint32_t start = (latIndex * (kSubdivision + 1) + lonIndex);
-			vertexDataSphere[start] = VertA;
-		}
-	}
+	//for (uint32_t latIndex = 0; latIndex < (kSubdivision + 1); ++latIndex)
+	//{
+	//	float lat = -std::numbers::pi_v<float> / 2.0f + kLatEvery * latIndex;
+	//	//経度の方向に分割しながら線を描く
+	//	for (uint32_t lonIndex = 0; lonIndex < (kSubdivision + 1); ++lonIndex)
+	//	{
+	//
+	//		float lon = lonIndex * kLonEvery;
+	//
+	//		VertexData VertA = {
+	//			{       //緯度   //経度
+	//				std::cosf(lat) * std::cos(lon),
+	//				std::sin(lat),
+	//				std::cos(lat) * std::sinf(lon),
+	//				1.0f
+	//			},
+	//			{                           //番号
+	//				float(lonIndex) / float(kSubdivision),
+	//				1.0f - float(latIndex) / float(kSubdivision)
+	//			},
+	//			{
+	//				std::cosf(lat) * std::cos(lon),
+	//				std::sin(lat),
+	//				std::cos(lat) * std::sinf(lon)
+	//			}
+	//		};
+	//		uint32_t start = (latIndex * (kSubdivision + 1) + lonIndex);
+	//		vertexDataSphere[start] = VertA;
+	//	}
+	//}
 	
 
 	//Sphere用のTransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
@@ -1561,41 +1561,41 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 
-  ID3D12Resource* indexResourceSphere = CreateBufferResources(device, sizeof(uint32_t) * sphereIndexNum);
-  
-  D3D12_INDEX_BUFFER_VIEW indexBufferViewSphere{};
-  //リソースの先頭のアドレスから使う
-  indexBufferViewSphere.BufferLocation = indexResourceSphere->GetGPUVirtualAddress();
-  //使用するリソースのサイズはインデックス6つ分のサイズ
-  indexBufferViewSphere.SizeInBytes = sizeof(uint32_t) * sphereIndexNum;
-  //インデックスはuint32_tとする
-  indexBufferViewSphere.Format = DXGI_FORMAT_R32_UINT;
-  
-  uint32_t* indexDataSphere = nullptr;
-  indexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&indexDataSphere));
+  //ID3D12Resource* indexResourceSphere = CreateBufferResources(device, sizeof(uint32_t) * sphereIndexNum);
+  //
+  //D3D12_INDEX_BUFFER_VIEW indexBufferViewSphere{};
+  ////リソースの先頭のアドレスから使う
+  //indexBufferViewSphere.BufferLocation = indexResourceSphere->GetGPUVirtualAddress();
+  ////使用するリソースのサイズはインデックス6つ分のサイズ
+  //indexBufferViewSphere.SizeInBytes = sizeof(uint32_t) * sphereIndexNum;
+  ////インデックスはuint32_tとする
+  //indexBufferViewSphere.Format = DXGI_FORMAT_R32_UINT;
+  //
+  //uint32_t* indexDataSphere = nullptr;
+  //indexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&indexDataSphere));
 
 //緯度の方向に分割
-for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
-{
-	
-	//経度の方向に分割しながら線を描く
-	for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex)
-	{
-
-		uint32_t ld = lonIndex + latIndex * (kSubdivision + 1);
-		uint32_t lt = lonIndex + (latIndex + 1) * (kSubdivision + 1);
-		uint32_t rd = (lonIndex + 1) + latIndex * (kSubdivision + 1);
-		uint32_t rt = (lonIndex + 1) + (latIndex + 1) * (kSubdivision + 1);
-
-		uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
-		indexDataSphere[start + 0] = ld;
-		indexDataSphere[start + 1] = lt;
-		indexDataSphere[start + 2] = rd;
-		indexDataSphere[start + 3] = lt;
-		indexDataSphere[start + 4] = rt;
-		indexDataSphere[start + 5] = rd;
-	}
-}
+//for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
+//{
+//	
+//	//経度の方向に分割しながら線を描く
+//	for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex)
+//	{
+//
+//		uint32_t ld = lonIndex + latIndex * (kSubdivision + 1);
+//		uint32_t lt = lonIndex + (latIndex + 1) * (kSubdivision + 1);
+//		uint32_t rd = (lonIndex + 1) + latIndex * (kSubdivision + 1);
+//		uint32_t rt = (lonIndex + 1) + (latIndex + 1) * (kSubdivision + 1);
+//
+//		uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
+//		indexDataSphere[start + 0] = ld;
+//		indexDataSphere[start + 1] = lt;
+//		indexDataSphere[start + 2] = rd;
+//		indexDataSphere[start + 3] = lt;
+//		indexDataSphere[start + 4] = rt;
+//		indexDataSphere[start + 5] = rd;
+//	}
+//}
 
 
 	//ビューポート
@@ -1655,9 +1655,11 @@ for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
 
 			ImGui::Begin("Setting");
 			ImGui::ColorEdit4("Color", &(materialData->color).x);
-			ImGui::DragFloat3("TranslateSprite", &transformSprite.translate.x);
+			ImGui::DragFloat3("Translate", &transform.translate.x);
+			ImGui::DragFloat3("Rotate", &transform.rotate.x);
+			ImGui::DragFloat3("Scale", &transform.scale.x);
 			ImGui::DragFloat3("CameraTransform", &cameraTransform.translate.x);
-			
+
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 
 			ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
@@ -1667,7 +1669,7 @@ for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
 			//開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
 			ImGui::ShowDemoWindow();
 
-			transform.rotate.y += 0.03f;
+			//transform.rotate.y += 0.03f;
 			Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 			Matrix4x4 cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
 			Matrix4x4 viewMatrix = Inverse(cameraMatrix);
@@ -1675,8 +1677,6 @@ for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
 			Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 			wvpData->WVP = worldViewProjectionMatrix;
 			wvpData->World = worldMatrix;
-			//transformationMatrixDataSphere->wvp=worldViewProjectionMatrix;
-			//transformationMatrixDataSphere->
 
 			//Sprite用のWorldViewProjectionMatrixを作る
 			Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
@@ -1745,9 +1745,9 @@ for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 			//Sphereの描画。変更が必要なものだけ変更する
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);//VBVを設定
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewObj);//VBVを設定
 			//IBVを設定
-			commandList->IASetIndexBuffer(&indexBufferViewSphere);
+			//commandList->IASetIndexBuffer(&indexBufferViewSphere);
 			//形状を設定。PSOに設定しているものととはまた別。同じものを設定すると考えておけば良い
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			//マテリアルCBufferの場所を設定
@@ -1764,6 +1764,8 @@ for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
 		    //commandList->DrawIndexedInstanced(sphereIndexNum, 1, 0, 0, 0);
 
 			commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
+
+
 			//マテリアルCBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
 			//Spriteの描画。変更が必要なものだけ変更する
@@ -1858,6 +1860,7 @@ for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
 	textureResource2->Release();
 
 	fence->Release();
+	vertexResourceObject->Release();
 
 	transformationMatrixResource->Release();
 
@@ -1875,10 +1878,10 @@ for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
 	vertexResourceSprite->Release();
 	transformationMatrixResourceSprite->Release();
 
-	vertexResourceSphere->Release();
+	//vertexResourceObject->Release();
 	transformationMatrixResourceSphere->Release();
 
-	indexResourceSphere->Release();
+	//indexResourceSphere->Release();
 
 	indexResourceSprite->Release();
 
