@@ -755,7 +755,56 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 	std::ifstream file(directoryPath + "/" + filename);//ファイルを開く
 	assert(file.is_open());//とりあえず開けなかったら止める
 
+	while (std::getline(file, line))
+	{
+		std::string identifier;
+		std::istringstream s(line);//文字列を分解しながら読むためのクラス
+		s >> identifier;//先頭の識別子を読む
+
+		if (identifier == "v")//頂点位置
+		{
+			Vector4 position;
+			s >> position.x >> position.y >> position.z;
+			position.w = 1.0f;
+			positions.push_back(position);
+		} else if (identifier == "vt")//頂点テクスチャ座標
+		{
+			Vector2 texcoord;
+			s >> texcoord.x >> texcoord.y;
+			texcoords.push_back(texcoord);
+		} else if (identifier == "vn")//頂点法線
+		{
+			Vector3 normal;
+			s >> normal.x >> normal.y >> normal.z;
+			normals.push_back(normal);
+		} else if (identifier == "f")
+		{//面は三角形限定。その他は未対応
+			for (int32_t faceVertex = 0; faceVertex < 3; ++faceVertex)
+			{
+				std::string vertexDefinition;
+				s >> vertexDefinition;
+				//頂点の要素へのIndexは「位置/UV/法線」で格納されているので、分解してIndexを取得する
+				std::istringstream v(vertexDefinition);
+				uint32_t elementIndices[3];
+				for (int32_t element = 0; element < 3; ++element)
+				{
+					std::string index;
+					std::getline(v, index, '/');//区切りでインデックスを読んでいく
+					elementIndices[element] = std::stoi(index);
+				}
+				//要素へのIndexから、実際の要素の値を取得して、頂点を構築する
+				Vector4 position = positions[elementIndices[0] - 1];
+				Vector2 texcoord = texcoords[elementIndices[1] - 1];
+				Vector3 normal = normals[elementIndices[2] - 1];
+				VertexData vertex = { position,texcoord,normal };
+				modelData.vertices.push_back(vertex);
+
+			}
+		}
+	}
+	return modelData;
 }
+
 
 bool useMonsterBall = true;
 //Transform変数を作る
@@ -1261,8 +1310,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		IID_PPV_ARGS(&graphicsPipelineState));
 	assert(SUCCEEDED(hr));
 
-	//リソースを作る
-	ID3D12Resource* vertexResource = CreateBufferResources(device, sizeof(VertexData) * 4);
+	//モデル読み込み
+	ModelData modelData = LoadObjFile("resources", "plane.obj");
+
+	//頂点リソースを作る
+	ID3D12Resource* vertexResource = CreateBufferResources(device, sizeof(VertexData) * modelData.vertices.size());
 
 	//DSV用のヒープでディスクリプタの数は1。DSVはShader内で触れるものではないので、ShaderVisibleはfalse
 	ID3D12DescriptorHeap* dsvDescriptorHeap = CreateDescriptorHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
@@ -1276,7 +1328,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//リリースの先頭のアドレスから使う
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
 	//使用するリソースのサイズは頂点3つ分のサイズ
-	vertexBufferView.SizeInBytes = sizeof(VertexData) * 4;
+	vertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * modelData.vertices.size());
 	//1頂点あたりのサイズ
 	vertexBufferView.StrideInBytes = sizeof(VertexData);
 
@@ -1284,6 +1336,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	VertexData* vertexData = nullptr;
 	//書き込むためのアドレスを取得
 	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+	//頂点データをリソースにコピー
+	std::memcpy(vertexData, modelData.vertices.data(), sizeof(VertexData)* modelData.vertices.size());
 
 	//1枚目の三角形
 	//左下
@@ -1707,8 +1761,9 @@ for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
 			//SRVのDescriptorTableの先頭を設定。2はrootParameter[2]である
 			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 			//描画(DrawCall/ドローコール)。3頂点で1つのインスタンス。インスタンスについては今後
-			commandList->DrawIndexedInstanced(sphereIndexNum, 1, 0, 0, 0);
+		    //commandList->DrawIndexedInstanced(sphereIndexNum, 1, 0, 0, 0);
 
+			commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
 			//マテリアルCBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
 			//Spriteの描画。変更が必要なものだけ変更する
@@ -1723,8 +1778,7 @@ for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
 			//Sprite用意のTransformationMatrixCBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 			//描画!(DrawCall/ドローコール)6個のインデックスを使用し1つのインスタンスを描画。その他は当面0で良い
-			commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
-
+			//commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 			
 		
 
