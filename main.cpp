@@ -15,6 +15,7 @@
 #include<vector>
 #include <numbers>
 #include<sstream>
+#include<wrl.h>
 
 
 #include "externals/DirectXTex/DirectXTex.h"
@@ -828,8 +829,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	SetUnhandledExceptionFilter(ExportDump);
 
 	CoInitializeEx(0, COINIT_MULTITHREADED);
+	
+	struct D3DResourceLeakChecker
+	{
+		~D3DResourceLeakChecker()
+		{
+			//リソースリークチェック
+			Microsoft::WRL::ComPtr<IDXGIDebug1>debug;
+			if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug))))
+			{
+				debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
+				debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
+				debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
+			}
 
+		}
 
+	};
 	//ログのディレクトリを用意
 	std::filesystem::create_directory("logs");
 
@@ -911,7 +927,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	);
 
 	//DXGIファクトリーの生成
-	IDXGIFactory7* dxgiFactory = nullptr;
+	Microsoft::WRL::ComPtr<IDXGIFactory7>dxgiFactory = nullptr;
 	//HRESULTはWindows系のエラーコードであり、
 	//関数が成功したかどうかをSUCCEEDEDマクロで判定できる
 	HRESULT hr = CreateDXGIFactory(IID_PPV_ARGS(&dxgiFactory));
@@ -1920,6 +1936,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
 		debug->Release();
 	}
+
+	D3DResourceLeakChecker leakCheck;
+	Microsoft::WRL::ComPtr<IDXGIFactory7>dxgiFactory;
+	Microsoft::WRL::ComPtr<ID3D12Device>device;
 
 	return 0;
 }	
