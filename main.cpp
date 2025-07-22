@@ -755,6 +755,7 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 	std::ifstream file(directoryPath + "/" + filename);//ファイルを開く
 	assert(file.is_open());//とりあえず開けなかったら止める
 
+	VertexData triangle[3];
 	while (std::getline(file, line))
 	{
 		std::string identifier;
@@ -765,6 +766,7 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 		{
 			Vector4 position;
 			s >> position.x >> position.y >> position.z;
+			position.x *= -1.0f;
 			position.w = 1.0f;
 			positions.push_back(position);
 		} else if (identifier == "vt")//頂点テクスチャ座標
@@ -776,6 +778,7 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 		{
 			Vector3 normal;
 			s >> normal.x >> normal.y >> normal.z;
+			normal.x *= -1.0f;
 			normals.push_back(normal);
 		} else if (identifier == "f")
 		{//面は三角形限定。その他は未対応
@@ -798,8 +801,12 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 				Vector3 normal = normals[elementIndices[2] - 1];
 				VertexData vertex = { position,texcoord,normal };
 				modelData.vertices.push_back(vertex);
-
+				triangle[faceVertex] = { position,texcoord,normal };
 			}
+			//頂点を逆順で登録することで、回り順を逆にする
+			modelData.vertices.push_back(triangle[2]);
+			modelData.vertices.push_back(triangle[1]);
+			modelData.vertices.push_back(triangle[0]);
 		}
 	}
 	return modelData;
@@ -1503,7 +1510,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	//球体リソースサイズデータに書き込む
 	VertexData* vertexDataObj = nullptr;
-
+	
 	//書き込むためのアドレスを取得
 	vertexResourceObject->Map(0, nullptr, reinterpret_cast<VOID**>(&vertexDataObj));
 	//頂点データをリソースにコピー
