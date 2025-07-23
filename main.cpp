@@ -1504,7 +1504,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//const uint32_t sphereIndexNum = (kSubdivision * kSubdivision) * 6;//インデックス数
 	
 	//モデル読み込み
-	ModelData modelData = LoadObjFile("resources", "plane.obj");
+	ModelData modelData = LoadObjFile("resources", "axis.obj");
 	
 	//Sphere用の頂点リソースを作る
 	ID3D12Resource* vertexResourceObject = CreateBufferResources(device, sizeof(VertexData) * modelData.vertices.size());
