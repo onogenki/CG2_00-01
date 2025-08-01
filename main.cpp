@@ -795,6 +795,7 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 		{
 			Vector4 position;
 			s >> position.x >> position.y >> position.z;
+			position.x *= -1.0f;
 			position.w = 1.0f;
 			positions.push_back(position);
 		} else if (identifier == "vt")//頂点テクスチャ座標
@@ -807,6 +808,8 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 		{
 			Vector3 normal;
 			s >> normal.x >> normal.y >> normal.z;
+			normal.x *= -1.0f;
+
 			normals.push_back(normal);
 		} else if (identifier == "f")
 		{//面は三角形限定。その他は未対応
@@ -1516,7 +1519,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//const uint32_t sphereIndexNum = (kSubdivision * kSubdivision) * 6;//インデックス数
 
 	//モデル読み込み
-	ModelData modelData = LoadObjFile("resources", "plane.obj");
+	ModelData modelData = LoadObjFile("resources", "axis.obj");
 
 	//Sphere用の頂点リソースを作る
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& vertexResourceObject = CreateBufferResources(device, sizeof(VertexData) * modelData.vertices.size());
@@ -1709,7 +1712,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::Begin("Setting");
 			ImGui::ColorEdit4("Color", &(materialData->color).x);
 			ImGui::DragFloat3("Translate", &transform.translate.x);
-			ImGui::DragFloat3("Rotate", &transform.rotate.x);
+			ImGui::DragFloat3("Rotate", &transform.rotate.x,0.01f,0.1f);
 			ImGui::DragFloat3("Scale", &transform.scale.x);
 			ImGui::DragFloat3("CameraTransform", &cameraTransform.translate.x);
 
