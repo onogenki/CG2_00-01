@@ -1232,7 +1232,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	const Microsoft::WRL::ComPtr < ID3D12DescriptorHeap>& srvDescriptorHeap = CreateDescriptorHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
 
 	//Textureを読んで転送する
-	DirectX::ScratchImage mipImages = LoadTexture("resources/uvChecker.png");
+	DirectX::ScratchImage mipImages = LoadTexture("Resources/uvChecker.png");
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& textureResource = CreateTextureResource(device, metadata);
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& intermediateResource = UploadTextureData(textureResource, mipImages, device, commandList);
@@ -1366,6 +1366,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//マスターボイスを生成
 	result = xAudio2->CreateMasteringVoice(&masterVoice);
 
+	//音声読み込み
+	SoundData soundData1 = SoundLoadWave("Resources/Alarm01.wav");
+
+	//音声再生
+	SoundPlayWave(xAudio2.Get(), soundData1);
+
 	//マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& materialResource = CreateBufferResources(device, sizeof(Material));
 	//マテリアルにデータを書き込む
@@ -1376,12 +1382,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	materialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 	materialData->enableLighting = true;
 	materialData->uvTransform = MakeIdentity4x4();
-
-	//音声読み込み
-	SoundData soundData1 = SoundLoadWave("Resources/Alarm01.wav");
-
-	//音声再生
-	SoundPlayWave(xAudio2.Get(), soundData1);
 
 	//WVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& wvpResource = CreateBufferResources(device, sizeof(TransformationMatrix));
@@ -1670,7 +1670,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//const uint32_t sphereIndexNum = (kSubdivision * kSubdivision) * 6;//インデックス数
 
 	//モデル読み込み
-	ModelData modelData = LoadObjFile("resources", "plane.obj");
+	ModelData modelData = LoadObjFile("Resources", "plane.obj");
 
 	//Sphere用の頂点リソースを作る
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& vertexResourceObject = CreateBufferResources(device, sizeof(VertexData) * modelData.vertices.size());
@@ -2037,7 +2037,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		}
 
 	}
-	//XAudio解放
+	//XAudio2解放
 	xAudio2.Reset();
 	//音声データ解放
 	SoundUnload(&soundData1);
