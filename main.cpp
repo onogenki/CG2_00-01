@@ -828,6 +828,7 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 		{
 			Vector4 position;
 			s >> position.x >> position.y >> position.z;
+			position.x *= -1.0f;
 			position.w = 1.0f;
 			positions.push_back(position);
 		} else if (identifier == "vt")//頂点テクスチャ座標
@@ -835,11 +836,13 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 			Vector2 texcoord;
 			s >> texcoord.x >> texcoord.y;
 			texcoord.y = 1.0f - texcoord.y;
+
 			texcoords.push_back(texcoord);
 		} else if (identifier == "vn")//頂点法線
 		{
 			Vector3 normal;
 			s >> normal.x >> normal.y >> normal.z;
+			normal.x *= -1.0f;
 			normals.push_back(normal);
 		} else if (identifier == "f")
 		{//面は三角形限定。その他は未対応
@@ -906,7 +909,7 @@ SoundData SoundLoadWave(const char* filename)
 	FormatChunk format = {};
 	//チャンクヘッダーの確認
 	file.read((char*)&format, sizeof(ChunkHeader));
-	if (strncmp(format.chunk.id, "fmt", 4) != 0)
+	if (strncmp(format.chunk.id, "fmt ", 4) != 0)
 	{
 		assert(0);
 	}
@@ -1864,7 +1867,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::Begin("Setting");
 			ImGui::ColorEdit4("Color", &(materialData->color).x);
 			ImGui::DragFloat3("Translate", &transform.translate.x);
-			ImGui::DragFloat3("Rotate", &transform.rotate.x);
+			ImGui::DragFloat3("Rotate", &transform.rotate.x,0.01f,0.01f);
 			ImGui::DragFloat3("Scale", &transform.scale.x);
 			ImGui::DragFloat3("CameraTransform", &cameraTransform.translate.x);
 
@@ -1988,7 +1991,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//Sprite用意のTransformationMatrixCBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 			//描画!(DrawCall/ドローコール)6個のインデックスを使用し1つのインスタンスを描画。その他は当面0で良い
-			//commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+			commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 
 
