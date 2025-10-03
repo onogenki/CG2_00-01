@@ -18,7 +18,6 @@
 #include<wrl.h>
 #include<xaudio2.h>
 
-
 #include "externals/DirectXTex/DirectXTex.h"
 #include"externals/DirectXTex/d3dx12.h"
 
