@@ -1288,6 +1288,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//すべての色要素を書き込む
 	blendDesc.RenderTarget[0].RenderTargetWriteMask =
 		D3D12_COLOR_WRITE_ENABLE_ALL;
+	blendDesc.RenderTarget[0].BlendEnable = TRUE;
+	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;      //これから書き込む色
+	blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;    //これから書き込む色a
+	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;    //既に書き込まれてる色
 
 	//RasiterZerStateの設定
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
@@ -1519,7 +1526,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//const uint32_t sphereIndexNum = (kSubdivision * kSubdivision) * 6;//インデックス数
 
 	//モデル読み込み
-	ModelData modelData = LoadObjFile("resources", "axis.obj");
+	ModelData modelData = LoadObjFile("resources", "plane.obj");
 
 	//Sphere用の頂点リソースを作る
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& vertexResourceObject = CreateBufferResources(device, sizeof(VertexData) * modelData.vertices.size());
@@ -1710,13 +1717,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 			ImGui::Begin("Setting");
+
 			ImGui::ColorEdit4("Color", &(materialData->color).x);
+			ImGui::SliderFloat("Intensity", &directionalLightData->intensity, 0.0f, 5.0f);
 			ImGui::DragFloat3("Translate", &transform.translate.x);
 			ImGui::DragFloat3("Rotate", &transform.rotate.x,0.01f,0.1f);
 			ImGui::DragFloat3("Scale", &transform.scale.x);
 			ImGui::DragFloat3("CameraTransform", &cameraTransform.translate.x);
 
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
+
+			
 
 			ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
 			ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
