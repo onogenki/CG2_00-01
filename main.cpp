@@ -99,6 +99,17 @@ struct ModelData {
 	MaterialData material;
 };
 
+
+//いろんなBlend
+enum BlendMode
+{
+	kBlendModeNormal,//ブレンドなし
+	kBlendeAdd,//加算
+	kBlendModeSubtract,
+	kBlendModeMultiply,
+	kBlendModeScreen,
+};
+
 //単位行列の作成
 Matrix4x4 MakeIdentity4x4()
 {
@@ -1289,12 +1300,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	blendDesc.RenderTarget[0].RenderTargetWriteMask =
 		D3D12_COLOR_WRITE_ENABLE_ALL;
 	blendDesc.RenderTarget[0].BlendEnable = TRUE;
+	//通常aブレンド、デフォルト
 	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
 	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;      //これから書き込む色
-	blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;    //これから書き込む色a
-	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;    //既に書き込まれてる色
+	//a値のブレンド設定
+	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;      
+	blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;    
+	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+	
 
 	//RasiterZerStateの設定
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
