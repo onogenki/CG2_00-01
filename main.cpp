@@ -1107,7 +1107,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	const Microsoft::WRL::ComPtr < ID3D12DescriptorHeap>& srvDescriptorHeap = CreateDescriptorHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
 
 	//Textureを読んで転送する
-	DirectX::ScratchImage mipImages = LoadTexture("resources/uvChecker.png");
+	DirectX::ScratchImage mipImages = LoadTexture("resources/fence.png");
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& textureResource = CreateTextureResource(device, metadata);
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& intermediateResource = UploadTextureData(textureResource, mipImages, device, commandList);
@@ -1560,7 +1560,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//const uint32_t sphereIndexNum = (kSubdivision * kSubdivision) * 6;//インデックス数
 
 	//モデル読み込み
-	ModelData modelData = LoadObjFile("resources", "plane.obj");
+	ModelData modelData = LoadObjFile("resources", "fence.obj");
 
 	//Sphere用の頂点リソースを作る
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& vertexResourceObject = CreateBufferResources(device, sizeof(VertexData) * modelData.vertices.size());

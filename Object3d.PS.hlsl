@@ -46,6 +46,11 @@ PixelShaderOutput main(VertexShaderOutput input)
         output.color.a = gMaterial.color.a * textureColor.a;
     }
     
+    if(textureColor.a<=0.5)
+    {
+        discard;
+    }
+    
     return output;
 
 }
