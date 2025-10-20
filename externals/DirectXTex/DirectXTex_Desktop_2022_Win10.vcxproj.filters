@@ -10,6 +10,9 @@
     <Filter Include="Source Files\Shaders">
       <UniqueIdentifier>{d665bb3f-6d2a-415d-83f5-abd5c813962b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\2d">
+      <UniqueIdentifier>{8597ce4d-6d01-427e-be49-29834278dd18}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <CLInclude Include="DirectXTex.h">
