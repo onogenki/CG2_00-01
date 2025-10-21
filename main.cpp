@@ -1000,7 +1000,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	CoInitializeEx(0, COINIT_MULTITHREADED);
 
-	
+
 
 	struct D3DResourceLeakChecker
 	{
@@ -1098,7 +1098,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			)
 		)
 	);
-	
+
 
 	//DXGIファクトリーの生成
 	Microsoft::WRL::ComPtr<IDXGIFactory7>dxgiFactory = nullptr;
@@ -1450,11 +1450,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 
 	//shaderをコンパイルする
-	const Microsoft::WRL::ComPtr < IDxcBlob>& vertexShaderBlob = CompileShader(L"Object3D.VS.hlsl",
+	const Microsoft::WRL::ComPtr < IDxcBlob>& vertexShaderBlob = CompileShader(L"resources/shaders/Object3D.VS.hlsl",
 		L"vs_6_0", dxcUtils, dxcCompiler, includeHandler, logStream);
 	assert(vertexShaderBlob != nullptr);
 
-	const Microsoft::WRL::ComPtr < IDxcBlob>& pixelShaderBlob = CompileShader(L"Object3D.PS.hlsl",
+	const Microsoft::WRL::ComPtr < IDxcBlob>& pixelShaderBlob = CompileShader(L"resources/shaders/Object3D.PS.hlsl",
 		L"ps_6_0", dxcUtils, dxcCompiler, includeHandler, logStream);
 	assert(pixelShaderBlob != nullptr);
 
@@ -1799,7 +1799,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 	const Microsoft::WRL::ComPtr < ID3D12Resource> indexResourceSphere = CreateBufferResources(device, sizeof(uint32_t) * sphereIndexNum);
-	
+
 	D3D12_INDEX_BUFFER_VIEW indexBufferViewSphere{};
 	//リソースの先頭のアドレスから使う
 	indexBufferViewSphere.BufferLocation = indexResourceSphere->GetGPUVirtualAddress();
@@ -1807,55 +1807,55 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	indexBufferViewSphere.SizeInBytes = sizeof(uint32_t) * sphereIndexNum;
 	//インデックスはuint32_tとする
 	indexBufferViewSphere.Format = DXGI_FORMAT_R32_UINT;
-	
+
 	uint32_t* indexDataSphere = nullptr;
 	indexResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&indexDataSphere));
 
-  //緯度の方向に分割
-  for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
-  {
-  	
-  	//経度の方向に分割しながら線を描く
-  	for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex)
-  	{
-  
-  		uint32_t ld = lonIndex + latIndex * (kSubdivision + 1);
-  		uint32_t lt = lonIndex + (latIndex + 1) * (kSubdivision + 1);
-  		uint32_t rd = (lonIndex + 1) + latIndex * (kSubdivision + 1);
-  		uint32_t rt = (lonIndex + 1) + (latIndex + 1) * (kSubdivision + 1);
-  
-  		uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
-  		indexDataSphere[start + 0] = ld;
-  		indexDataSphere[start + 1] = lt;
-  		indexDataSphere[start + 2] = rd;
-  		indexDataSphere[start + 3] = lt;
-  		indexDataSphere[start + 4] = rt;
-  		indexDataSphere[start + 5] = rd;
-  	}
-  }
+	//緯度の方向に分割
+	for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
+	{
 
-  //マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
-  const Microsoft::WRL::ComPtr < ID3D12Resource>& materialResourceSphere = CreateBufferResources(device, sizeof(Material));
-  //マテリアルにデータを書き込む
-  Material* materialDataSphere = nullptr;
-  //mapしてデータを書き込む色は白
-  materialResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&materialDataSphere));
-  materialDataSphere->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-  //SpriteはLightingしないのでfalseに設定しておく
-  materialDataSphere->enableLighting = false;
-  materialDataSphere->uvTransform = MakeIdentity4x4();
+		//経度の方向に分割しながら線を描く
+		for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex)
+		{
 
-  const Microsoft::WRL::ComPtr < ID3D12Resource>& directionalLightResourceSphere = CreateBufferResources(device, sizeof(DirectionalLight));
+			uint32_t ld = lonIndex + latIndex * (kSubdivision + 1);
+			uint32_t lt = lonIndex + (latIndex + 1) * (kSubdivision + 1);
+			uint32_t rd = (lonIndex + 1) + latIndex * (kSubdivision + 1);
+			uint32_t rt = (lonIndex + 1) + (latIndex + 1) * (kSubdivision + 1);
 
- 
-  directionalLightResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
-  directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-  directionalLightData->direction = { 1.0f,0.0f,0.0f };
-  directionalLightData->intensity = 1.0f;
-  directionalLightData->direction = Normalize(directionalLightData->direction);
+			uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
+			indexDataSphere[start + 0] = ld;
+			indexDataSphere[start + 1] = lt;
+			indexDataSphere[start + 2] = rd;
+			indexDataSphere[start + 3] = lt;
+			indexDataSphere[start + 4] = rt;
+			indexDataSphere[start + 5] = rd;
+		}
+	}
+
+	//マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
+	const Microsoft::WRL::ComPtr < ID3D12Resource>& materialResourceSphere = CreateBufferResources(device, sizeof(Material));
+	//マテリアルにデータを書き込む
+	Material* materialDataSphere = nullptr;
+	//mapしてデータを書き込む色は白
+	materialResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&materialDataSphere));
+	materialDataSphere->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	//SpriteはLightingしないのでfalseに設定しておく
+	materialDataSphere->enableLighting = false;
+	materialDataSphere->uvTransform = MakeIdentity4x4();
+
+	const Microsoft::WRL::ComPtr < ID3D12Resource>& directionalLightResourceSphere = CreateBufferResources(device, sizeof(DirectionalLight));
 
 
-	  //ビューポート
+	directionalLightResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
+	directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	directionalLightData->direction = { 1.0f,0.0f,0.0f };
+	directionalLightData->intensity = 1.0f;
+	directionalLightData->direction = Normalize(directionalLightData->direction);
+
+
+	//ビューポート
 	D3D12_VIEWPORT viewport{};
 	//クライアント領域のサイズと一緒にして画面全体に表示
 	viewport.Width = kClientWidth;
@@ -1894,7 +1894,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//textureSrvHandleCPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	//textureSrvHandleGPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-	
+
 
 	MSG msg{};
 	//ウィンドウのxボタンが押されるまでループ
@@ -2030,15 +2030,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//RootSignatureを設定。PS0に設定しているけど別途設定が必要
 			commandList->SetGraphicsRootSignature(rootSignature.Get());
 			commandList->SetPipelineState(graphicsPipelineState.Get());//PSOを設定
-			
-
-			
-			
 
 
 
 
-		
+
+
+
+
+
 
 			// 描画開始（共通設定は済んでいる前提）
 			if (selectedUI == 0) {
