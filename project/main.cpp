@@ -1387,9 +1387,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//入力の初期化
 	input = new Input();
 	input->Initialize(GetModuleHandle(nullptr),hwnd);
-	
-	//入力解放
-	delete input;
 
 	//マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& materialResource = CreateBufferResources(device, sizeof(Material));
@@ -2039,9 +2036,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			input->Update();
 
 			////数字の0キーが押されていたら
-			if (input->key[DIK_0])
+			if(input->PushKey(DIK_0))
 			{
 				OutputDebugStringA("Hit 0\n");//出力ウィンドウに「Hit 0」と表示
+			}
+
+			////数字の0キーが押されていたら
+			if (input->TriggerKey(DIK_P))
+			{
+				OutputDebugStringA("Hit p\n");//出力ウィンドウに「Hit p」と表示
 			}
 
 			//コマンドリストの内容を確定させる。すべてのコマンドを積んでからCloseすること
@@ -2156,6 +2159,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 	CloseHandle(fenceEvent);
+
+	//入力解放
+	delete input;
+
 	//dxcUtils->Release();
 	//dxcCompiler->Release();
 	//includeHandler->Release();

@@ -17,12 +17,6 @@ public:
 
 	bool PushKey(BYTE keyNumber);
 
-	//今回の全キーの状態
-	BYTE key[256] = {};
-
-	//前回の全キーの状態
-	BYTE keyPre[256] = {};
-
 	bool TriggerKey(BYTE keyNumber);
 
 private:
@@ -32,5 +26,10 @@ private:
 	//キーボードのデバイス
 	ComPtr<IDirectInputDevice8>keyboard;
 
+	//今回の全キーの状態
+	BYTE key[256] = {};
+
+	//前回の全キーの状態
+	BYTE keyPre[256] = {};
 };
 
