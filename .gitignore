@@ -316,4 +316,7 @@ DirectXGame/imgui.ini
 
 # DirectXTex Compiled Shaders
 **/DirectXTex/Shaders/Compiled/
-/Dumps
+Dumps/
+logs/
+imgui.ini
+/project/imgui.ini
