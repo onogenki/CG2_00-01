@@ -1,5 +1,4 @@
 #include <Windows.h>
-#include <cstdint>
 #include<string>
 //#include<format>
 #include<filesystem>
@@ -18,6 +17,7 @@
 #include<wrl.h>
 #include<xaudio2.h>
 #include "Input.h"
+#include "WinApp.h"
 
 #include "externals/DirectXTex/DirectXTex.h"
 #include"externals/DirectXTex/d3dx12.h"
@@ -689,7 +689,7 @@ D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(Microsoft::WRL::ComPtr < ID3D
 }
 
 //ウィンドウプロシージャ
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT  msg, WPARAM wparam, LPARAM lparam)
+LRESULT CALLBACKWinApp::WindowProc(HWND hwnd, UINT  msg, WPARAM wparam, LPARAM lparam)
 {
 	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam))
 	{
@@ -1044,7 +1044,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//ファイルを作って書き込み準備
 	std::ofstream logStream(logFilePath);
 
+	//ポインタ
+	WinApp* winApp = nullptr;
 
+	WinApp = new WinApp();
+	WinApp->Initisloize();
 
 	WNDCLASS wc{};
 	//ウィンドウプロシージャ
@@ -2162,7 +2166,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	//入力解放
 	delete input;
-
+	delete winApp;
 	//dxcUtils->Release();
 	//dxcCompiler->Release();
 	//includeHandler->Release();
