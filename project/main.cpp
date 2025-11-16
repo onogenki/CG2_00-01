@@ -2153,6 +2153,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 #ifdef _DEBUG
 	//debugController->Release();
 #endif
+
 	// WinApp
 	if (winApp) {
 		winApp->Finalize();
