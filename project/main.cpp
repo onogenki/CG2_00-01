@@ -1,12 +1,8 @@
 #include <Windows.h>
 #include<string>
-//#include<format>
 #include<filesystem>
 #include<chrono>
 #include<fstream>
-#include<d3d12.h>
-#include<dxgi1_6.h>
-#include<cassert>
 #include <dbghelp.h>
 #include <strsafe.h>
 #include<dxgidebug.h>
@@ -14,10 +10,10 @@
 #include<vector>
 #include <numbers>
 #include<sstream>
-#include<wrl.h>
 #include<xaudio2.h>
 #include "Input.h"
 #include "WinApp.h"
+#include "DirectXCommon.h"
 
 #include "externals/DirectXTex/DirectXTex.h"
 #include"externals/DirectXTex/d3dx12.h"
@@ -25,11 +21,6 @@
 #include"externals/imgui/imgui_impl_dx12.h"
 #include"externals/imgui/imgui_impl_win32.h"
 
-//#define DIRECTINPUT_VERSION 0x0800
-//#include<dinput.h>
-
-#pragma comment(lib,"d3d12.lib")
-#pragma comment(lib,"dxgi.lib")
 #pragma comment(lib,"Dbghelp.lib")
 #pragma comment(lib,"dxguid.lib")
 #pragma comment(lib,"dxcompiler.lib")
@@ -1022,6 +1013,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	winApp = new WinApp();
 	winApp->Initialize();
+
+	DirectXCommon* dxCommon = nullptr;
+	//DirectXの初期化
+	dxCommon = new DirectXCommon();
+	dxCommon->Initialize();
+
 
 
 #ifdef _DEBUG
@@ -2154,18 +2151,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//debugController->Release();
 #endif
 
-	// WinApp
+	// WinApp解放
 	if (winApp) {
 		winApp->Finalize();
 		delete winApp;
 		winApp = nullptr;
 	}
 
-	// Input
+	// Input解放
 	if (input) {
 		delete input;
 		input = nullptr;
 	}
+
+	//DirectX解放
+	delete dxCommon;
+
 
 	return 0;
 }
