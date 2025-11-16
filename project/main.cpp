@@ -1020,8 +1020,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//ポインタ
 	WinApp* winApp = nullptr;
 
-	WinApp = new WinApp();
-	WinApp->Initisloize();
+	winApp = new WinApp();
+	winApp->Initialize();
 
 
 #ifdef _DEBUG
@@ -1328,7 +1328,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	//入力の初期化
 	input = new Input();
-	input->Initialize(winApp->GetHInstance(), winApp->GetHwnd());
+	input->Initialize(winApp);
 
 	//マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& materialResource = CreateBufferResources(device, sizeof(Material));
@@ -1854,14 +1854,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	MSG msg{};
 	//ウィンドウのxボタンが押されるまでループ
-	while (msg.message != WM_QUIT)
+	while (true)
 	{//ウィンドウにメッセージが来てたら最優先で処理される
-		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+		if (winApp->ProcessMessage())
 		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		} else {
-
+			break;
+		}
 			static int selectedUI = 0;
 
 			//ゲームの処理
@@ -2083,15 +2081,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			hr = commandList->Reset(commandAllocator.Get(), nullptr);
 			assert(SUCCEEDED(hr));
 
-		}
-
 	}
 	//XAudio2解放
 	xAudio2.Reset();
 	//音声データ解放
 	SoundUnload(&soundData1);
-
-	CoUninitialize();
 
 	//ImGuiの終了処理
 	ImGui_ImplDX12_Shutdown();
@@ -2102,9 +2096,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	CloseHandle(fenceEvent);
 
-	//入力解放
-	delete input;
-	delete winApp;
 	//dxcUtils->Release();
 	//dxcCompiler->Release();
 	//includeHandler->Release();
@@ -2162,7 +2153,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 #ifdef _DEBUG
 	//debugController->Release();
 #endif
-	CloseWindow(winApp->GetHwnd());
+	// WinApp
+	if (winApp) {
+		winApp->Finalize();
+		delete winApp;
+		winApp = nullptr;
+	}
+
+	// Input
+	if (input) {
+		delete input;
+		input = nullptr;
+	}
 
 	return 0;
 }

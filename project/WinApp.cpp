@@ -5,7 +5,7 @@
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wPARAM, LPARAM lParam);
 
 //ウィンドウプロシージャ
-LRESULT CALLBACKWinApp::WindowProc(HWND hwnd, UINT  msg, WPARAM wparam, LPARAM lparam)
+LRESULT CALLBACK WinApp::WindowProc(HWND hwnd, UINT  msg, WPARAM wparam, LPARAM lparam)
 {
 	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam))
 	{
@@ -48,6 +48,8 @@ void WinApp::Initialize() {
 
 
 	//ウィンドウの生成
+	hwnd = CreateWindow(
+		wc.lpszClassName,
 		L"CG2",              //タイトルバーの文字
 		WS_OVERLAPPEDWINDOW, //よく見るウィンドウスタイル
 		CW_USEDEFAULT,       //表示X座標(windowsに任せる)
@@ -57,8 +59,8 @@ void WinApp::Initialize() {
 		nullptr,             //親ウィンドウハンドル
 		nullptr,            //メニューハンドル
 		wc.hInstance,       //インスタンスハンドル
-		nullptr;           //オプション
-
+		nullptr            //オプション
+	);
 	//ウィンドウを表示する
 	ShowWindow(hwnd, SW_SHOW);
 
@@ -67,4 +69,28 @@ void WinApp::Initialize() {
 void WinApp::Update()
 {
 
+}
+
+void WinApp::Finalize()
+{
+	CloseWindow(hwnd);
+	CoUninitialize();
+}
+
+bool WinApp::ProcessMessage()
+{
+	MSG msg{};
+
+	if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+	{
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+	}
+
+	if (msg.message == WM_QUIT)
+	{
+		return true;
+	}
+
+	return false;
 }
