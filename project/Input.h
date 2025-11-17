@@ -14,6 +14,8 @@ public:
 
 	void Initialize(WinApp* winApp);
 
+	void InitializeDXGIDevice();
+
 	void Update();
 
 	bool PushKey(BYTE keyNumber);
