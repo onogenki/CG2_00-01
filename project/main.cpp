@@ -2151,18 +2151,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//debugController->Release();
 #endif
 
-	// WinApp解放
-	if (winApp) {
 		winApp->Finalize();
-		delete winApp;
-		winApp = nullptr;
-	}
-
-	// Input解放
-	if (input) {
-		delete input;
-		input = nullptr;
-	}
 
 	//DirectX解放
 	delete dxCommon;
