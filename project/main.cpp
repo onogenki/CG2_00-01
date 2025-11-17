@@ -2154,18 +2154,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//debugController->Release();
 #endif
 
-	// WinApp
-	if (winApp) {
 		winApp->Finalize();
-		delete winApp;
-		winApp = nullptr;
-	}
-
-	// Input
-	if (input) {
-		delete input;
-		input = nullptr;
-	}
 
 	return 0;
 }
