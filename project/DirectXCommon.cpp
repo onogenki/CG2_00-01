@@ -102,6 +102,16 @@ void DirectXCommon::()
 	//IMGUIの初期化
 }
 
+void DirectXCommon::PreDraw()
+{
+	//バックバッファの番号取得
+}
+
+void DirectXCommon::PostDraw()
+{
+	//バックバッファの番号取得
+	UINT bbIndex = swapchain->GetCurrentBackBufferIndex();
+}
 
 
 D3D12_CPU_DESCRIPTOR_HANDLE DirectXCommon::GetSRVCPUDescriptorHandle(uint32_t index)

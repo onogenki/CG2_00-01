@@ -1019,6 +1019,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	dxCommon = new DirectXCommon();
 	dxCommon->Initialize();
 
+	//描画前処理
+	dxCommon->PreDraw();
 
 
 #ifdef _DEBUG
@@ -1784,6 +1786,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   		indexDataSphere[start + 3] = lt;
   		indexDataSphere[start + 4] = rt;
   		indexDataSphere[start + 5] = rd;
+
   	}
   }
 
@@ -2077,6 +2080,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			assert(SUCCEEDED(hr));
 			hr = commandList->Reset(commandAllocator.Get(), nullptr);
 			assert(SUCCEEDED(hr));
+
+			dxCommon->PostDraw();
 
 	}
 	//XAudio2解放

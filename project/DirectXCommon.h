@@ -10,6 +10,11 @@ public:
 
 	void Initialize();
 
+	//描画前処理
+	void PreDraw();
+	//描画後処理
+	void PostDraw();
+
 	//SRVの指定番号のCPUデスクリプタハンドルを取得する
 	D3D12_CPU_DESCRIPTOR_HANDLE GetSRVCPUDescriptorHandle(uint32_t index);
 
@@ -18,6 +23,9 @@ public:
 
 	//スワップチェーンリソース
 	std::array<Microsoft::WRL::Comptr<ID3D12Resource>, 2>swapChainRsource;
+
+	//フェンス値
+	UINT64 fenceVal = 0;
 
 private:
 
