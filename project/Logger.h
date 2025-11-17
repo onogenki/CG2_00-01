@@ -1,4 +1,5 @@
 #pragma once
+#include "DirectXCommon.h"
 
 	namespace Logger
 	{
