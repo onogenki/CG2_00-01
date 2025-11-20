@@ -30,13 +30,13 @@ public:
 
 	void DepthStencilView();
 
-	void fence();
+	void CreateFence();
 
 	void viewportRect();
 
 	void scissorRect();
 
-	void dxcCompiler();
+	void CreateDxcCompiler();
 
 	void ImGui();
 
@@ -109,11 +109,11 @@ private:
 		//Compilerに使用するProfile
 		const wchar_t* profile);
 
-	ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap;
-	ComPtr<ID3D12DescriptorHeap> srvDescriptorHeap;
-	ComPtr<ID3D12DescriptorHeap> dsvDescriptorHeap;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> srvDescriptorHeap;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvDescriptorHeap;
 
-	ComPtr<ID3D12Resource> depthStencilResource;
+	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource;
 	UINT descriptorSizeSRV;
 	UINT descriptorSizeRTV;
 	UINT descriptorSizeDSV;
@@ -124,10 +124,12 @@ private:
 	WinApp* winApp = nullptr;
 
 	//指定番号のCPUデスクリプタハンドルを取得する
-	static D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle(const Microsoft::WRL::ComposableBase<ID3D12DescriptorHeap>& descriptorHeap, uint32_t descriptorSize, uint32_t index);
+	static D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle(const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap,
+		uint32_t descriptorSize, uint32_t index);
 
 	//指定番号のGPUデスクリプタハンドルを取得する
-	static D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(const Microsoft::WRL::ComposableBase<ID3D12DescriptorHeap>& descriptorHeap, uint32_t descriptorSize, uint32_t index);
+	static D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap,
+		uint32_t descriptorSize, uint32_t index);
 
 	//FPS固定初期化
 	void InitializeFixFPS();
