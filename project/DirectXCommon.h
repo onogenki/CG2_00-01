@@ -73,7 +73,7 @@ public:
 
 private:
 
-	Microsoft::WRL::ComPtr<ID3D12Device>device;
+	Microsoft::WRL::ComPtr<ID3D12Device>device_;
 	Microsoft::WRL::ComPtr<IDXGIFactory7>dxgiFactory;
 	Microsoft::WRL::ComPtr < ID3D12Debug1> debugController;
 	Microsoft::WRL::ComPtr < IDXGIAdapter4> useAdapter;
@@ -87,9 +87,6 @@ private:
 	//現時点でincludeはしないが、includeに対応するための設定を行っておく
 	Microsoft::WRL::ComPtr<IDxcIncludeHandler> includeHandler;
 
-	//DirectX12デバイス
-	Microsoft::WRL::ComPtr<ID3D12Device> device_;
-
 	Microsoft::WRL::ComPtr < ID3D12GraphicsCommandList> commandList_;
 	//DXGIファクトリ
 	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory_;
@@ -99,7 +96,16 @@ private:
 
 	//スワップチェーンを生成する
 	Microsoft::WRL::ComPtr < IDXGISwapChain4> swapChain;
+	Microsoft::WRL::ComPtr < ID3D12Resource> swapChainResources[2];
 
+	//描画先のRTVとDSVを設定する
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	//SRVを作成するDescriptorHeapの場所を決める
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2 = GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2 = GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
+
+	DXGI_SWAP_CHAIN_DESC1 swapChainDesc_;
+	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc_;
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors, bool shaderVisible);
 
@@ -118,7 +124,13 @@ private:
 	UINT descriptorSizeRTV;
 	UINT descriptorSizeDSV;
 
+	//ビューポート
+	D3D12_VIEWPORT viewport_;
+
 	HRESULT hr;
+
+	//シザー短形
+	D3D12_RECT scissorRect_;
 
 	//WindowsAPI
 	WinApp* winApp = nullptr;
@@ -138,8 +150,10 @@ private:
 
 	//記録時間(FPS固定用)
 	std::chrono::steady_clock::time_point reference_;
+	std::chrono::microseconds kMinTime_;
+	std::chrono::microseconds kMinCheckTime_;
 
-	uint32_t width;
-	uint32_t height;
+	uint32_t width = WinApp::kClientWidth; // 幅・高さをメンバに
+	uint32_t height = WinApp::kClientHeight;
 };
 
