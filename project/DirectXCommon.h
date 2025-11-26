@@ -98,12 +98,6 @@ private:
 	Microsoft::WRL::ComPtr < IDXGISwapChain4> swapChain;
 	Microsoft::WRL::ComPtr < ID3D12Resource> swapChainResources[2];
 
-	//描画先のRTVとDSVを設定する
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	//SRVを作成するDescriptorHeapの場所を決める
-	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2 = GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2 = GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
-
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc_;
 	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc_;
 
@@ -123,6 +117,11 @@ private:
 	UINT descriptorSizeSRV;
 	UINT descriptorSizeRTV;
 	UINT descriptorSizeDSV;
+
+	//描画先のRTVとDSVを設定する
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle_;
+
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle_[2];
 
 	//ビューポート
 	D3D12_VIEWPORT viewport_;

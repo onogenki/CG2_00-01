@@ -633,6 +633,38 @@ Microsoft::WRL::ComPtr < ID3D12Resource> UploadTextureData(Microsoft::WRL::ComPt
 
 Microsoft::WRL::ComPtr < ID3D12Resource> CreateDepthStencilTextureResoource(Microsoft::WRL::ComPtr < ID3D12Device> device, int32_t width, int32_t height)
 {
+	//生成するResourceの設定
+	D3D12_RESOURCE_DESC resourceDesc{};
+	resourceDesc.Width = width;//Textureの幅
+	resourceDesc.Height = height;//Textureの高さ
+	resourceDesc.MipLevels = 1;//mipmapの数
+	resourceDesc.DepthOrArraySize = 1;//奥行き or 配列Textureの配列数
+	resourceDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;//DepthStencilとして利用可能なフォーマット
+	resourceDesc.SampleDesc.Count = 1;//サンプリングカウント。1固定
+	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;//2次元
+	resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;//DepthStencilとして使う通知
+
+	//利用するHeapの設定
+	D3D12_HEAP_PROPERTIES heapProperties{};
+	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;//VRAM上に作る
+
+	//深度数のクリア設定
+	D3D12_CLEAR_VALUE depthClearValue{};
+	depthClearValue.DepthStencil.Depth = 1.0f;//1.0f(最大値)でクリア
+	depthClearValue.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;//フォーマット。Resourceと合わせる
+
+	//Resourceの生成
+	Microsoft::WRL::ComPtr < ID3D12Resource> resource = nullptr;
+	HRESULT hr = device->CreateCommittedResource(
+		&heapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&resourceDesc,
+		D3D12_RESOURCE_STATE_DEPTH_WRITE,
+		&depthClearValue,
+		IID_PPV_ARGS(&resource));
+	assert(SUCCEEDED(hr));
+
+	return resource;
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle(Microsoft::WRL::ComPtr < ID3D12DescriptorHeap> descriptorHeap, uint32_t descriptorSize, uint32_t index)
@@ -1419,9 +1451,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	srvDesc2.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc2.Texture2D.MipLevels = UINT(metadata2.mipLevels);
 
-	//SRVの生成
-	dxCommon->GetDevice()->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
-
 	//Sphere用のTransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& transformationMatrixResourceSphere = CreateBufferResources(dxCommon->GetDevice(), sizeof(TransformationMatrix));
 
@@ -1569,8 +1598,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//textureSrvHandleCPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	//textureSrvHandleGPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-	
-
 	MSG msg{};
 	//ウィンドウのxボタンが押されるまでループ
 	while (true)
@@ -1658,32 +1685,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			//ImGuiの内部コマンドを生成する
 			ImGui::Render();
-
-
-
-			//TransitionBarrierの設定
-			D3D12_RESOURCE_BARRIER barrier{};
-			//今回のバリアはTransition
-			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-			//Noneにしておく
-			barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-			//遷移前(現在)のResourceState
-			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-			//遷移後のResourceState
-			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-			//TransitionBarrierを張る
-			dxCommon->GetCommandList()->ResourceBarrier(1, &barrier);
-
-			//描画先のRTVを設定する
-			dxCommon->GetCommandList()->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, &dsvHandle);
-
-
-			//指定した色で画面全体をクリアする
-			float clearColor[] = { 0.1f,0.25f,0.5f,1.0f };//青っぽい色。RGBAの順
-			dxCommon->GetCommandList()->ClearRenderTargetView(rtvHandles[backBufferIndex], clearColor, 0, nullptr);
-
-			//指定した深度で画面全体をクリアする
-			dxCommon->GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 			
 			//入力の更新
 			input->Update();
@@ -1699,15 +1700,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			{
 				OutputDebugStringA("Hit p\n");//出力ウィンドウに「Hit p」と表示
 			}
-			
-
-			
-			
-
-
-
-
-		
 
 			// 描画開始（共通設定は済んでいる前提）
 			if (selectedUI == 0) {
@@ -1717,7 +1709,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResourceSphere->GetGPUVirtualAddress());
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
-				dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU2); // 例
+				dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU); // 例
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResourceSprite->GetGPUVirtualAddress());
 				dxCommon->GetCommandList()->DrawIndexedInstanced(sphereIndexNum, 1, 0, 0, 0);
 			} else if (selectedUI == 1) {
@@ -1747,45 +1739,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//実際のcommandListのImGuiの描画コマンドを積む
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxCommon->GetCommandList());
 
-			//画面に描く描画はすべて終わり、画面に映すので、状態を遷移
-			//今回はRendeerTargetからPresentにする
-			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-			//TransitionBarrierを張る
-			dxCommon->GetCommandList()->ResourceBarrier(1, &barrier);
-
-			hr = dxCommon->GetCommandList()->Close();
-			assert(SUCCEEDED(hr));
-
-			//GPUにコマンドリストの実行を行わせる
-			Microsoft::WRL::ComPtr < ID3D12CommandList> commandLists[] = { dxCommon->GetCommandList() };
-			commandQueue->ExecuteCommandLists(1, commandLists->GetAddressOf());
-			//GPUとOSに画面の交渉を行うように通知する
-			swapChain->Present(1, 0);
-
-			
-
-			//Fenceの値を更新
-			fenceValue++;
-			//GPUがここまでたどり着いたときに、Fenceの値を指定した値に代入するようにSignalを送る
-			commandQueue->Signal(fence.Get(), ++fenceValue);
-			//Fenceの値が指定したSignal値にたどり着いているか確認する
-			//GetCompletedValueの初期値はFence作成時に渡した初期値
-			if (fence->GetCompletedValue() != fenceValue)
-			{
-				HANDLE event = CreateEvent(nullptr, false, false, nullptr);
-				//指定したSignalにたどり着いていないので、たどり着くまで待つようにイベントを設定する
-				fence->SetEventOnCompletion(event,INFINITE);
-				//イベント待つ
-				CloseHandle(event);
-			}
-
-			//次のフレーム用のコマンドリストを準備
-			hr = commandAllocator->Reset();
-			assert(SUCCEEDED(hr));
-			hr = dxCommon->GetCommandList()->Reset(commandAllocator.Get(), nullptr);
-			assert(SUCCEEDED(hr));
-
 
 
 			dxCommon->PostDraw();
@@ -1800,10 +1753,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
-
-
-
-	CloseHandle(fenceEvent);
 
 	//dxcUtils->Release();
 	//dxcCompiler->Release();
