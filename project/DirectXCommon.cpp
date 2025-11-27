@@ -127,6 +127,13 @@ void DirectXCommon::InitializeDevice()//デバイスの初期化
 
 void DirectXCommon::commandList()
 {
+	//コマンドアロケータ
+	hr = device_->CreateCommandAllocator(
+		D3D12_COMMAND_LIST_TYPE_DIRECT, 
+		IID_PPV_ARGS(commandAllocator.GetAddressOf())
+	);
+	//コマンドアロケータの生成がうまくいかなかったので起動できない
+	assert(SUCCEEDED(hr));
 
 	hr = device_->CreateCommandList(
 		0,
@@ -135,25 +142,24 @@ void DirectXCommon::commandList()
 		nullptr,
 		IID_PPV_ARGS(&commandList_)
 	);
-	//コマンドアロケータ
-	hr = device_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(commandAllocator.GetAddressOf()));
-	//コマンドアロケータの生成がうまくいかなかったので起動できない
+
 	assert(SUCCEEDED(hr));
 
-	//コマンドリストの内容を確定させる。すべてのコマンドを積んでからCloseすること
-	//描画用のDescriptorHeapの設定
-	ComPtr < ID3D12DescriptorHeap> descriptorHeaps[] = { srvDescriptorHeap.Get() };
-	commandList_->SetDescriptorHeaps(1, descriptorHeaps->GetAddressOf());
-
-	//コマンドリストの実行
-	ID3D12CommandList* commandLists[] = { GetCommandList() };
-	commandQueue->ExecuteCommandLists(1, commandLists);
+	hr = GetCommandList()->Close();
+	assert(SUCCEEDED(hr));
 
 	D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
 	hr = device_->CreateCommandQueue(&commandQueueDesc,
 		IID_PPV_ARGS(&commandQueue));
 	//コマンドキューの生成がうまくいかなかったので起動できない
 	assert(SUCCEEDED(hr));
+
+	//コマンドリストの内容を確定させる。すべてのコマンドを積んでからCloseすること
+	//描画用のDescriptorHeapの設定
+
+	//コマンドリストの実行
+	ID3D12CommandList* commandLists[] = { GetCommandList() };
+	commandQueue->ExecuteCommandLists(1, commandLists);
 
 }
 
@@ -225,9 +231,9 @@ void DirectXCommon::DescriptorHeap()
 {
 	//RTV,SRV,DSVデスクリプタヒープの生成
 	//DescriptorSizeを取得しておく
-	uint32_t descriptorSizeSRV = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	uint32_t descriptorSizeRTV = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	uint32_t descriptorSizeDSV = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+	descriptorSizeSRV = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	descriptorSizeRTV = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	descriptorSizeDSV = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
 	//ディスクリプタヒープの生成
 	//RTV用のヒープでディスクリプタの数は2。RTVはShader内で触るものではないので、ShaderVisibleはfalse
@@ -241,18 +247,20 @@ void DirectXCommon::DescriptorHeap()
 void DirectXCommon::RenderTargetView()
 {//レンダーターゲットビューの初期化
 	 // RTV 設定
+	 
+	// インクリメントサイズ
+	UINT increment = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	 
 	// ディスクリプタの先頭
 	D3D12_CPU_DESCRIPTOR_HANDLE handle =
 		rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 
-	// インクリメントサイズ
-	UINT increment = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
 	// 2つのバックバッファに対して RTV を作成
 	for (int i = 0; i < 2; ++i)
 	{
+		assert(swapChainResources[i]);
 		device_->CreateRenderTargetView(
-			swapChainResource[i].Get(),
+			swapChainResources[i].Get(),
 			nullptr,
 			handle
 		);
@@ -269,6 +277,9 @@ void DirectXCommon::RenderTargetView()
 
 void DirectXCommon::DepthStencilView()
 {
+	assert(device_);
+	assert(dsvDescriptorHeap);
+	assert(depthStencilResource);
 	//深度ステンシルビューの初期化
 	//描画先のRTVとDSVを設定する
 	dsvHandle_ = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
@@ -278,20 +289,18 @@ void DirectXCommon::DepthStencilView()
 	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;//Format。基本的にはResourceに合わせる
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;//2dTexture
 
-	Microsoft::WRL::ComPtr < ID3D12Resource> textureResource2;
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc2{};
-
-	//SRVを作成するDescriptorHeapの場所を決める
-	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2 = GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2 = GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
-
-	//SRVの生成
-	GetDevice()->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
-
 	//DSVHeapの先頭にDSVを作る
 	device_->CreateDepthStencilView(depthStencilResource.Get(), &dsvDesc, dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
-
+	//Microsoft::WRL::ComPtr < ID3D12Resource> textureResource2;
+	//D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc2{};
+	//
+	////SRVを作成するDescriptorHeapの場所を決める
+	//D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2 = GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
+	//D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2 = GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
+	//
+	////SRVの生成
+	//GetDevice()->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
 }
 
 void DirectXCommon::CreateFence()
@@ -376,9 +385,14 @@ void DirectXCommon::PreDraw()
 	//遷移後のResourceState
 	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
+	//TransitionBarrierを張る
+	commandList_->ResourceBarrier(1, &barrier);
+
 	//描画先のRTVを設定する
 	GetCommandList()->OMSetRenderTargets(1, &rtvHandle_[backBufferIndex], false, &dsvHandle_);
 
+	ComPtr < ID3D12DescriptorHeap> descriptorHeaps[] = { srvDescriptorHeap.Get() };
+	commandList_->SetDescriptorHeaps(1, descriptorHeaps->GetAddressOf());
 
 	//指定した色で画面全体をクリアする
 	float clearColor[] = { 0.1f,0.25f,0.5f,1.0f };//青っぽい色。RGBAの順
@@ -401,12 +415,12 @@ void DirectXCommon::PostDraw()
 	//Noneにしておく
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 	//遷移前(現在)のResourceState
-	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 	//遷移後のResourceState
-	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
 	
 	//TransitionBarrierを張る
-	GetCommandList()->ResourceBarrier(1, &barrier);
+	commandList_->ResourceBarrier(1, &barrier);
 
 	hr = GetCommandList()->Close();
 	assert(SUCCEEDED(hr));
@@ -415,8 +429,6 @@ void DirectXCommon::PostDraw()
 	//今回はRendeerTargetからPresentにする
 	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-	//TransitionBarrierを張る
-	GetCommandList()->ResourceBarrier(1, &barrier);
 
 	//GPUにコマンドリストの実行を行わせる
 	Microsoft::WRL::ComPtr < ID3D12CommandList> commandLists[] = { GetCommandList() };
@@ -491,4 +503,36 @@ void DirectXCommon::UpdateFixFPS()
 	}
 	//現在の時間を記録する
 	reference_ = std::chrono::steady_clock::now();
+}
+
+Microsoft::WRL::ComPtr < ID3D12DescriptorHeap> DirectXCommon::CreateDescriptorHeap(
+	D3D12_DESCRIPTOR_HEAP_TYPE heapType,
+	UINT numDescriptors,
+	bool shaderVisible)
+{
+	Microsoft::WRL::ComPtr < ID3D12DescriptorHeap> descriptorHeap = nullptr;
+	D3D12_DESCRIPTOR_HEAP_DESC descriptorHeapDesc{};
+	descriptorHeapDesc.Type = heapType;
+	descriptorHeapDesc.NumDescriptors = numDescriptors;
+	descriptorHeapDesc.Flags = shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	
+	HRESULT hr = device_->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&descriptorHeap));
+	assert(SUCCEEDED(hr));
+
+	return descriptorHeap;
+
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE DirectXCommon::GetCPUDescriptorHandle(Microsoft::WRL::ComPtr < ID3D12DescriptorHeap> descriptorHeap, uint32_t descriptorSize, uint32_t index)
+{
+	D3D12_CPU_DESCRIPTOR_HANDLE handleCPU = descriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	handleCPU.ptr += (descriptorSize * index);
+	return handleCPU;
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE DirectXCommon::GetGPUDescriptorHandle(Microsoft::WRL::ComPtr < ID3D12DescriptorHeap> descriptorHeap, uint32_t descriptorSize, uint32_t index)
+{
+	D3D12_GPU_DESCRIPTOR_HANDLE handleGPU = descriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	handleGPU.ptr += (descriptorSize * index);
+	return handleGPU;
 }
