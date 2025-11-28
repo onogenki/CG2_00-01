@@ -1914,6 +1914,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//形状を設定。PSOに設定しているものととはまた別。同じものを設定すると考えておけば良い
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+			//フェンスが10枚描画
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewObj);//VBVを設定
+			commandList->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
+			//SRVのDescriptorTableの先頭を設定。2はrootParameter[2]である
+			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+			//描画6頂点の板ポリゴンを、kNumInstance(10)だけInstance描画を行う
+			commandList->DrawInstanced(UINT(modelData.vertices.size()), kNumInstance, 0, 0);
+
 			//Sphereの描画。変更が必要なものだけ変更する
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewObj);//VBVを設定
 			//IBVを設定
