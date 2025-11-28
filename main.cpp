@@ -1410,7 +1410,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	assert(SUCCEEDED(hr));
 
 	//頂点リソースを作る
-	const Microsoft::WRL::ComPtr < ID3D12Resource>& vertexResource = CreateBufferResource(device, sizeof(VertexData) * 4);
+	Microsoft::WRL::ComPtr < ID3D12Resource> vertexResource = CreateBufferResource(device, sizeof(VertexData) * 4);
 
 	//DSV用のヒープでディスクリプタの数は1。DSVはShader内で触れるものではないので、ShaderVisibleはfalse
 	const Microsoft::WRL::ComPtr < ID3D12DescriptorHeap>& dsvDescriptorHeap = CreateDescriptorHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
@@ -1469,7 +1469,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 	//Sprite用のリソースを作る
-	const Microsoft::WRL::ComPtr < ID3D12Resource>& vertexResourceSprite = 
+	Microsoft::WRL::ComPtr < ID3D12Resource> vertexResourceSprite = 
 		CreateBufferResource(device, sizeof(VertexData) * 4);
 
 	//頂点バッファビューを作成する
@@ -1600,7 +1600,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	modelData.material.textureFilePath = "./resources/uvChecker.png";
 
 	//Sphere用の頂点リソースを作る
-	const Microsoft::WRL::ComPtr < ID3D12Resource>& vertexResourceObject = 
+	Microsoft::WRL::ComPtr < ID3D12Resource> vertexResourceObject = 
 		CreateBufferResource(device, sizeof(VertexData) * modelData.vertices.size());
 
 	//Sphereバッファビューを作成
@@ -1903,22 +1903,28 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//描画用のDescriptorHeapの設定
 			ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
 			commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-
-			commandList->RSSetViewports(1, &viewport);//viewportを設定
-			commandList->RSSetScissorRects(1, &scissorRect);//scirssorを設定
 			//RootSignatureを設定。PS0に設定しているけど別途設定が必要
 			commandList->SetGraphicsRootSignature(rootSignature.Get());
 			commandList->SetPipelineState(graphicsPipelineState.Get());//PSOを設定
+
+			commandList->RSSetViewports(1, &viewport);//viewportを設定
+			commandList->RSSetScissorRects(1, &scissorRect);//scirssorを設定
+	
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);//VBVを設定
 
 			//形状を設定。PSOに設定しているものととはまた別。同じものを設定すると考えておけば良い
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+			//マテリアルCBufferの場所を設定
+			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 			//フェンスが10枚描画
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewObj);//VBVを設定
 			commandList->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
 			//SRVのDescriptorTableの先頭を設定。2はrootParameter[2]である
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+			//SRVのDescriptorTableの先頭を設定。2はrootParameter[2]である
+			commandList->SetGraphicsRootConstantBufferView(3, wvpResource->GetGPUVirtualAddress());
+			
 			//描画6頂点の板ポリゴンを、kNumInstance(10)だけInstance描画を行う
 			commandList->DrawInstanced(UINT(modelData.vertices.size()), kNumInstance, 0, 0);
 
@@ -1928,13 +1934,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//commandList->IASetIndexBuffer(&indexBufferViewSphere);
 			//形状を設定。PSOに設定しているものととはまた別。同じものを設定すると考えておけば良い
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			//マテリアルCBufferの場所を設定
-			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 			//commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 			//Sphere用意のTransformationMatrixCBufferの場所を設定
 			//commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
-			//SRVのDescriptorTableの先頭を設定。2はrootParameter[2]である
-			commandList->SetGraphicsRootConstantBufferView(3, wvpResource->GetGPUVirtualAddress());
 
 			//SRVのDescriptorTableの先頭を設定。2はrootParameter[2]である
 			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
