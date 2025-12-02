@@ -8,6 +8,7 @@
 #include "externals/imgui/imgui_impl_win32.h"
 #include "externals/imgui/imgui_impl_dx12.h"
 #include <thread>
+using namespace Logger;
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
@@ -117,6 +118,35 @@ void DirectXCommon::InitializeDevice()//デバイスの初期化
 	}
 	//デバイスの生成がうまくいかなかったので起動できない
 	assert(device_ != nullptr);
+
+#ifdef _DEBUG
+	ComPtr<ID3D12InfoQueue> infoQueue = nullptr;
+	if (SUCCEEDED(device_->QueryInterface(IID_PPV_ARGS(&infoQueue))))
+	{
+		//ヤバイエラー時に止まる
+		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
+		//エラー時に止まる
+		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+		//緊急時に止まる
+		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
+		//解放
+		//infoQueue->Release();
+		//抑制するメッセージのID
+		D3D12_MESSAGE_ID denyIds[] =
+		{
+			D3D12_MESSAGE_ID_RESOURCE_BARRIER_MISMATCHING_COMMAND_LIST_TYPE };
+		//抑制するレベル
+		D3D12_MESSAGE_SEVERITY severities[] = { D3D12_MESSAGE_SEVERITY_INFO };
+		D3D12_INFO_QUEUE_FILTER filter{};
+		filter.DenyList.NumIDs = _countof(denyIds);
+		filter.DenyList.pIDList = denyIds;
+		filter.DenyList.NumSeverities = _countof(severities);
+		filter.DenyList.pSeverityList = severities;
+		//指定したメッセージの表示の描画を抑制する
+		infoQueue->PushStorageFilter(&filter);
+
+	}
+#endif
 
 	//デバックレイヤーをオンに
 	//DXGIファクトリの生成
@@ -255,13 +285,16 @@ void DirectXCommon::RenderTargetView()
 	D3D12_CPU_DESCRIPTOR_HANDLE handle =
 		rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 
+	rtvDesc_.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	rtvDesc_.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
 	// 2つのバックバッファに対して RTV を作成
 	for (int i = 0; i < 2; ++i)
 	{
 		assert(swapChainResources[i]);
 		device_->CreateRenderTargetView(
 			swapChainResources[i].Get(),
-			nullptr,
+			&rtvDesc_,
 			handle
 		);
 
@@ -270,9 +303,6 @@ void DirectXCommon::RenderTargetView()
 
 		handle.ptr += increment;
 	}
-
-	rtvDesc_.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-	rtvDesc_.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 }
 
 void DirectXCommon::DepthStencilView()
@@ -305,14 +335,12 @@ void DirectXCommon::DepthStencilView()
 
 void DirectXCommon::CreateFence()
 {
-	//フェンス生成
-	uint64_t fenceValue = 0;
-	hr = device_->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
+	hr = device_->CreateFence(fenceValue_, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
 	assert(SUCCEEDED(hr));
 
+	fenceEvent_ = CreateEvent(NULL, FALSE, FALSE, NULL);
 	//FenceのSignalを待つためのイベントを作成する
-	HANDLE fenceEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-	assert(fenceEvent != nullptr);
+	assert(fenceEvent_ != nullptr);
 }
 
 void DirectXCommon::viewportRect()
@@ -326,7 +354,10 @@ void DirectXCommon::viewportRect()
 	viewport_.TopLeftY = 0;
 	viewport_.MinDepth = 0.0f;
 	viewport_.MaxDepth = 1.0f;
+}
 
+void DirectXCommon::scissorRect()
+{
 	//基本的にはビューポートと同じ短形が構成されるようにする
 	scissorRect_.left = 0;
 	scissorRect_.right = WinApp::kClientWidth;
@@ -334,11 +365,6 @@ void DirectXCommon::viewportRect()
 	scissorRect_.bottom = WinApp::kClientHeight;
 }
 
-void DirectXCommon::scissorRect()
-{
-	//シザリング矩形の設定
-	commandList_->RSSetScissorRects(1, &scissorRect_);//scirssorを設定
-}
 
 void DirectXCommon::CreateDxcCompiler()
 {
@@ -380,6 +406,8 @@ void DirectXCommon::PreDraw()
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	//Noneにしておく
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	//バリアを張る対象のリソース。現在のバックバッファに対して行う
+	barrier.Transition.pResource = swapChainResources[backBufferIndex].Get();
 	//遷移前(現在)のResourceState
 	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
 	//遷移後のResourceState
@@ -389,24 +417,29 @@ void DirectXCommon::PreDraw()
 	commandList_->ResourceBarrier(1, &barrier);
 
 	//描画先のRTVを設定する
-	GetCommandList()->OMSetRenderTargets(1, &rtvHandle_[backBufferIndex], false, &dsvHandle_);
-
-	ComPtr < ID3D12DescriptorHeap> descriptorHeaps[] = { srvDescriptorHeap.Get() };
-	commandList_->SetDescriptorHeaps(1, descriptorHeaps->GetAddressOf());
+	commandList_->OMSetRenderTargets(1, &rtvHandle_[backBufferIndex], false, &dsvHandle_);
 
 	//指定した色で画面全体をクリアする
 	float clearColor[] = { 0.1f,0.25f,0.5f,1.0f };//青っぽい色。RGBAの順
-	GetCommandList()->ClearRenderTargetView(rtvHandle_[backBufferIndex], clearColor, 0, nullptr);
+	commandList_->ClearRenderTargetView(rtvHandle_[backBufferIndex], clearColor, 0, nullptr);
 
 	//指定した深度で画面全体をクリアする
-	GetCommandList()->ClearDepthStencilView(dsvHandle_, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+	commandList_->ClearDepthStencilView(dsvHandle_, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+
+	ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
+	commandList_->SetDescriptorHeaps(1, descriptorHeaps);
+
+	commandList_->RSSetViewports(1, &viewport_);
+
+	commandList_->RSSetScissorRects(1, &scissorRect_);//scirssorを設定
 
 }
 
 void DirectXCommon::PostDraw()
 {
 	//バックバッファの番号取得
-	UINT bbIndex = swapChain->GetCurrentBackBufferIndex();
+	UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
 
 	//TransitionBarrierの設定
 	D3D12_RESOURCE_BARRIER barrier{};
@@ -414,6 +447,8 @@ void DirectXCommon::PostDraw()
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	//Noneにしておく
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	//バリアを張る対象のリソース。現在のバックバッファに対して行う
+	barrier.Transition.pResource = swapChainResources[backBufferIndex].Get();
 	//遷移前(現在)のResourceState
 	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 	//遷移後のResourceState
@@ -424,11 +459,6 @@ void DirectXCommon::PostDraw()
 
 	hr = GetCommandList()->Close();
 	assert(SUCCEEDED(hr));
-
-	//画面に描く描画はすべて終わり、画面に映すので、状態を遷移
-	//今回はRendeerTargetからPresentにする
-	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
 
 	//GPUにコマンドリストの実行を行わせる
 	Microsoft::WRL::ComPtr < ID3D12CommandList> commandLists[] = { GetCommandList() };
@@ -442,13 +472,12 @@ void DirectXCommon::PostDraw()
 	commandQueue->Signal(fence.Get(), ++fenceVal);
 	//Fenceの値が指定したSignal値にたどり着いているか確認する
 	//GetCompletedValueの初期値はFence作成時に渡した初期値
-	if (fence->GetCompletedValue() != fenceVal)
+	if (fence->GetCompletedValue() < fenceVal)
 	{
-		HANDLE event = CreateEvent(nullptr, false, false, nullptr);
 		//指定したSignalにたどり着いていないので、たどり着くまで待つようにイベントを設定する
-		fence->SetEventOnCompletion(fenceVal, event);
+		fence->SetEventOnCompletion(fenceVal, fenceEvent_);
 		//イベント待つ
-		CloseHandle(event);
+		WaitForSingleObject(fenceEvent_, INFINITE);
 	}
 
 	//次のフレーム用のコマンドリストを準備
@@ -504,6 +533,71 @@ void DirectXCommon::UpdateFixFPS()
 	//現在の時間を記録する
 	reference_ = std::chrono::steady_clock::now();
 }
+
+
+
+Microsoft::WRL::ComPtr < IDxcBlob> DirectXCommon::CompileShader(
+	//CompilerするShaderファイルへのパス
+	const std::wstring& filePath,
+	//Compilerに使用するProfile
+	const wchar_t* profile
+	)
+{
+	//これからシェーダーをコンバイルする旨をログに出す
+	Log(StringUtility::ConvertString(std::format(L"Begin CompileShader,path:{},profile:{}\n", filePath, profile)));
+	//hlslファイルを読む
+	Microsoft::WRL::ComPtr<IDxcBlobEncoding> shaderSource = nullptr;
+	HRESULT hr = dxcUtils->LoadFile(filePath.c_str(), nullptr, &shaderSource);
+	//読めなかったら止める
+	assert(SUCCEEDED(hr));
+	//読み込んだファイルの内容を設定する
+	DxcBuffer shaderSourceBuffer;
+	shaderSourceBuffer.Ptr = shaderSource->GetBufferPointer();
+	shaderSourceBuffer.Size = shaderSource->GetBufferSize();
+	shaderSourceBuffer.Encoding = DXC_CP_UTF8;//UTF8の文字コードであることを通知
+
+	LPCWSTR arguments[] = {
+		filePath.c_str(),//コンバイル対象のh|s|ファイル名
+		L"-E",L"main",//エントリーポイントの指定。基本的にmain以外にはしない
+		L"-T",profile,//shaderProfileの設定
+		L"-Zi",L"-Qembed_debug",//デバック用の情報を埋め込む
+		L"-Od",//最適解を外しておく
+		L"-Zpr",//メモリレイアウトは行優先
+	};
+	Microsoft::WRL::ComPtr < IDxcResult> shaderResult = nullptr;
+	hr = dxcCompiler->Compile(
+		&shaderSourceBuffer,//読み込んだファイル
+		arguments,//コンバイルオプション
+		_countof(arguments),//コンバイルオプションの数
+		includeHandler.Get(),//includeが含まれた諸々
+		IID_PPV_ARGS(&shaderResult)//コンパイル結果
+	);
+	//コンパイルエラーではなくdxcが起動できないなど致命的な状況
+	assert(SUCCEEDED(hr));
+
+	//警告・エラーが出てたらログに出して止める
+	Microsoft::WRL::ComPtr < IDxcBlobUtf8> shaderError = nullptr;
+	shaderResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&shaderError), nullptr);
+	if (shaderError != nullptr && shaderError->GetStringLength() != 0)
+	{
+		Log(shaderError->GetStringPointer());
+		//警告・エラーダメ絶対
+		assert(false);
+	}
+	//コンパイル結果から実行用のバイナリ部分を取得
+	Microsoft::WRL::ComPtr < IDxcBlob> shaderBlob = nullptr;
+	hr = shaderResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&shaderBlob), nullptr);
+	assert(SUCCEEDED(hr));
+	//成功したログを出す
+	Log(StringUtility::ConvertString(std::format(L"Compile,Succeeded,path:{},profile:{}\n", filePath, profile)));
+	//もう使わないリソースを解散
+	//shaderSource->Release();
+	//shaderResult->Release();
+	//実行用のバイナリを返却
+	return shaderBlob;
+}
+
+
 
 Microsoft::WRL::ComPtr < ID3D12DescriptorHeap> DirectXCommon::CreateDescriptorHeap(
 	D3D12_DESCRIPTOR_HEAP_TYPE heapType,

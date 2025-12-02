@@ -52,6 +52,14 @@ public:
 	//SRVの指定番号のGPUデスクリプタハンドルを取得する
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSRVGPUDescriptorHandle(uint32_t index);
 
+
+	Microsoft::WRL::ComPtr < IDxcBlob> CompileShader(
+		//CompilerするShaderファイルへのパス
+		const std::wstring& filePath,
+		//Compilerに使用するProfile
+		const wchar_t* profile);
+
+
 	//スワップチェーンリソース
 	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, 2>swapChainResource;
 
@@ -103,15 +111,14 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors, bool shaderVisible);
 
-	Microsoft::WRL::ComPtr < IDxcBlob> CompileShader(
-		//CompilerするShaderファイルへのパス
-		const std::wstring& filePath,
-		//Compilerに使用するProfile
-		const wchar_t* profile);
-
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> srvDescriptorHeap;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvDescriptorHeap;
+
+	//フェンス生成
+	uint64_t fenceValue_ = 0;
+
+	HANDLE fenceEvent_;
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource;
 	UINT descriptorSizeSRV;
