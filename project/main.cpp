@@ -1420,7 +1420,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		}
 	}
 
-
 	//単位行列を書き込んでおく
 	transformationMatrixDataSphere->WVP = MakeIdentity4x4();
 	//単位行列を書き込んでおく
