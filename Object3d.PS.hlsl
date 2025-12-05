@@ -5,6 +5,7 @@ struct Material
     float32_t4 color;
     int32_t enableLighting;
     float32_t4x4 uvTransform;
+    float32_t shininess;
 };
 
 struct DirectionalLight
@@ -19,6 +20,16 @@ struct PixelShaderOutput
     float32_t4 color : SV_TARGET0;
 };
 
+struct CameraForGPU
+{
+    Vector3 worldPosition;
+};
+
+struct Camera
+{
+    float32_t3 worldPosition;
+};
+
 ConstantBuffer<Material> gMaterial : register(b0);
 
 ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
@@ -26,7 +37,26 @@ ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
 Texture2D<float32_t4> gTexture : register(t0);
 SamplerState gSampler : register(s0);
 
+ConstantBuffer<Camera> gCamera : register(b2);
 
+float32_t3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
+
+float32_t3 reflectLight = reflect(gDirectionalLight.direction, normalize(input.normal));
+
+float RdotE = dot(reflectLight.toEye);
+float specularPow = pow(saturate(RdotE), gMaterial.shininess);//îΩéÀã≠ìx
+
+//ägéUîΩéÀ
+float32_t3 diffuse =
+gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * cos * gDirectionalLight.intensity;
+//ãæñ îΩéÀ
+float32_t3 spacular =
+gDirectionalLight.color.rgb * gDirectionalLight.intensity * spacecularPow * flaot32_t3(1.0f, 1.0f, 1.0f);
+
+//ägéUîΩéÀÅEãæñ îΩéÀ
+output.color.rgb=diffuse+specular;
+//ÉAÉãÉtÉ@ÇÕç°Ç‹Ç≈í ÇË
+output.color.a=gMaterial.color.a*textureColor.a;
 
 PixelShaderOutput main(VertexShaderOutput input)
 {

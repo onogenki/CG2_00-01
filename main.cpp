@@ -99,7 +99,6 @@ struct ModelData {
 	MaterialData material;
 };
 
-
 //いろんなBlend
 enum BlendMode
 {
@@ -1196,7 +1195,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 	//RootParameter作成。複数設定できるので配列
-	D3D12_ROOT_PARAMETER rootParameters[4] = {};
+	D3D12_ROOT_PARAMETER rootParameters[5] = {};
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;//CBVを使う
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;//PixelShaderで使う
 	rootParameters[0].Descriptor.ShaderRegister = 0;//レジスタ番号0とバインド
@@ -1215,6 +1214,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;//CBVを使う
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;//PixelShaderで使う
 	rootParameters[3].Descriptor.ShaderRegister = 1;//レジスタ番号0を使う
+
+	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[4].Descriptor.ShaderRegister = 2;
 
 	descriptionRootSignature.pParameters = rootParameters;//ルートパレメーター配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters);//配列の長さ
@@ -1754,6 +1757,32 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   //	}
   //}
 
+	//カメラ調整用のリソースを作る
+	Microsoft::WRL::ComPtr < ID3D12Resource> vertexResourceCamera =
+		CreateBufferResource(device, sizeof(TransformationMatrix));
+
+	materialData->shininess = 10.0f;
+
+	//頂点バッファビューを作成する
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewCamera{};
+	//リソースの先頭のアドレスから使う
+	vertexBufferViewCamera.BufferLocation = vertexResourceCamera->GetGPUVirtualAddress();
+	//使用するリソースのサイズは頂点のサイズ
+	vertexBufferViewCamera.SizeInBytes = sizeof(VertexData) * 4;
+	//1頂点あたりのサイズ
+	vertexBufferViewCamera.StrideInBytes = sizeof(VertexData);
+
+	//スプライト用の頂点リソースにデータを書き込む
+	VertexData* vertexDataCamera = nullptr;
+	//書き込むためのアドレスを取得
+	vertexResourceCamera->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataCamera));
+	
+	//CameraGPUを使って実装
+
+
+
+	//デフォルト値はカメラの位置と同じが良い
+	cameraData->worldPosition = cameraTransform.translate;
 
 	  //ビューポート
 	D3D12_VIEWPORT viewport{};
@@ -1927,6 +1956,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			
 			//描画6頂点の板ポリゴンを、kNumInstance(10)だけInstance描画を行う
 			commandList->DrawInstanced(UINT(modelData.vertices.size()), kNumInstance, 0, 0);
+
+			commandList->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
 
 			//Sphereの描画。変更が必要なものだけ変更する
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewObj);//VBVを設定
