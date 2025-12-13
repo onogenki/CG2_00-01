@@ -1,6 +1,8 @@
 #include "WinApp.h"
 #include <cstdint>
 #include "externals/imgui/imgui.h"
+#include "SpriteCommon.h"
+
 #pragma comment(lib,"winmm.lib")
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wPARAM, LPARAM lParam);
@@ -67,7 +69,6 @@ void WinApp::Initialize() {
 
 	//システムタイマーの分解度を上げる
 	timeBeginPeriod(1);
-
 }
 
 void WinApp::Update()
