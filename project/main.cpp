@@ -1609,6 +1609,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//描画前処理
 			dxCommon->PreDraw();
 
+			//Spriteの描画準備Spriteの描画に共通のグラフィックスコマンドを積む
+			spriteCommon->SetCommonDrawSetting();
+
 			//RootSignatureを設定。PS0に設定しているけど別途設定が必要
 			dxCommon->GetCommandList()->SetGraphicsRootSignature(rootSignature.Get());
 			dxCommon->GetCommandList()->SetPipelineState(graphicsPipelineState.Get());//PSOを設定
