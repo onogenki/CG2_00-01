@@ -873,11 +873,11 @@ bool useMonsterBall = true;
 
 bool usePhong = true;
 float specularPower = 32.0f;   // 鏡面反射の鋭さ
-float specularStrength = 1.0f; // 鏡面反射の強さ
+float specularStrength = 3.0f; // 鏡面反射の強さ
 //Transform変数を作る
 Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
-Transform transformSphere{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+Transform transformSphere{ {1.0f,1.0f,1.0f},{0.0f,-0.8f,0.0f},{0.0f,0.0f,0.0f} };
 
 Transform uvTransformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
@@ -1259,7 +1259,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//今回は赤を書き込んでみる
 	materialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 	materialData->enableLighting = true;
-	materialData->shininess = 20.0f;
+	materialData->shininess = 32.0f;
 	materialData->uvTransform = MakeIdentity4x4();
 
 
@@ -1590,7 +1590,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	DirectionalLight* directionalLightDataSprite = nullptr;
 	directionalLightResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightDataSprite));
 	directionalLightDataSprite->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	directionalLightDataSprite->direction = { 0.0f, 0.0f, 1.0f };
+	directionalLightDataSprite->direction = { 0.0f, 0.0f, -1.0f };
 	directionalLightDataSprite->direction = Normalize(directionalLightDataSprite->direction);
 	directionalLightDataSprite->intensity = 1.0f;
 
@@ -1785,7 +1785,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	DirectionalLight* directionalLightDataSphere = nullptr;
 	directionalLightResourceSphere->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightDataSphere));
 	directionalLightDataSphere->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	directionalLightDataSphere->direction = { 0.0f, 1.0f, 0.0f };
+	directionalLightDataSphere->direction = { 0.5f, 1.0f, 0.3f };
 	directionalLightDataSphere->direction = Normalize(directionalLightDataSphere->direction);
 	directionalLightDataSphere->intensity = 1.0f;
 
@@ -1921,7 +1921,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 
 			ImGui::Checkbox("Use Phong Shading", &usePhong);
-			ImGui::SliderFloat("Specular Power", &specularPower, 1.0f, 128.0f);
+			ImGui::SliderFloat("Specular Power", &specularPower, 1.0f, 16.0f);
 			ImGui::SliderFloat("Specular Strength", &specularStrength, 0.0f, 5.0f);
 
 			if (ImGui::CollapsingHeader("directionalLight", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -1930,7 +1930,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			}
 
 			directionalLightDataSphere->direction = Normalize(directionalLightDataSphere->direction);
-
+			cameraData->worldPosition = cameraTransform.translate;
 			ImGui::ColorEdit4("Sphere Color", &(materialDataSphere->color).x);
 			ImGui::DragFloat3("Sphere Rotate", &transformSphere.rotate.x, 0.01f, -3.14f, 3.14f);
 			ImGui::DragFloat3("Sphere Translate", &transformSphere.translate.x, 0.01f, -10.0f, 10.0f);
@@ -1986,6 +1986,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 					Multiply(instancingData[0].World,
 						Multiply(viewMatrix, projectionMatrix));
 			}
+			materialDataSphere->shininess = specularPower;
+			directionalLightDataSphere->specularPower = specularPower;
+			directionalLightDataSphere->specularStrength = specularStrength;
+			materialDataSphere->enableLighting = usePhong ? 1 : 0;
 
 			//ImGuiの内部コマンドを生成する
 			ImGui::Render();

@@ -4,6 +4,7 @@ struct Material
 {
     float32_t4 color;
     int32_t enableLighting;
+    float padding[3];
     float32_t4x4 uvTransform;
     float32_t shininess;
 };
@@ -13,6 +14,10 @@ struct DirectionalLight
     float32_t4 color; //ライトの色
     float32_t3 direction; //ライトの向き
     float intensity; //輝度
+    
+    float specularPower;
+    float specularStrength;
+    float2 padding;
 };
 
 struct PixelShaderOutput
@@ -60,14 +65,14 @@ PixelShaderOutput main(VertexShaderOutput input)
     float32_t3 reflectLight = reflect(-L, N);
     float RdotE = saturate(dot(reflectLight, toEye));
     float specularPow =
-        pow(saturate(RdotE), gMaterial.shininess);
+        pow(RdotE, gMaterial.shininess);
 
     //鏡面反射
     float3 specular =
         gDirectionalLight.color.rgb *
         gDirectionalLight.intensity *
         specularPow *
-        float32_t3(1.0f, 1.0f, 1.0f);
+        gDirectionalLight.specularStrength;
 
     // 拡散反射+鏡面反射
     output.color.rgb = diffuse + specular;
@@ -80,6 +85,14 @@ PixelShaderOutput main(VertexShaderOutput input)
     {
         discard;
     }
-
+    
+    if (gMaterial.enableLighting != 0)
+    {
+        output.color.rgb = diffuse + specular;
+    }
+    else
+    {
+        output.color.rgb = diffuse;
+    }
     return output;
 }
