@@ -44,35 +44,42 @@ PixelShaderOutput main(VertexShaderOutput input)
     // ƒ‰ƒCƒg•ûŒü
     float3 L = normalize(-gDirectionalLight.direction);
     //‹üƒxƒNƒgƒ‹
-    float3 V = normalize(gCamera.worldPosition - input.worldPosition);
+    float3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
     
-//ŠgU”½Ë
-    float NdotL = saturate(dot(N, L));
-    float3 diffuse =
-gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * NdotL * gDirectionalLight.intensity;
-    
-//    float3 specular = 0;
-//    if(gMaterial.usePhong!=0)
-//    {
-//     // ‹¾–Ê”½Ë
-//        float3 R = reflect(-L, N);
-//        float RdotV = saturate(dot(R, V));
-//        float spececularPow = pow(RdotV, gMaterial.specularPower); //”½Ë‹­“x
-////‹¾–Ê”½Ë
-//        float3 specular =
-//gDirectionalLight.color.rgb * gDirectionalLight.intensity * spececularPow * gMaterial.specularStrength;
-//    }
+  // ŠgU”½Ë
+    float cos = saturate(dot(N, L));
+    //ŠgU”½Ë
+    float32_t3 diffuse =
+        gMaterial.color.rgb *
+        textureColor.rgb *
+        gDirectionalLight.color.rgb *
+        cos *
+        gDirectionalLight.intensity;
 
-//ŠgU”½ËE‹¾–Ê”½Ë
+    // ‹¾–Ê”½Ë
+    float32_t3 reflectLight = reflect(-L, N);
+    float RdotE = saturate(dot(reflectLight, toEye));
+    float specularPow =
+        pow(saturate(RdotE), gMaterial.shininess);
+
+    //‹¾–Ê”½Ë
+    float3 specular =
+        gDirectionalLight.color.rgb *
+        gDirectionalLight.intensity *
+        specularPow *
+        float32_t3(1.0f, 1.0f, 1.0f);
+
+    // ŠgU”½Ë+‹¾–Ê”½Ë
     output.color.rgb = diffuse + specular;
-//ƒAƒ‹ƒtƒ@‚Í¡‚Ü‚Å’Ê‚è
-    output.color.a = gMaterial.color.a * textureColor.a;
-   
-    if (output.color.a == 0.0)
+
+    // ƒAƒ‹ƒtƒ@
+    output.color.a =
+        gMaterial.color.a * textureColor.a;
+
+    if (output.color.a == 0.0f)
     {
         discard;
     }
-    
-    return output;
 
+    return output;
 }

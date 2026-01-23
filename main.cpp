@@ -1976,8 +1976,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 					MakeAffineMatrix(transforms[index].scale, transforms[index].rotate, transforms[index].translate);
 				Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 				Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, viewProjectionMatrix);
-				instancingData[index].WVP = worldViewProjectionMatrix;
-				instancingData[index].World = worldMatrix;
+				
+				instancingData[0].World =
+					MakeAffineMatrix(transformSphere.scale,
+						transformSphere.rotate,
+						transformSphere.translate);
+
+				instancingData[0].WVP =
+					Multiply(instancingData[0].World,
+						Multiply(viewMatrix, projectionMatrix));
 			}
 
 			//ImGuiの内部コマンドを生成する
