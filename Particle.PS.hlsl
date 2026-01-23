@@ -28,26 +28,26 @@ SamplerState gSampler : register(s0);
 PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
-    float4 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
-    float32_t4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
-    output.color = gMaterial.color * textureColor;
     
+    float4 uv = mul(float4(input.texcoord, 0, 1), gMaterial.uvTransform);
+    float4 tex = gTexture.Sample(gSampler, uv.xy);
+
     if (gMaterial.enableLighting != 0)
     {
-        float NdotL = dot(normalize(input.normal), -gDirectionalLight.direction);
-        float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
-        output.color.rgb = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * cos * gDirectionalLight.intensity;
+        float3 normal = normalize(input.normal);
+        float3 lightDir = normalize(-gDirectionalLight.direction);
+        float NdotL = saturate(dot(normal, lightDir));
+        float3 diffuse = gMaterial.color.rgb * tex.rgb * gDirectionalLight.color.rgb * NdotL * gDirectionalLight.intensity;
+        output.color.rgb = diffuse;
+        output.color.a = gMaterial.color.a * tex.a;
+
     }
     else
     {
-        output.color.a = gMaterial.color.a * textureColor.a;
+        output.color = gMaterial.color * tex;
     }
     
-    if (textureColor.a <= 0.5)
-    {
+    if (tex.a <= 0.5f)
         discard;
-    }
-    
     return output;
-
 }
