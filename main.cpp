@@ -1106,7 +1106,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	const Microsoft::WRL::ComPtr < ID3D12DescriptorHeap>& srvDescriptorHeap = CreateDescriptorHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
 
 	//Textureを読んで転送する
-	DirectX::ScratchImage mipImages = LoadTexture("resources/fence.png");
+	DirectX::ScratchImage mipImages = LoadTexture("resources/uvChecker.png");
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& textureResource = CreateTextureResource(device, metadata);
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& intermediateResource = UploadTextureData(textureResource, mipImages, device, commandList);
@@ -1841,7 +1841,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//Sprite用のWorldViewProjectionMatrixを作る
 			Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
 			Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
-			Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(kClientWidth), float(kClientHeight), 0.0f, 100.0f);
+			Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, float(kClientHeight), float(kClientWidth), 0.0f, 0.0f, 100.0f);
 			Matrix4x4 worldViewProjectionMatrixSprite = Multiply(worldMatrixSprite, Multiply(viewMatrixSprite, projectionMatrixSprite));
 			transformationMatrixDataSprite->WVP = worldViewProjectionMatrixSprite;
 			transformationMatrixDataSprite->World = worldMatrixSprite;
@@ -1851,11 +1851,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransformSprite.translate));
 			materialDataSprite->uvTransform = uvTransformMatrix;
 
+				Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
+			
+
+			Matrix4x4 worldMatrixSphere =
+				MakeAffineMatrix(transformSphere.scale,
+					transformSphere.rotate,
+					transformSphere.translate);
+
+			Matrix4x4 wvpSphere =
+				Multiply(worldMatrixSphere, Multiply(viewMatrix, projectionMatrix));
+
+			// 親（ImGuiで動かす）
+			Matrix4x4 parentWorld =
+				MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+
 			for (uint32_t index = 0; index < kNumInstance; ++index)
 			{
-				Matrix4x4 worldMatrix =
-					MakeAffineMatrix(transforms[index].scale, transforms[index].rotate, transforms[index].translate);
-				Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
+				Matrix4x4 worldMatrix = MakeAffineMatrix(transforms[index].scale, transforms[index].rotate, transforms[index].translate);
 				Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, viewProjectionMatrix);
 				instancingData[index].WVP = worldViewProjectionMatrix;
 				instancingData[index].World = worldMatrix;
@@ -1923,7 +1936,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//SRVのDescriptorTableの先頭を設定。2はrootParameter[2]である
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 			//SRVのDescriptorTableの先頭を設定。2はrootParameter[2]である
-			commandList->SetGraphicsRootConstantBufferView(3, wvpResource->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResourceSprite->GetGPUVirtualAddress());
 			
 			//描画6頂点の板ポリゴンを、kNumInstance(10)だけInstance描画を行う
 			commandList->DrawInstanced(UINT(modelData.vertices.size()), kNumInstance, 0, 0);
@@ -1939,7 +1952,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
 
 			//SRVのDescriptorTableの先頭を設定。2はrootParameter[2]である
-			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU : textureSrvHandleGPU2);
 			//描画(DrawCall/ドローコール)。3頂点で1つのインスタンス。インスタンスについては今後
 			//commandList->DrawIndexedInstanced(sphereIndexNum, 1, 0, 0, 0);
 
@@ -1956,7 +1969,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//commandList->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
 
 			//描画6頂点の板ポリゴンを、kNumInstance(10)だけInstance描画を行う
-			commandList->DrawInstanced(UINT(modelData.vertices.size()), kNumInstance, 0, 0);
+			//commandList->DrawInstanced(UINT(modelData.vertices.size()), kNumInstance, 0, 0);
 
 			//マテリアルCBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
@@ -1966,10 +1979,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->IASetIndexBuffer(&indexBufferViewSprite);
 			//形状を設定。PSOに設定しているものととはまた別。同じものを設定すると考えておけば良い
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			//SRVのDescriptorTableの先頭を設定。2はrootParameter[2]である
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 
-			commandList->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
 			//Sprite用意のTransformationMatrixCBufferの場所を設定
 			//commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 			//描画!(DrawCall/ドローコール)6個のインデックスを使用し1つのインスタンスを描画。その他は当面0で良い
