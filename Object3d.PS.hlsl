@@ -52,7 +52,7 @@ PixelShaderOutput main(VertexShaderOutput input)
     float3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
     
   // ŠgŽU”½ŽË
-    float cos = saturate(dot(N, L));
+   // float cos = saturate(dot(N, L));
     //ŠgŽU”½ŽË
     float32_t3 diffuse =
         gMaterial.color.rgb *
