@@ -806,7 +806,7 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 		{
 			Vector4 position;
 			s >> position.x >> position.y >> position.z;
-			position.x *= -1.0f;
+			//position.x *= -1.0f;
 			position.w = 1.0f;
 			positions.push_back(position);
 		} else if (identifier == "vt")//頂点テクスチャ座標
@@ -1569,7 +1569,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	directionalLightResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
 	directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	directionalLightData->direction = { 1.0f,0.0f,0.0f };
-	directionalLightData->intensity = 1.0f;
+	directionalLightData->intensity = 2.0f;
 	directionalLightData->direction = Normalize(directionalLightData->direction);
 
 
@@ -1589,7 +1589,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//const uint32_t sphereIndexNum = (kSubdivision * kSubdivision) * 6;//インデックス数
 
 	//モデル読み込み
-	ModelData modelData = LoadObjFile("resources", "fence.obj");
+	ModelData modelData = LoadObjFile("resources", "plane.obj");
 
 	modelData.vertices.push_back({ .position = {1.0f,1.0f,0.0f,1.0f},.texcoord = {0.0f,0.0f},.normal = {0.0f,0.0f,1.0f} });//左上
 	modelData.vertices.push_back({ .position = {-1.0f,1.0f,0.0f,1.0f},.texcoord = {1.0f,0.0f},.normal = {0.0f,0.0f,1.0f} });//右上
