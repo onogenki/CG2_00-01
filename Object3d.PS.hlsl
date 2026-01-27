@@ -1,4 +1,4 @@
-#include "object3d.hlsli"
+#include"Object3d.hlsli"
 
 struct Material
 {
@@ -52,7 +52,7 @@ PixelShaderOutput main(VertexShaderOutput input)
     float3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
     
   // ŠgŽU”½ŽË
-   // float cos = saturate(dot(N, L));
+    float cos = saturate(dot(N, L));
     //ŠgŽU”½ŽË
     float32_t3 diffuse =
         gMaterial.color.rgb *
@@ -85,14 +85,6 @@ PixelShaderOutput main(VertexShaderOutput input)
     {
         discard;
     }
-    
-    if (gMaterial.enableLighting != 0)
-    {
-        output.color.rgb = diffuse + specular;
-    }
-    else
-    {
-        output.color.rgb = diffuse;
-    }
+   
     return output;
 }
