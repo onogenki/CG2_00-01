@@ -2189,7 +2189,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//形状を設定。PSOに設定しているものととはまた別。同じものを設定すると考えておけば良い
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewObj);//VBVを設定
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);//VBVを設定
 			commandList->IASetIndexBuffer(&indexBufferViewSphere);
 			
 			//パラメータ設定
