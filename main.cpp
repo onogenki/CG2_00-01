@@ -2207,22 +2207,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 			
-			commandList->SetPipelineState(objectPipelineState.Get());
-			//Spriteの描画。変更が必要なものだけ変更する
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);//VBVを設定
-			//IBVを設定
-			commandList->IASetIndexBuffer(&indexBufferViewSprite);
-			//形状を設定。PSOに設定しているものととはまた別。同じものを設定すると考えておけば良い
-			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-			commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
-			//Sprite用意のTransformationMatrixCBufferの場所を設定
-			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
-			//SRVのDescriptorTableの先頭を設定。2はrootParameter[2]である
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
-
-			// 描画 (6頂点, 1インスタンス)
-			commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+			//commandList->SetPipelineState(objectPipelineState.Get());
+			////Spriteの描画。変更が必要なものだけ変更する
+			//commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);//VBVを設定
+			////IBVを設定
+			//commandList->IASetIndexBuffer(&indexBufferViewSprite);
+			////形状を設定。PSOに設定しているものととはまた別。同じものを設定すると考えておけば良い
+			//commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			//
+			//commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
+			////Sprite用意のTransformationMatrixCBufferの場所を設定
+			//commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+			////SRVのDescriptorTableの先頭を設定。2はrootParameter[2]である
+			//commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+			//
+			//// 描画 (6頂点, 1インスタンス)
+			//commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 
 			//描画6頂点の板ポリゴンを、kNumInstance(10)だけInstance描画を行う
