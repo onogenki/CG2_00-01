@@ -30,7 +30,9 @@
 #include"Vector4.h"
 #include"Matrix4x4.h"
 #include"Transform.h"
-#include"math.h"
+#include"MyMath.h"
+#include"Model.h"
+#include"Audio.h"
 
 #pragma comment(lib,"Dbghelp.lib")
 #pragma comment(lib,"dxguid.lib")
@@ -41,6 +43,7 @@
 
 
 using namespace Microsoft::WRL;
+using namespace MyMath;
 
 static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception)
 {
@@ -759,14 +762,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//transformationMatrixData->World = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 
 
-
-
-
-	
-
-	////Sprite用のリソースを作る
-	//const Microsoft::WRL::ComPtr < ID3D12Resource>& vertexResourceSprite = CreateBufferResources(dxCommon->GetDevice(), sizeof(VertexData) * 4);
-
 	////頂点バッファビューを作成する
 	//D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite{};
 	////リソースの先頭のアドレスから使う
@@ -803,8 +798,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	////スプライト用のTransform変数を作る
 	//Transform transformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
-	////Sprite用のTransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	//const Microsoft::WRL::ComPtr < ID3D12Resource>& transformationMatrixResourceSprite = CreateBufferResources(dxCommon->GetDevice(), sizeof(TransformationMatrix));
 	////データを書き込む
 	//TransformationMatrix* transformationMatrixDataSprite = nullptr;
 	////書き込むためのアドレスを取得
@@ -825,8 +818,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 
-	//const Microsoft::WRL::ComPtr < ID3D12Resource>& indexResourceSprite = CreateBufferResources(dxCommon->GetDevice(), sizeof(uint32_t) * 6);
-
+	
 	//D3D12_INDEX_BUFFER_VIEW indexBufferViewSprite{};
 	////リソースの先頭のアドレスから使う
 	//indexBufferViewSprite.BufferLocation = indexResourceSprite->GetGPUVirtualAddress();
@@ -843,9 +835,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 
-	////マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
-	//const Microsoft::WRL::ComPtr < ID3D12Resource>& materialResourceSprite = CreateBufferResources(dxCommon->GetDevice(), sizeof(Material));
-	////マテリアルにデータを書き込む
+////マテリアルにデータを書き込む
 	//Material* materialDataSprite = nullptr;
 	////mapしてデータを書き込む色は白
 	//materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&materialDataSprite));
@@ -1196,16 +1186,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResourceSprite->GetGPUVirtualAddress());
 				dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
-			} else if (selectedUI == 2) {
-				// Sprite のみ描画
-				dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
-				dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSprite);
-				dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
-				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
-				dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
-				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResourceSprite->GetGPUVirtualAddress());
-				dxCommon->GetCommandList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
 			}
 
 

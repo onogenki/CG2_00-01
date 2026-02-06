@@ -1,16 +1,23 @@
 #pragma once
-#include "main.cpp"
-
+#include <d3d12.h>
+#include <wrl.h>
+#include <cstdint>
+#include "Vector2.h"
+#include "Vector3.h"
+#include "Vector4.h"
+#include "Matrix4x4.h"
+#include"MyMath.h"
 
 class SpriteCommon;
 
 //スプライト1枚分
 class Sprite
 {
+public:
 
 	//頂点データ
 	struct VertexData {
-		Vector4 posotion;
+		Vector4 position;
 		Vector2 texcoord;
 		Vector3 normal;
 	};
@@ -21,7 +28,7 @@ class Sprite
 		Vector4 color;
 		int32_t enableLighting;
 		float padding[3];
-		Matrix4x4 uvTrasnform;
+		Matrix4x4 uvTransform;
 	};
 
 	//座標変換行列データ
@@ -31,34 +38,42 @@ class Sprite
 		Matrix4x4 World;
 	};
 
-	void Initialize();
-
-	void Updata();
-
-	void Draw();
-
-	SpriteCommon* spriteCommon = nullptr;
+	Sprite() = default;
+	~Sprite() = default;
 
 	void Initialize(SpriteCommon* spriteCommon);
 
-	//バッファリソース
-	void VertexResource(VertexBuffer);
-	void IndexResource(IndexBuffer);
-		//バッファリソース内のデータを指すポインタ
-		VertexData* vertexData = nullptr;
-	uint32_t* indexData = nullptr;
-	//バッファリソースの使い道を補足するバッファビュー
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
-	D3D12_INDEX_BUFFER_VIEW indexBufferView;
+	void Update();
+
+	void Draw();
+
+private:
+
+	SpriteCommon* spriteCommon = nullptr;
 
 	//バッファリソース
-	void MaterialResource(ConstantBuffer);
-		//バッファリソース内のデータを指すポインタ
-		Material* materialData = nullptr;
-
+	Microsoft::WRL::ComPtr<ID3D12Resource>vertexResource;
+	//頂点バッファビューを作成する
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
 	//バッファリソース内のデータを指すポインタ
-		TransformationMatrix* transformationMatrixData;
+	VertexData* vertexData = nullptr;
 
+
+	Microsoft::WRL::ComPtr<ID3D12Resource>indexResource;
+	D3D12_INDEX_BUFFER_VIEW indexBufferView{};
+	uint32_t* indexData = nullptr;
+
+	//バッファリソース
+	Microsoft::WRL::ComPtr<ID3D12Resource>materialResource;
+	//バッファリソース内のデータを指すポインタ
+	Material* materialData = nullptr;
+
+	Microsoft::WRL::ComPtr<ID3D12Resource>transformationMatrixResource;
+	//バッファリソース内のデータを指すポインタ
+	TransformationMatrix* transformationMatrixData = nullptr;
+
+	// 変形情報
+	MyMath::Transform transform;
 
 };
 
