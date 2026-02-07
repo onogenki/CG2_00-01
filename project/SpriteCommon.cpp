@@ -10,15 +10,10 @@ void SpriteCommon::Initialize(DirectXCommon* dxCommon)
 
 	//ルートシグネチャをセットするコマンド
 	CreateRootSignature();
-	//グラフィックスパイプラインステートをセットするコマンド
-	CreateGraphicsPipelineState();
+
 	//プリミティブトポロジーをセットするコマンド
 	SetCommonDrawSetting();
 	
-	SpriteCommon* spriteCommon = nullptr;
-
-	spriteCommon = new SpriteCommon;
-	spriteCommon->Initialize(dxCommon);
 
 }
 

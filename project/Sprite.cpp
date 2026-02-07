@@ -5,6 +5,58 @@
 
 using namespace MyMath;
 
+Microsoft::WRL::ComPtr<ID3D12Resource> Sprite::CreateBufferResources(ID3D12Device* device, size_t sizeInBytes)
+{
+	//頂点リソース用のヒープの設定
+	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
+	uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD; // UploadHeapを使う
+
+	//頂点リソースの設定
+	D3D12_RESOURCE_DESC resourceDesc{};
+	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resourceDesc.Width = sizeInBytes;
+	resourceDesc.Height = 1;
+	resourceDesc.DepthOrArraySize = 1;
+	resourceDesc.MipLevels = 1;
+	resourceDesc.SampleDesc.Count = 1;
+	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	//実際にリソースを作る
+	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
+	HRESULT hr = device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE,
+		&resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+		IID_PPV_ARGS(&resource));
+	assert(SUCCEEDED(hr));
+
+	return resource;
+}
+
+Microsoft::WRL::ComPtr<ID3D12Resource> Sprite::CreateBufferResources(ID3D12Device* device, size_t sizeInBytes)
+{
+	//頂点リソース用のヒープの設定
+	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
+	uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD; // UploadHeapを使う
+
+	//頂点リソースの設定
+	D3D12_RESOURCE_DESC resourceDesc{};
+	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resourceDesc.Width = sizeInBytes;
+	resourceDesc.Height = 1;
+	resourceDesc.DepthOrArraySize = 1;
+	resourceDesc.MipLevels = 1;
+	resourceDesc.SampleDesc.Count = 1;
+	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	//実際にリソースを作る
+	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
+	HRESULT hr = device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE,
+		&resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+		IID_PPV_ARGS(&resource));
+	assert(SUCCEEDED(hr));
+
+	return resource;
+}
+
 void Sprite::Initialize(SpriteCommon* spriteCommon)
 {
 	//Sprite* sprite = new Sprite();
@@ -29,21 +81,21 @@ void Sprite::Initialize(SpriteCommon* spriteCommon)
 
 
 
-	////1枚目の三角形
-	////左下
-	//vertexData[0].position = { -0.5f,-0.5f,0.0f,1.0f };
-	//vertexData[0].texcoord = { 0.0f,1.0f };
-	////上
-	//vertexData[1].position = { 0.0f, 0.5f, 0.0f, 1.0f };
-	//vertexData[1].texcoord = { 0.5f,0.0f };
-	////右下
-	//vertexData[2].position = { 0.5f,-0.5f,0.0f,1.0f };
-	//vertexData[2].texcoord = { 1.0f,1.0f };
+	//1枚目の三角形
+	//左下
+	vertexData[0].position = { -0.5f,-0.5f,0.0f,1.0f };
+	vertexData[0].texcoord = { 0.0f,1.0f };
+	//上
+	vertexData[1].position = { 0.0f, 0.5f, 0.0f, 1.0f };
+	vertexData[1].texcoord = { 0.5f,0.0f };
+	//右下
+	vertexData[2].position = { 0.5f,-0.5f,0.0f,1.0f };
+	vertexData[2].texcoord = { 1.0f,1.0f };
 
-	////2枚目の三角形
-	////上2
-	//vertexData[3].position = { 0.0f, 0.0f, 0.0f, 1.0f };
-	//vertexData[3].texcoord = { 0.5f,0.0f };
+	//2枚目の三角形
+	//上2
+	vertexData[3].position = { 0.0f, 0.0f, 0.0f, 1.0f };
+	vertexData[3].texcoord = { 0.5f,0.0f };
 
 	indexResource = CreateBufferResources(device, sizeof(uint32_t) * 6);
 
@@ -81,8 +133,10 @@ void Sprite::Initialize(SpriteCommon* spriteCommon)
 
 void Sprite::Update()
 {
-	Matrix4x4 viewMatrix = MakeIdentity4x4();
+	// ワールド行列の作成 (Scale, Rotate, Translate)
+	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 
+	Matrix4x4 viewMatrix = MakeIdentity4x4();
 
 	//頂点リソースにデータを書き込む
 	VertexData* vertexData = nullptr;
@@ -90,11 +144,12 @@ void Sprite::Update()
 	//マテリアルにデータを書き込む
 	Material* materialData = nullptr;
 
+
 	//mapしてデータを書き込む色は白
 	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
 
 	//WVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	const Microsoft::WRL::ComPtr < ID3D12Resource>& wvpResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(TransformationMatrix));
+	//const Microsoft::WRL::ComPtr < ID3D12Resource>& wvpResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(TransformationMatrix));
 	//データを書き込む
 	TransformationMatrix* wvpData = nullptr;
 	//書き込むためのアドレスを取得
@@ -112,7 +167,7 @@ void Sprite::Update()
 	TransformationMatrix CreateBufferResource();
 
 	//Sprite用のリソースを作る
-	const Microsoft::WRL::ComPtr < ID3D12Resource>& vertexResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(VertexData) * 4);
+	//const Microsoft::WRL::ComPtr < ID3D12Resource>& vertexResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(VertexData) * 4);
 
 
 	//リソースの先頭のアドレスから使う
@@ -125,21 +180,26 @@ void Sprite::Update()
 	//書き込むためのアドレスを取得
 	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 
-	//1枚目の三角形
-	//左下
-	//vertexDataSprite[0].position = { 0.0f,360.0f,0.0f,1.0f };
-	//vertexDataSprite[0].texcoord = { 0.0f,1.0f };
-	////上
-	//vertexDataSprite[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };
-	//vertexDataSprite[1].texcoord = { 0.0f,0.0f };
-	////右下
-	//vertexDataSprite[2].position = { 640.0f,360.0f,0.0f,1.0f };
-	//vertexDataSprite[2].texcoord = { 1.0f,1.0f };
-	//
-	////2枚目の三角形
-	////上2
-	//vertexDataSprite[3].position = { 640.0f, 0.0f, 0.0f, 1.0f };
-	//vertexDataSprite[3].texcoord = { 1.0f,0.0f };
+	////スプライト用の頂点リソースにデータを書き込む
+	VertexData* vertexDataSprite = nullptr;
+	////書き込むためのアドレスを取得
+	//vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
+
+	////1枚目の三角形
+	////左下
+	vertexDataSprite[0].position = { 0.0f,360.0f,0.0f,1.0f };
+	vertexDataSprite[0].texcoord = { 0.0f,1.0f };
+	//上
+	vertexDataSprite[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };
+	vertexDataSprite[1].texcoord = { 0.0f,0.0f };
+	//右下
+	vertexDataSprite[2].position = { 640.0f,360.0f,0.0f,1.0f };
+	vertexDataSprite[2].texcoord = { 1.0f,1.0f };
+
+	//2枚目の三角形
+	//上2
+	vertexDataSprite[3].position = { 640.0f, 0.0f, 0.0f, 1.0f };
+	vertexDataSprite[3].texcoord = { 1.0f,0.0f };
 
 	//DepthStencilTextureをウィンドウのサイズで作成
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& depthStencilResource = CreateDepthStencilTextureResoource(dxCommon->GetDevice(), WinApp::kClientWidth, WinApp::kClientHeight);
@@ -148,7 +208,7 @@ void Sprite::Update()
 	Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
 	//Sprite用のTransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	const Microsoft::WRL::ComPtr < ID3D12Resource>& transformationMatrixResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(TransformationMatrix));
+	//const Microsoft::WRL::ComPtr < ID3D12Resource>& transformationMatrixResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(TransformationMatrix));
 
 	//書き込むためのアドレスを取得
 	transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData));

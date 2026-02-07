@@ -43,16 +43,6 @@ namespace MyMath {
 		return result;
 	}
 
-	void MatrixScreenPrintf(int x, int y, const Matrix4x4& matrix, const char* label)
-	{
-		for (int row = 0; row < 4; row++)
-		{
-			for (int col = 0; col < 4; col++)
-			{
-			}
-		}
-	}
-
 	Matrix4x4 MakeScaleMatrix(const Vector3& scale) {
 		Matrix4x4 result = {};
 		result.m[0][0] = scale.x;

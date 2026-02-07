@@ -31,13 +31,6 @@ public:
 		Matrix4x4 uvTransform;
 	};
 
-	//座標変換行列データ
-	struct TransformationMatrix
-	{
-		Matrix4x4 WVP;
-		Matrix4x4 World;
-	};
-
 	Sprite() = default;
 	~Sprite() = default;
 
@@ -47,7 +40,11 @@ public:
 
 	void Draw();
 
+	void SetTexture(D3D12_GPU_DESCRIPTOR_HANDLE textureHandle) { textureHandle_ = textureHandle; }
 private:
+
+	// デバイスを受け取ってバッファを作る関数
+	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResources(ID3D12Device* device, size_t sizeInBytes);
 
 	SpriteCommon* spriteCommon = nullptr;
 
@@ -70,10 +67,9 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D12Resource>transformationMatrixResource;
 	//バッファリソース内のデータを指すポインタ
-	TransformationMatrix* transformationMatrixData = nullptr;
+	MyMath::TransformationMatrix* transformationMatrixData = nullptr;
 
-	// 変形情報
-	MyMath::Transform transform;
+	D3D12_GPU_DESCRIPTOR_HANDLE textureHandle_;
 
 };
 

@@ -83,10 +83,10 @@ namespace MyMath {
 	// ビューポート変換行列
 	Matrix4x4 MakeViewportMatrix(float left, float top, float width, float height, float minDepth, float maxDepth);
 
-	void MatrixScreenPrintf() {};
+	inline void MatrixScreenPrintf() {};
 
-	static const int kRowHeight = 20;
-	static const int kColumnWidth = 60;
+	inline constexpr int kRowHeight = 20;
+	inline constexpr int kColumnWidth = 60;
 
 	// --- 補助関数 ---
 
