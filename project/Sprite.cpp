@@ -121,7 +121,7 @@ void Sprite::Initialize(SpriteCommon* spriteCommon)
 	materialData->uvTransform = MakeIdentity4x4();
 
 	//TransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	transformationMatrixResource = CreateBufferResources(device, sizeof(TransformationMatrix));
+	transformationMatrixResource = CreateBufferResources(device, sizeof(MyMath::TransformationMatrix));
 	//座標変換行列リソースにデータを書き込むためのアドレスを取得してtransformationMatrixDataに割り当てる
 	transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData));
 
@@ -144,79 +144,82 @@ void Sprite::Update()
 	//マテリアルにデータを書き込む
 	Material* materialData = nullptr;
 
+	Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(WinApp::kClientWidth) / float(WinApp::kClientHeight), 0.1f, 100.0f);
+	
+	Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 
-	//mapしてデータを書き込む色は白
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
-
-	//WVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	//const Microsoft::WRL::ComPtr < ID3D12Resource>& wvpResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(TransformationMatrix));
-	//データを書き込む
-	TransformationMatrix* wvpData = nullptr;
-	//書き込むためのアドレスを取得
-	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
-	//単位行列をかきこんでおく
-	wvpData->WVP = MakeIdentity4x4();
-	wvpData->World = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
-
-	//バッファリソース
-	//座標変換行列リソース (constantBuffer)
-	//バッファリソース内のデータを指すポインタ
-	TransformationMatrix* transformationMatrixData = nullptr;
-
-	//座標変換行列リソースを作る
-	TransformationMatrix CreateBufferResource();
-
-	//Sprite用のリソースを作る
-	//const Microsoft::WRL::ComPtr < ID3D12Resource>& vertexResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(VertexData) * 4);
-
-
-	//リソースの先頭のアドレスから使う
-	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
-	//使用するリソースのサイズは頂点6つ分のサイズ
-	vertexBufferView.SizeInBytes = sizeof(VertexData) * 4;
-	//1頂点あたりのサイズ
-	vertexBufferView.StrideInBytes = sizeof(VertexData);
-
-	//書き込むためのアドレスを取得
-	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
-
-	////スプライト用の頂点リソースにデータを書き込む
-	VertexData* vertexDataSprite = nullptr;
+	////mapしてデータを書き込む色は白
+	//materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
+	//
+	////WVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
+	////const Microsoft::WRL::ComPtr < ID3D12Resource>& wvpResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(TransformationMatrix));
+	////データを書き込む
+	//TransformationMatrix* wvpData = nullptr;
 	////書き込むためのアドレスを取得
-	//vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
-
-	////1枚目の三角形
-	////左下
-	vertexDataSprite[0].position = { 0.0f,360.0f,0.0f,1.0f };
-	vertexDataSprite[0].texcoord = { 0.0f,1.0f };
-	//上
-	vertexDataSprite[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };
-	vertexDataSprite[1].texcoord = { 0.0f,0.0f };
-	//右下
-	vertexDataSprite[2].position = { 640.0f,360.0f,0.0f,1.0f };
-	vertexDataSprite[2].texcoord = { 1.0f,1.0f };
-
-	//2枚目の三角形
-	//上2
-	vertexDataSprite[3].position = { 640.0f, 0.0f, 0.0f, 1.0f };
-	vertexDataSprite[3].texcoord = { 1.0f,0.0f };
-
-	//DepthStencilTextureをウィンドウのサイズで作成
-	const Microsoft::WRL::ComPtr < ID3D12Resource>& depthStencilResource = CreateDepthStencilTextureResoource(dxCommon->GetDevice(), WinApp::kClientWidth, WinApp::kClientHeight);
-
-	//スプライト用のTransform変数を作る
-	Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
-
-	//Sprite用のTransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	//const Microsoft::WRL::ComPtr < ID3D12Resource>& transformationMatrixResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(TransformationMatrix));
-
-	//書き込むためのアドレスを取得
-	transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData));
+	//wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
+	////単位行列をかきこんでおく
+	//wvpData->WVP = MakeIdentity4x4();
+	//wvpData->World = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+	//
+	////バッファリソース
+	////座標変換行列リソース (constantBuffer)
+	////バッファリソース内のデータを指すポインタ
+	//TransformationMatrix* transformationMatrixData = nullptr;
+	//
+	////座標変換行列リソースを作る
+	//TransformationMatrix CreateBufferResource();
+	//
+	////Sprite用のリソースを作る
+	////const Microsoft::WRL::ComPtr < ID3D12Resource>& vertexResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(VertexData) * 4);
+	//
+	//
+	////リソースの先頭のアドレスから使う
+	//vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
+	////使用するリソースのサイズは頂点6つ分のサイズ
+	//vertexBufferView.SizeInBytes = sizeof(VertexData) * 4;
+	////1頂点あたりのサイズ
+	//vertexBufferView.StrideInBytes = sizeof(VertexData);
+	//
+	////書き込むためのアドレスを取得
+	//vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+	//
+	//////スプライト用の頂点リソースにデータを書き込む
+	//VertexData* vertexDataSprite = nullptr;
+	//////書き込むためのアドレスを取得
+	////vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
+	//
+	//////1枚目の三角形
+	//////左下
+	//vertexDataSprite[0].position = { 0.0f,360.0f,0.0f,1.0f };
+	//vertexDataSprite[0].texcoord = { 0.0f,1.0f };
+	////上
+	//vertexDataSprite[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };
+	//vertexDataSprite[1].texcoord = { 0.0f,0.0f };
+	////右下
+	//vertexDataSprite[2].position = { 640.0f,360.0f,0.0f,1.0f };
+	//vertexDataSprite[2].texcoord = { 1.0f,1.0f };
+	//
+	////2枚目の三角形
+	////上2
+	//vertexDataSprite[3].position = { 640.0f, 0.0f, 0.0f, 1.0f };
+	//vertexDataSprite[3].texcoord = { 1.0f,0.0f };
+	//
+	////DepthStencilTextureをウィンドウのサイズで作成
+	//const Microsoft::WRL::ComPtr < ID3D12Resource>& depthStencilResource = CreateDepthStencilTextureResoource(dxCommon->GetDevice(), WinApp::kClientWidth, WinApp::kClientHeight);
+	//
+	////スプライト用のTransform変数を作る
+	//Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+	//
+	////Sprite用のTransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
+	////const Microsoft::WRL::ComPtr < ID3D12Resource>& transformationMatrixResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(TransformationMatrix));
+	//
+	////書き込むためのアドレスを取得
+	//transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData));
 	transformationMatrixData->WVP = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 	//単位行列を書き込んでおく
 	transformationMatrixData->World = worldMatrix;
 
-	uint32_t* indexData = nullptr;
+	//uint32_t* indexData = nullptr;
 
 
 
