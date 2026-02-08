@@ -989,7 +989,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	////先頭はImGuiが使ってるのでその次を使う
 	//textureSrvHandleCPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	//textureSrvHandleGPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	sprite->SetTexture(textureSrvHandleGPU);
+
+	std::vector<Sprite*>sprites;
+	for (uint32_t i = 0; i < 5; ++i)
+	{
+		Sprite* sprite = new Sprite();
+		sprite->Initialize(spriteCommon);
+		sprite->SetTexture(textureSrvHandleGPU);
+		
+		Vector2 pos = { i * 50.0f,i*50.0f };
+		sprite->SetPosition(pos);
+
+		sprites.push_back(sprite);
+	}
+
 	MSG msg{};
 	//ウィンドウのxボタンが押されるまでループ
 	while (true)
@@ -1024,9 +1037,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			switch (selectedUI) {
 			case 0: // Sprite
 				ImGui::Text("Editing UVTranslate");
-				ImGui::DragFloat3("Translate", &sprite->GetTransform().translate.x);
-				ImGui::DragFloat3("Rotate", &sprite->GetTransform().rotate.x, 0.01f);
-				ImGui::DragFloat3("Scale", &sprite->GetTransform().scale.x);
+			//for (Sprite* sprite : sprites)
+			//{
+			//	ImGui::DragFloat3("Translate", &sprite->GetPosition());
+			//	ImGui::DragFloat("Rotate", &sprite->GetRotation());
+			//	ImGui::DragFloat3("Scale", &sprite->GetSize());
+			//}
 				break;
 			case 1: // Object
 				ImGui::Text("Editing Object");
@@ -1068,7 +1084,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			// リソースに書き込む
 			transformationMatrixDataSphere->WVP = worldViewProjectionMatrixSphere;
 			transformationMatrixDataSphere->World = worldMatrixSphere;
-			
 
 			//ImGuiの内部コマンドを生成する
 			ImGui::Render();
@@ -1076,8 +1091,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//入力の更新
 			input->Update();
 
-
-			sprite->Update();
+			for (Sprite* sprite : sprites)
+			{
+				sprite->Update();
+			}
 
 			////数字の0キーが押されていたら
 			if(input->PushKey(DIK_0))
@@ -1090,6 +1107,42 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			{
 				OutputDebugStringA("Hit p\n");//出力ウィンドウに「Hit p」と表示
 			}
+
+			///
+			///デバック確認
+			///
+			
+			////現在の座標を変数で受ける
+			//Vector2 position = sprite->GetPosition();
+			////座標を変更する
+			//position += Vector2{ 0.1f,0.1f };
+			////変更を反映する
+			//sprite->SetPosition(position);
+			//
+			////回転
+			//float rotation = sprite->GetRotation();
+			//rotation += 0.01f;
+			//sprite->SetRotation(rotation);
+			//
+			////色
+			//Vector4 color = sprite->GetColor();
+			//color.x += 0.01f;
+			//if (color.x > 1.0f)
+			//{
+			//	color.x -= 1.0f;
+			//}
+			//sprite->SetColor(color);
+			//
+			//サイズ
+			//Vector2 size = sprite->GetSize();
+			//size.x += 0.1f;
+			//size.y += 0.1f;
+			//sprite->SetSize(size);
+
+
+			///
+			///
+			///
 
 			//描画前処理
 			dxCommon->PreDraw();
@@ -1105,7 +1158,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			// 描画開始（共通設定は済んでいる前提）
 			if (selectedUI == 0) {
 				// Sprite のみ描画
-				sprite->Draw();
+				for (Sprite* sprite : sprites)
+				{
+					sprite->Draw();
+				}
 			}
 			else if (selectedUI == 1) {
 				// Object のみ描画
@@ -1141,7 +1197,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//音声データ解放
 	SoundUnload(&soundData1);
 
-	delete sprite;
+	for (Sprite* sprite : sprites)
+	{
+		delete sprite;
+	}
+	sprites.clear();
+
 	delete spriteCommon;
 
 

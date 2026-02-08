@@ -47,6 +47,18 @@ public:
 
 	void Draw();
 
+	//getter
+	const Vector2& GetPosition() const { return position; }//座標
+	float GetRotation() const { return rotation; }//回転
+	const Vector4& GetColor()const { return materialData->color; }//色
+	const Vector2& GetSize() const { return size; }//サイズ
+
+	//setter
+	void SetPosition(const Vector2& position) { this->position = position; }//座標
+	void SetRotation(float rotation) { this->rotation = rotation; }//回転
+	void SetColor(const Vector4& color) { materialData->color = color; }//色
+	void SetSize(const Vector2& size) { this->size = size; }//サイズ
+
 	void SetTexture(D3D12_GPU_DESCRIPTOR_HANDLE textureHandle) { textureHandle_ = textureHandle; }
 	Transform& GetTransform() { return transform; }
 private:
@@ -72,6 +84,12 @@ private:
 	uint32_t* indexData = nullptr;
 	Material* materialData = nullptr;
 	TransformationMatrix* transformationMatrixData = nullptr;
+
+	Vector2 position = { 0.0f,0.0f };
+
+	float rotation = 0.0f;
+
+	Vector2 size = { 640.0f,360.0f };
 
 	Transform transform{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 	D3D12_GPU_DESCRIPTOR_HANDLE textureHandle_;

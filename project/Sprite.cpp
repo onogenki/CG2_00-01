@@ -56,20 +56,21 @@ void Sprite::Initialize(SpriteCommon* spriteCommon)
 
 	//1枚目の三角形
 	//左下
-	vertexData[0].position = { 0.0f,360.0f,0.0f,1.0f };
+	vertexData[0].position = { 0.0f,1.0f,0.0f,1.0f };
 	vertexData[0].texcoord = { 0.0f,1.0f };
-	//上
+	vertexData[0].normal = { 0.0f,0.0f,-1.0f };
+	//左上
 	vertexData[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };
 	vertexData[1].texcoord = { 0.0f,0.0f };
+	vertexData[1].normal = { 0.0f,0.0f,-1.0f };
 	//右下
-	vertexData[2].position = { 640.0f,360.0f,0.0f,1.0f };
+	vertexData[2].position = { 1.0f,1.0f,0.0f,1.0f };
 	vertexData[2].texcoord = { 1.0f,1.0f };
-
-	//2枚目の三角形
-	//上2
-	vertexData[3].position = { 640.0f, 0.0f, 0.0f, 1.0f };
+	vertexData[2].normal = { 0.0f,0.0f,-1.0f };
+	//右上
+	vertexData[3].position = { 1.0f, 0.0f, 0.0f, 1.0f };
 	vertexData[3].texcoord = { 1.0f,0.0f };
-
+	vertexData[3].normal = { 0.0f,0.0f,-1.0f };
 
 
 
@@ -108,12 +109,18 @@ void Sprite::Initialize(SpriteCommon* spriteCommon)
 	transformationMatrixData->WVP = MakeIdentity4x4();
 	transformationMatrixData->World = MakeIdentity4x4();
 
-	transform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
+
+	transform.translate = { position.x,position.y,0.0f };
+
+
 	uvTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 }
 
 void Sprite::Update()
 {
+	transform.translate = { position.x, position.y, 0.0f };
+	transform.rotate = { 0.0f,0.0f,rotation };
+	transform.scale = { size.x,size.y,1.0f };
 
 	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 	Matrix4x4 viewMatrix = MakeIdentity4x4();
@@ -127,10 +134,10 @@ void Sprite::Update()
 	uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransform.translate));
 	materialData->uvTransform = uvTransformMatrix;
 
-	//スプライト用の頂点リソースにデータを書き込む
-	VertexData* vertexData = nullptr;
-	////書き込むためのアドレスを取得
-	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+	////スプライト用の頂点リソースにデータを書き込む
+	//VertexData* vertexData = nullptr;
+	//////書き込むためのアドレスを取得
+	//vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 	
 
 }
