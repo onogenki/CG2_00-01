@@ -70,7 +70,7 @@ public:
 	Microsoft::WRL::ComPtr<ID3D12Resource>CreateTextureResource(const DirectX::TexMetadata& metadata);
 
 	//テクスチャデータの転送
-	void UploadTextureData(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages);
+	Microsoft::WRL::ComPtr<ID3D12Resource> UploadTextureData(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages);
 
 	//テクスチャファイルの読み込み
 	static DirectX::ScratchImage UploadTexture(const std::string& filePath);
@@ -78,6 +78,12 @@ public:
 	//getter
 	ID3D12Device* GetDevice() const { return device_.Get(); }
 	ID3D12GraphicsCommandList* GetCommandList()const { return commandList_.Get(); }
+
+	ID3D12CommandQueue* GetCommandQueue() const { return commandQueue.Get(); }
+	ID3D12CommandAllocator* GetCommandAllocator() const { return commandAllocator.Get(); }
+
+	//最大SRV数(最大テクスチャ枚数)
+	static const uint32_t kMaxSRVCount;
 
 private:
 

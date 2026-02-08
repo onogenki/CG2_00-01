@@ -3,6 +3,7 @@
 #include "MyMath.h"
 #include <cassert>
 #include "Model.h"
+#include "TextureManager.h"
 
 using namespace MyMath;
 
@@ -32,10 +33,12 @@ Microsoft::WRL::ComPtr<ID3D12Resource> Sprite::CreateBufferResources(ID3D12Devic
 	return resource;
 }
 
-void Sprite::Initialize(SpriteCommon* spriteCommon)
+void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 {
 	//Sprite* sprite = new Sprite();
 	//sprite->Initialize();
+	 
+	
 	//引数で受け取ってメンバ変数に記録する
 	this->spriteCommon = spriteCommon;
 
@@ -114,6 +117,12 @@ void Sprite::Initialize(SpriteCommon* spriteCommon)
 
 
 	uvTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
+
+
+	//単位行列を書き込んでおく
+	textureIndex_ = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath);
+
+	SetTexture(textureFilePath);
 }
 
 void Sprite::Update()
@@ -150,7 +159,12 @@ void Sprite::Draw()
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootDescriptorTable(2, textureHandle_);
+	commandList->SetGraphicsRootDescriptorTable(2, TextureManager::GetInstance()->GetSrvHandleGPU(textureIndex_));
 	commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
+}
+
+void Sprite::SetTexture(const std::string& textureFilePath) {
+	// 1. TextureManagerから、その画像のインデックス番号を取得
+	textureIndex_ = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath);
 }

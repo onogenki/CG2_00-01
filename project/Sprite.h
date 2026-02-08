@@ -8,6 +8,8 @@
 #include "Matrix4x4.h"
 #include "Transform.h"
 #include"MyMath.h"
+#include "SpriteCommon.h"
+#include <string>
 
 class SpriteCommon;
 
@@ -41,7 +43,7 @@ public:
 	Sprite() = default;
 	~Sprite() = default;
 
-	void Initialize(SpriteCommon* spriteCommon);
+	void Initialize(SpriteCommon* spriteCommon,std::string textureFilePath);
 
 	void Update();
 
@@ -58,8 +60,10 @@ public:
 	void SetRotation(float rotation) { this->rotation = rotation; }//回転
 	void SetColor(const Vector4& color) { materialData->color = color; }//色
 	void SetSize(const Vector2& size) { this->size = size; }//サイズ
+	// テクスチャを変更する関数
+	void SetTexture(const std::string& textureFilePath);
 
-	void SetTexture(D3D12_GPU_DESCRIPTOR_HANDLE textureHandle) { textureHandle_ = textureHandle; }
+	//void SetTexture(D3D12_GPU_DESCRIPTOR_HANDLE textureHandle) { textureHandle_ = textureHandle; }
 	Transform& GetTransform() { return transform; }
 private:
 
@@ -92,9 +96,12 @@ private:
 	Vector2 size = { 640.0f,360.0f };
 
 	Transform transform{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
-	D3D12_GPU_DESCRIPTOR_HANDLE textureHandle_;
+	//D3D12_GPU_DESCRIPTOR_HANDLE textureHandle_;
 
 	Transform uvTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
+
+	//テクスチャ番号
+	uint32_t textureIndex_ = 0;
 
 };
 

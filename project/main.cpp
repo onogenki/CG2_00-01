@@ -33,6 +33,7 @@
 #include"MyMath.h"
 #include"Model.h"
 #include"Audio.h"
+#include "TextureManager.h"
 
 #pragma comment(lib,"Dbghelp.lib")
 #pragma comment(lib,"dxguid.lib")
@@ -505,6 +506,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	dxCommon = new DirectXCommon();
 	dxCommon->Initialize(winApp);
 
+	TextureManager::GetInstance()->Initialize(dxCommon);
+
 	//Textureを読んで転送する
 	DirectX::ScratchImage mipImages = LoadTexture("Resources/uvChecker.png");
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
@@ -596,10 +599,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	SpriteCommon* spriteCommon = new SpriteCommon();
 	spriteCommon->Initialize(dxCommon);
 
-	Sprite* sprite = new Sprite();
-	sprite->Initialize(spriteCommon);
-
-	sprite->SetTexture(textureSrvHandleGPU);
+	//sprite->SetTexture(textureSrvHandleGPU);
 
 	//マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& materialResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(Material));
@@ -990,13 +990,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//textureSrvHandleCPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	//textureSrvHandleGPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
+	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");//1枚目
+	TextureManager::GetInstance()->LoadTexture("Resources/monsterBall.png");//2枚目
 	std::vector<Sprite*>sprites;
 	for (uint32_t i = 0; i < 5; ++i)
 	{
 		Sprite* sprite = new Sprite();
-		sprite->Initialize(spriteCommon);
-		sprite->SetTexture(textureSrvHandleGPU);
+		sprite->Initialize(spriteCommon, "Resources/uvChecker.png");
+		//sprite->SetTexture(textureSrvHandleGPU);
 		
+		if (i % 2 == 0) {
+			// 偶数にモンスターボールpng
+			sprite->SetTexture("Resources/monsterBall.png");
+		}
+
 		Vector2 pos = { i * 50.0f,i*50.0f };
 		sprite->SetPosition(pos);
 
@@ -1202,7 +1209,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		delete sprite;
 	}
 	sprites.clear();
-
+	TextureManager::GetInstance()->Finalize();
 	delete spriteCommon;
 
 
