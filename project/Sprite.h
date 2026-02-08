@@ -6,6 +6,7 @@
 #include "Vector3.h"
 #include "Vector4.h"
 #include "Matrix4x4.h"
+#include "Transform.h"
 #include"MyMath.h"
 
 class SpriteCommon;
@@ -31,6 +32,12 @@ public:
 		Matrix4x4 uvTransform;
 	};
 
+	// 座標変換行列データ
+	struct TransformationMatrix {
+		Matrix4x4 WVP;
+		Matrix4x4 World;
+	};
+
 	Sprite() = default;
 	~Sprite() = default;
 
@@ -41,6 +48,7 @@ public:
 	void Draw();
 
 	void SetTexture(D3D12_GPU_DESCRIPTOR_HANDLE textureHandle) { textureHandle_ = textureHandle; }
+	Transform& GetTransform() { return transform; }
 private:
 
 	// デバイスを受け取ってバッファを作る関数
@@ -50,26 +58,24 @@ private:
 
 	//バッファリソース
 	Microsoft::WRL::ComPtr<ID3D12Resource>vertexResource;
+	Microsoft::WRL::ComPtr<ID3D12Resource>indexResource;
+	Microsoft::WRL::ComPtr<ID3D12Resource>materialResource;
+	Microsoft::WRL::ComPtr<ID3D12Resource>transformationMatrixResource;
+
 	//頂点バッファビューを作成する
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
+	D3D12_INDEX_BUFFER_VIEW indexBufferView{};
+	
 	//バッファリソース内のデータを指すポインタ
 	VertexData* vertexData = nullptr;
-
-
-	Microsoft::WRL::ComPtr<ID3D12Resource>indexResource;
-	D3D12_INDEX_BUFFER_VIEW indexBufferView{};
 	uint32_t* indexData = nullptr;
-
-	//バッファリソース
-	Microsoft::WRL::ComPtr<ID3D12Resource>materialResource;
-	//バッファリソース内のデータを指すポインタ
 	Material* materialData = nullptr;
+	TransformationMatrix* transformationMatrixData = nullptr;
 
-	Microsoft::WRL::ComPtr<ID3D12Resource>transformationMatrixResource;
-	//バッファリソース内のデータを指すポインタ
-	MyMath::TransformationMatrix* transformationMatrixData = nullptr;
-
+	Transform transform{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 	D3D12_GPU_DESCRIPTOR_HANDLE textureHandle_;
+
+	Transform uvTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 
 };
 

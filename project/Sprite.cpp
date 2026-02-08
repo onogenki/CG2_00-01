@@ -2,34 +2,9 @@
 #include"SpriteCommon.h"
 #include "MyMath.h"
 #include <cassert>
+#include "Model.h"
 
 using namespace MyMath;
-
-Microsoft::WRL::ComPtr<ID3D12Resource> Sprite::CreateBufferResources(ID3D12Device* device, size_t sizeInBytes)
-{
-	//頂点リソース用のヒープの設定
-	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
-	uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD; // UploadHeapを使う
-
-	//頂点リソースの設定
-	D3D12_RESOURCE_DESC resourceDesc{};
-	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resourceDesc.Width = sizeInBytes;
-	resourceDesc.Height = 1;
-	resourceDesc.DepthOrArraySize = 1;
-	resourceDesc.MipLevels = 1;
-	resourceDesc.SampleDesc.Count = 1;
-	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-	//実際にリソースを作る
-	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
-	HRESULT hr = device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE,
-		&resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-		IID_PPV_ARGS(&resource));
-	assert(SUCCEEDED(hr));
-
-	return resource;
-}
 
 Microsoft::WRL::ComPtr<ID3D12Resource> Sprite::CreateBufferResources(ID3D12Device* device, size_t sizeInBytes)
 {
@@ -129,14 +104,23 @@ void Sprite::Initialize(SpriteCommon* spriteCommon)
 	transformationMatrixData->WVP = MakeIdentity4x4();
 	transformationMatrixData->World = MakeIdentity4x4();
 
+	transform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 }
 
 void Sprite::Update()
 {
-	// ワールド行列の作成 (Scale, Rotate, Translate)
-	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 
+	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 	Matrix4x4 viewMatrix = MakeIdentity4x4();
+	Matrix4x4 projectionMatrix = MakeOrthographicMatrix(0.0f, 0.0f, float(WinApp::kClientWidth), float(WinApp::kClientHeight), 0.0f, 100.0f);
+	Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
+	transformationMatrixData->WVP = worldViewProjectionMatrix;
+	transformationMatrixData->World = worldMatrix;
+
+	Matrix4x4 uvTransformMatrix = MakeScaleMatrix(uvTransform.scale);
+	uvTransformMatrix = Multiply(uvTransformMatrix, MakeRotateZMatrix(uvTransform.rotate.z));
+	uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransform.translate));
+	materialData->uvTransform = uvTransformMatrix;
 
 	//頂点リソースにデータを書き込む
 	VertexData* vertexData = nullptr;
@@ -144,23 +128,10 @@ void Sprite::Update()
 	//マテリアルにデータを書き込む
 	Material* materialData = nullptr;
 
-	Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(WinApp::kClientWidth) / float(WinApp::kClientHeight), 0.1f, 100.0f);
-	
-	Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-
 	////mapしてデータを書き込む色は白
 	//materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
 	//
-	////WVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	////const Microsoft::WRL::ComPtr < ID3D12Resource>& wvpResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(TransformationMatrix));
-	////データを書き込む
-	//TransformationMatrix* wvpData = nullptr;
-	////書き込むためのアドレスを取得
-	//wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
-	////単位行列をかきこんでおく
-	//wvpData->WVP = MakeIdentity4x4();
-	//wvpData->World = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
-	//
+	
 	////バッファリソース
 	////座標変換行列リソース (constantBuffer)
 	////バッファリソース内のデータを指すポインタ
@@ -214,15 +185,8 @@ void Sprite::Update()
 	////const Microsoft::WRL::ComPtr < ID3D12Resource>& transformationMatrixResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(TransformationMatrix));
 	//
 	////書き込むためのアドレスを取得
-	//transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData));
-	transformationMatrixData->WVP = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-	//単位行列を書き込んでおく
-	transformationMatrixData->World = worldMatrix;
 
 	//uint32_t* indexData = nullptr;
-
-
-
 
 }
 
@@ -238,8 +202,9 @@ void Sprite::Draw()
 	//座標変換行列CBufferの場所を設定
 	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
 	//SRVのDescriptorTableの戦闘を設定
-	commandList->SetGraphicsRootDescriptorTable(2, textureHandle);
+	commandList->SetGraphicsRootDescriptorTable(2, textureHandle_);
 	//描画(DrawCall/ドローコール)
 	commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+
 
 }

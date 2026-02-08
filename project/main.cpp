@@ -593,10 +593,34 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	input = new Input();
 	input->Initialize(winApp);
 
+	SpriteCommon* spriteCommon = new SpriteCommon();
+	spriteCommon->Initialize(dxCommon);
 
 	Sprite* sprite = new Sprite();
-	sprite->Initialize(dxCommon);
+	sprite->Initialize(spriteCommon);
 
+	sprite->SetTexture(textureSrvHandleGPU);
+
+	//マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
+	const Microsoft::WRL::ComPtr < ID3D12Resource>& materialResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(Material));
+	//マテリアルにデータを書き込む
+	Material* materialData = nullptr;
+	//書き込むためのアドレスを取得
+	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
+	//今回は赤を書き込んでみる
+	materialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+	materialData->enableLighting = true;
+	materialData->uvTransform = MakeIdentity4x4();
+
+	//WVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
+	const Microsoft::WRL::ComPtr < ID3D12Resource>& wvpResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(TransformationMatrix));
+	//データを書き込む
+	TransformationMatrix* wvpData = nullptr;
+	//書き込むためのアドレスを取得
+	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
+	//単位行列をかきこんでおく
+	wvpData->WVP = MakeIdentity4x4();
+	wvpData->World = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 
 	//シリアライズしてバイナリにする
 	Microsoft::WRL::ComPtr < ID3DBlob> signatureBlob = nullptr;
@@ -698,7 +722,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 
+	const Microsoft::WRL::ComPtr < ID3D12Resource>& directionalLightResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(DirectionalLight));
 
+	DirectionalLight* directionalLightData = nullptr;
+	directionalLightResource->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
+	directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	directionalLightData->direction = { 1.0f,0.0f,0.0f };
+	directionalLightData->intensity = 1.0f;
+	directionalLightData->direction = Normalize(directionalLightData->direction);
 
 
 	const uint32_t kSubdivision = 16;//分割数
@@ -822,6 +853,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		}
 	}
 
+	//const Microsoft::WRL::ComPtr<ID3D12Resource>& transformationMatrixResourceSphere = CreateBufferResources(dxCommon->GetDevice(), sizeof(TransformationMatrix));
+	//
+	////データを書き込む
+	//TransformationMatrix* wvpData = nullptr;
+	////書き込むためのアドレスを取得
+	//wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
+	//
 	//単位行列を書き込んでおく
 	transformationMatrixDataSphere->WVP = MakeIdentity4x4();
 	//単位行列を書き込んでおく
@@ -912,11 +950,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::NewFrame();
 
 			ImGui::Begin("test");
-			if (ImGui::Button("Sphere")) {
+			if (ImGui::Button("Object")) {
 				selectedUI = 0;
 			}
 			ImGui::SameLine();
-			if (ImGui::Button("Object")) {
+			if (ImGui::Button("Sphere")) {
 				selectedUI = 1;
 			}
 			//ImGui::SameLine();
@@ -928,20 +966,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			// UI選択用コンボボックス
 			switch (selectedUI) {
-			case 0: // Sphere
-				ImGui::Text("Editing Sphere");
-				ImGui::ColorEdit4("Sphere Color", &(materialDataSphere->color).x);
-				ImGui::DragFloat3("Translate", &transformSphere.translate.x);
-				ImGui::DragFloat3("Rotate", &transformSphere.rotate.x, 0.01f);
-				ImGui::DragFloat3("Scale", &transformSphere.scale.x);
-				break;
-
-			case 1: // Object
+			case 0: // Object
 				ImGui::Text("Editing Object");
 				ImGui::ColorEdit4("Object Color", &(materialData->color).x);
 				ImGui::DragFloat3("Translate", &transform.translate.x);
 				ImGui::DragFloat3("Rotate", &transform.rotate.x, 0.01f);
 				ImGui::DragFloat3("Scale", &transform.scale.x);
+				break;
+
+			case 1: // Sphere
+				ImGui::Text("Editing Sphere");
+				ImGui::ColorEdit4("Sphere Color", &(materialDataSphere->color).x);
+				ImGui::DragFloat3("Translate", &transformSphere.translate.x);
+				ImGui::DragFloat3("Rotate", &transformSphere.rotate.x, 0.01f);
+				ImGui::DragFloat3("Scale", &transformSphere.scale.x);
 				break;
 
 			//case 2: // UVTranslate (Sprite)
@@ -968,20 +1006,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			wvpData->WVP = worldViewProjectionMatrix;
 			wvpData->World = worldMatrix;
 
-			sprite->Draw();
 
-			//Sprite用のWorldViewProjectionMatrixを作る
-			//Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
-			//Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
-			//Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(WinApp::kClientWidth), float(WinApp::kClientHeight), 0.0f, 100.0f);
-			//Matrix4x4 worldViewProjectionMatrixSprite = Multiply(worldMatrixSprite, Multiply(viewMatrixSprite, projectionMatrixSprite));
-			//transformationMatrixDataSprite->WVP = worldViewProjectionMatrixSprite;
-			//transformationMatrixDataSprite->World = worldMatrixSprite;
 
-			//Matrix4x4 uvTransformMatrix = MakeScaleMatrix(uvTransformSprite.scale);
-			//uvTransformMatrix = Multiply(uvTransformMatrix, MakeRotateZMatrix(uvTransformSprite.rotate.z));
-			//uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransformSprite.translate));
-			//materialDataSprite->uvTransform = uvTransformMatrix;
+			Matrix4x4 worldMatrixSphere = MakeAffineMatrix(transformSphere.scale, transformSphere.rotate, transformSphere.translate);
+			Matrix4x4 worldViewProjectionMatrixSphere = Multiply(worldMatrixSphere, Multiply(viewMatrix, projectionMatrix));
+
+			// リソースに書き込む
+			transformationMatrixDataSphere->WVP = worldViewProjectionMatrixSphere;
+			transformationMatrixDataSphere->World = worldMatrixSphere;
+			
 
 			//ImGuiの内部コマンドを生成する
 			ImGui::Render();
@@ -1008,7 +1041,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			dxCommon->PreDraw();
 
 			//Spriteの描画準備Spriteの描画に共通のグラフィックスコマンドを積む
-			spriteCommon->SetCommonDrawSetting();
+			//spriteCommon->SetCommonDrawSetting();
+
 
 			//RootSignatureを設定。PS0に設定しているけど別途設定が必要
 			dxCommon->GetCommandList()->SetGraphicsRootSignature(rootSignature.Get());
@@ -1016,16 +1050,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			// 描画開始（共通設定は済んでいる前提）
 			if (selectedUI == 0) {
-				// Sphere のみ描画
-				dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
-				dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSphere);
-				dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResourceSphere->GetGPUVirtualAddress());
-				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
-				dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU); // 例
-				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
-				dxCommon->GetCommandList()->DrawIndexedInstanced(sphereIndexNum, 1, 0, 0, 0);
-			} else if (selectedUI == 1) {
 				// Object のみ描画
 				dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewObj);
 				dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -1034,14 +1058,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
 				dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
+			} else if (selectedUI == 1) {
+				// sphere のみ描画
+				dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
+				dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSphere);
+				dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResourceSphere->GetGPUVirtualAddress());
+				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSphere->GetGPUVirtualAddress());
+				dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU); // 例
+				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
+				dxCommon->GetCommandList()->DrawIndexedInstanced(sphereIndexNum, 1, 0, 0, 0);
 			}
 
 
+			sprite->Draw();
 
 
 			//実際のcommandListのImGuiの描画コマンドを積む
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxCommon->GetCommandList());
-
 
 			
 			dxCommon->PostDraw();
