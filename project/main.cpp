@@ -510,10 +510,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	TextureManager::GetInstance()->Initialize(dxCommon);
 
-	Object3dCommon* object3dCommon = nullptr;
 	//3Dオブジェクト共通部の初期化
-	object3dCommon = new Object3dCommon;
-	object3dCommon->Initialize();
+	Object3dCommon* object3dCommon = new Object3dCommon;
+	object3dCommon->Initialize(dxCommon);
 
 	Object3d* object3d = new Object3d();
 	object3d->Initialize();
@@ -585,7 +584,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Microsoft::WRL::ComPtr <IXAudio2> xAudio2;
 	IXAudio2MasteringVoice* masterVoice;
 
+	
+	
 	HRESULT result;
+
 
 	//XAudioエンジンのインスタンスを生成
 	result = XAudio2Create(&xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
@@ -1210,6 +1212,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//Spriteの描画準備Spriteの描画に共通のグラフィックスコマンドを積む
 			//spriteCommon->SetCommonDrawSetting();
 
+			//3Dオブジェクトの描画準備3Dオブジェクトの描画に共通のグラフィックスコマンドを積む
+			object3dCommon->SetCommonDrawSetting();
 
 			//RootSignatureを設定。PS0に設定しているけど別途設定が必要
 			dxCommon->GetCommandList()->SetGraphicsRootSignature(rootSignature.Get());
