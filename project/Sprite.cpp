@@ -33,6 +33,19 @@ Microsoft::WRL::ComPtr<ID3D12Resource> Sprite::CreateBufferResources(ID3D12Devic
 	return resource;
 }
 
+void Sprite::AdjustTextureSize()
+{
+	//テクスチャメタデータを取得
+	const DirectX::TexMetadata& metadata = TextureManager::GetInstance()->GetMetaData(textureIndex_);
+
+	textureSize.x = static_cast<float>(metadata.width);
+	textureSize.y = static_cast<float>(metadata.height);
+
+	//画像サイズをテクスチャサイズに合わせる
+	size = textureSize;
+
+}
+
 void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 {
 	//Sprite* sprite = new Sprite();
@@ -199,17 +212,14 @@ void Sprite::Draw()
 
 }
 
+//画像をセットする関数
 void Sprite::SetTexture(const std::string& textureFilePath) {
-	// 1. TextureManagerから、その画像のインデックス番号を取得
+	//TextureManagerから、その画像のインデックス番号を取得
 	textureIndex_ = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath);
-
-	// 自動的にそのサイズをスプライトのサイズ設定に反映させる
-	const DirectX::TexMetadata& metadata = TextureManager::GetInstance()->GetMetaData(textureIndex_);
-
-	// これがないと、main.cppで SetTextureSize をしない限り画像がつぶれたり消えたりします
-	textureSize.x = static_cast<float>(metadata.width);
-	textureSize.y = static_cast<float>(metadata.height);
 
 	// 切り出し位置もリセットしておく（左上に戻す）
 	textureLeftTop = { 0.0f, 0.0f };
+
+	//サイズも表示範囲も自動的に画像に合わせる
+	AdjustTextureSize();
 }

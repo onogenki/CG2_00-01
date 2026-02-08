@@ -667,8 +667,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	//RasiterZerStateの設定
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
-	//裏面(時計回り)を表示しない
-	rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
+	//カリングしない(裏面も表示する)
+	rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
 	//三角形の中を塗りつぶす
 	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 
@@ -1054,32 +1054,40 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				ImGui::PushID(i);
 
 				ImGui::Text("Sprite %d", i); // 番号表示
+				//座標
 				Vector2 pos = sprites[i]->GetPosition();
 				if (ImGui::DragFloat2("Pos", &pos.x, 1.0f)) {
 					sprites[i]->SetPosition(pos);
-				}
+				}//回転
 				float rot = sprites[i]->GetRotation();
 				if (ImGui::DragFloat("Rot", &rot, 0.01f)) {
 					sprites[i]->SetRotation(rot);
-				}
+				}//サイズ
 				Vector2 size = sprites[i]->GetSize();
 				if (ImGui::DragFloat2("Size", &size.x, 1.0f)) {
 					sprites[i]->SetSize(size);
-				}
+				}//アンカーポイント
 				Vector2 anchor = sprites[i]->GetAnchorPoint();
 				// 0.0～1.0 の範囲で動かす
 				if (ImGui::DragFloat2("Anchor", &anchor.x, 0.01f, 0.0f, 1.0f)) {
 					sprites[i]->SetAnchorPoint(anchor);
-				}
+				}//左右反転
 				bool isFlipX = sprites[i]->GetIsFlipX();
 				if (ImGui::Checkbox("isFlipX", &isFlipX)) {
 					sprites[i]->SetIsFlipX(isFlipX);
 				}
-
-				// Y軸フリップ
+				//上下反転
 				bool isFlipY = sprites[i]->GetIsFlipY();
 				if (ImGui::Checkbox("isFlipY", &isFlipY)) {
 					sprites[i]->SetIsFlipY(isFlipY);
+				}//左上座標
+				Vector2 texBase = sprites[i]->GetTextureLeftTop();
+				if (ImGui::DragFloat2("TexLeftTop", &texBase.x, 1.0f)) {
+					sprites[i]->SetTextureLeftTop(texBase);
+				}//切り出しサイズ
+				Vector2 texSize = sprites[i]->GetTextureSize();
+				if (ImGui::DragFloat2("TexSize", &texSize.x, 1.0f)) {
+					sprites[i]->SetTextureSize(texSize);
 				}
 
 				ImGui::Separator();

@@ -58,7 +58,7 @@ public:
 	bool GetIsFlipX()const { return isFlipX_; }//フリップX
 	bool GetIsFlipY()const { return isFlipY_; }//フリップY
 	const Vector2& GetTextureLeftTop()const { return textureLeftTop; }
-	const Vector2& GettextureSize()const { return textureSize; }
+	const Vector2& GetTextureSize()const { return textureSize; }
 
 	//setter
 	void SetPosition(const Vector2& position) { this->position = position; }//座標
@@ -127,4 +127,6 @@ private:
 	//テクスチャ切り出しサイズ
 	Vector2 textureSize = { 100.0f,100.0f };
 
+	//テクスチャサイズをイメージに合わせる
+	void AdjustTextureSize();
 };
