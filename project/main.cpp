@@ -993,21 +993,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");//1枚目
 	TextureManager::GetInstance()->LoadTexture("Resources/monsterBall.png");//2枚目
 	std::vector<Sprite*>sprites;
-	for (uint32_t i = 0; i < 5; ++i)
+	for (uint32_t i = 0; i < 1; ++i)
 	{
 		Sprite* sprite = new Sprite();
-		sprite->Initialize(spriteCommon, "Resources/uvChecker.png");
+		sprite->Initialize(spriteCommon, "Resources/monsterBall.png");
 		//sprite->SetTexture(textureSrvHandleGPU);
-		
+
 		if (i % 2 == 0) {
 			// 偶数にモンスターボールpng
-			sprite->SetTexture("Resources/monsterBall.png");
+			sprite->SetTexture("Resources/uvChecker.png");
 		}
 
-		Vector2 pos = { i * 50.0f,i*50.0f };
+		Vector2 pos = { 320.0f + i * 50.0f,180.0f + i * 50.0f };
 		sprite->SetPosition(pos);
-
 		sprites.push_back(sprite);
+		
+		//切り取り
+		//sprite->SetTextureLeftTop({ 0.0f, 0.0f });
+		//sprite->SetTextureSize({ 100.0f, 100.0f });
 	}
 
 	MSG msg{};
@@ -1018,39 +1021,71 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		{
 			break;
 		}
-			static int selectedUI = 0;
+		static int selectedUI = 0;
 
-			//ゲームの処理
-			ImGui_ImplDX12_NewFrame();
-			ImGui_ImplWin32_NewFrame();
-			ImGui::NewFrame();
+		//ゲームの処理
+		ImGui_ImplDX12_NewFrame();
+		ImGui_ImplWin32_NewFrame();
+		ImGui::NewFrame();
 
-			ImGui::Begin("test");
-			if (ImGui::Button("UVTranslate")) {
-				selectedUI = 0;
+		ImGui::Begin("test");
+		if (ImGui::Button("UVTranslate")) {
+			selectedUI = 0;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Object")) {
+			selectedUI = 1;
+		}
+		//ImGui::SameLine();
+		if (ImGui::Button("Sphere")) {
+			selectedUI = 2;
+		}
+
+		ImGui::Separator();
+
+		// UI選択用コンボボックス
+		switch (selectedUI) {
+		case 0: // Sprite
+			ImGui::Text("Editing UVTranslate");
+			// std::vector の全要素に対して処理
+			for (int i = 0; i < sprites.size(); ++i)
+			{
+				// IDをプッシュ（これが無いと全部のスプライトが同時に動いてしまう）
+				ImGui::PushID(i);
+
+				ImGui::Text("Sprite %d", i); // 番号表示
+				Vector2 pos = sprites[i]->GetPosition();
+				if (ImGui::DragFloat2("Pos", &pos.x, 1.0f)) {
+					sprites[i]->SetPosition(pos);
+				}
+				float rot = sprites[i]->GetRotation();
+				if (ImGui::DragFloat("Rot", &rot, 0.01f)) {
+					sprites[i]->SetRotation(rot);
+				}
+				Vector2 size = sprites[i]->GetSize();
+				if (ImGui::DragFloat2("Size", &size.x, 1.0f)) {
+					sprites[i]->SetSize(size);
+				}
+				Vector2 anchor = sprites[i]->GetAnchorPoint();
+				// 0.0～1.0 の範囲で動かす
+				if (ImGui::DragFloat2("Anchor", &anchor.x, 0.01f, 0.0f, 1.0f)) {
+					sprites[i]->SetAnchorPoint(anchor);
+				}
+				bool isFlipX = sprites[i]->GetIsFlipX();
+				if (ImGui::Checkbox("isFlipX", &isFlipX)) {
+					sprites[i]->SetIsFlipX(isFlipX);
+				}
+
+				// Y軸フリップ
+				bool isFlipY = sprites[i]->GetIsFlipY();
+				if (ImGui::Checkbox("isFlipY", &isFlipY)) {
+					sprites[i]->SetIsFlipY(isFlipY);
+				}
+
+				ImGui::Separator();
+				ImGui::PopID(); // IDをポップ
 			}
-			ImGui::SameLine();
-			if (ImGui::Button("Object")) {
-				selectedUI = 1;
-			}
-			//ImGui::SameLine();
-			if (ImGui::Button("Sphere")) {
-				selectedUI = 2;
-			}
-
-			ImGui::Separator();
-
-			// UI選択用コンボボックス
-			switch (selectedUI) {
-			case 0: // Sprite
-				ImGui::Text("Editing UVTranslate");
-			//for (Sprite* sprite : sprites)
-			//{
-			//	ImGui::DragFloat3("Translate", &sprite->GetPosition());
-			//	ImGui::DragFloat("Rotate", &sprite->GetRotation());
-			//	ImGui::DragFloat3("Scale", &sprite->GetSize());
-			//}
-				break;
+			break;
 			case 1: // Object
 				ImGui::Text("Editing Object");
 				ImGui::ColorEdit4("Object Color", &(materialData->color).x);

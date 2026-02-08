@@ -54,14 +54,24 @@ public:
 	float GetRotation() const { return rotation; }//回転
 	const Vector4& GetColor()const { return materialData->color; }//色
 	const Vector2& GetSize() const { return size; }//サイズ
+	const Vector2& GetAnchorPoint()const { return anchorPoint; }//アンカーポイント
+	bool GetIsFlipX()const { return isFlipX_; }//フリップX
+	bool GetIsFlipY()const { return isFlipY_; }//フリップY
+	const Vector2& GetTextureLeftTop()const { return textureLeftTop; }
+	const Vector2& GettextureSize()const { return textureSize; }
 
 	//setter
 	void SetPosition(const Vector2& position) { this->position = position; }//座標
 	void SetRotation(float rotation) { this->rotation = rotation; }//回転
 	void SetColor(const Vector4& color) { materialData->color = color; }//色
 	void SetSize(const Vector2& size) { this->size = size; }//サイズ
-	// テクスチャを変更する関数
-	void SetTexture(const std::string& textureFilePath);
+	void SetTexture(const std::string& textureFilePath);// テクスチャを変更する関数
+	void SetAnchorPoint(const Vector2& anchorPoint) { this->anchorPoint = anchorPoint; }//アンカーポイント
+	void SetIsFlipX(bool isFlipX) { this->isFlipX_ = isFlipX; }
+	void SetIsFlipY(bool isFlipY) { this->isFlipY_ = isFlipY; }
+	void SetTextureLeftTop(const Vector2& textureLeftTop) { this->textureLeftTop = textureLeftTop; }
+	void SetTextureSize(const Vector2& textureSize) { this->textureSize = textureSize; }
+
 
 	//void SetTexture(D3D12_GPU_DESCRIPTOR_HANDLE textureHandle) { textureHandle_ = textureHandle; }
 	Transform& GetTransform() { return transform; }
@@ -81,7 +91,7 @@ private:
 	//頂点バッファビューを作成する
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
 	D3D12_INDEX_BUFFER_VIEW indexBufferView{};
-	
+
 
 	//バッファリソース内のデータを指すポインタ
 	VertexData* vertexData = nullptr;
@@ -103,5 +113,18 @@ private:
 	//テクスチャ番号
 	uint32_t textureIndex_ = 0;
 
-};
+	//基準点
+	Vector2 anchorPoint = { 0.0f,0.0f };
 
+	//左右フリップ
+	bool isFlipX_ = false;
+	//上下フリップ
+	bool isFlipY_ = false;
+
+	//テクスチャ左上座標
+	Vector2 textureLeftTop = { 0.0f,0.0f };
+
+	//テクスチャ切り出しサイズ
+	Vector2 textureSize = { 100.0f,100.0f };
+
+};

@@ -59,20 +59,20 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 
 	//1枚目の三角形
 	//左下
-	vertexData[0].position = { 0.0f,1.0f,0.0f,1.0f };
-	vertexData[0].texcoord = { 0.0f,1.0f };
+	//vertexData[0].position = { 0.0f,1.0f,0.0f,1.0f };
+	//vertexData[0].texcoord = { 0.0f,1.0f };
 	vertexData[0].normal = { 0.0f,0.0f,-1.0f };
 	//左上
-	vertexData[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };
-	vertexData[1].texcoord = { 0.0f,0.0f };
+	//vertexData[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };
+	//vertexData[1].texcoord = { 0.0f,0.0f };
 	vertexData[1].normal = { 0.0f,0.0f,-1.0f };
 	//右下
-	vertexData[2].position = { 1.0f,1.0f,0.0f,1.0f };
-	vertexData[2].texcoord = { 1.0f,1.0f };
+	//vertexData[2].position = { 1.0f,1.0f,0.0f,1.0f };
+	//vertexData[2].texcoord = { 1.0f,1.0f };
 	vertexData[2].normal = { 0.0f,0.0f,-1.0f };
 	//右上
-	vertexData[3].position = { 1.0f, 0.0f, 0.0f, 1.0f };
-	vertexData[3].texcoord = { 1.0f,0.0f };
+	//vertexData[3].position = { 1.0f, 0.0f, 0.0f, 1.0f };
+	//vertexData[3].texcoord = { 1.0f,0.0f };
 	vertexData[3].normal = { 0.0f,0.0f,-1.0f };
 
 
@@ -143,6 +143,41 @@ void Sprite::Update()
 	uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransform.translate));
 	materialData->uvTransform = uvTransformMatrix;
 
+	float left = 0.0f - anchorPoint.x;
+	float right = 1.0f - anchorPoint.x;
+	float top = 0.0f - anchorPoint.y;
+	float bottom = 1.0f - anchorPoint.y;
+
+	//左右反転
+	if (isFlipX_)
+	{
+		left = -left;
+		right = -right;
+	}
+	//上下反転
+	if (isFlipY_)
+	{
+		top = -top;
+		bottom = -bottom;
+	}
+
+	const DirectX::TexMetadata& metadata =
+		TextureManager::GetInstance()->GetMetaData(textureIndex_);
+	float tex_left = textureLeftTop.x / metadata.width;
+	float tex_right = (textureLeftTop.x + textureSize.x) / metadata.width;
+	float tex_top = textureLeftTop.y / metadata.height;
+	float tex_bottom = (textureLeftTop.y + textureSize.y) / metadata.height;
+
+	vertexData[0].position = { left,bottom,0.0f,1.0f };//左下
+	vertexData[1].position = { left,top,0.0f,1.0f };//左上
+	vertexData[2].position = { right,bottom,0.0f,1.0f };//右下
+	vertexData[3].position = { right,top,0.0f,1.0f };//右上
+
+	vertexData[0].texcoord = { tex_left, tex_bottom };//左下
+	vertexData[1].texcoord = { tex_left, tex_top };//左上
+	vertexData[2].texcoord = { tex_right,tex_bottom };//右下
+	vertexData[3].texcoord = { tex_right,tex_top };//右上
+
 	////スプライト用の頂点リソースにデータを書き込む
 	//VertexData* vertexData = nullptr;
 	//////書き込むためのアドレスを取得
@@ -167,4 +202,14 @@ void Sprite::Draw()
 void Sprite::SetTexture(const std::string& textureFilePath) {
 	// 1. TextureManagerから、その画像のインデックス番号を取得
 	textureIndex_ = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath);
+
+	// 自動的にそのサイズをスプライトのサイズ設定に反映させる
+	const DirectX::TexMetadata& metadata = TextureManager::GetInstance()->GetMetaData(textureIndex_);
+
+	// これがないと、main.cppで SetTextureSize をしない限り画像がつぶれたり消えたりします
+	textureSize.x = static_cast<float>(metadata.width);
+	textureSize.y = static_cast<float>(metadata.height);
+
+	// 切り出し位置もリセットしておく（左上に戻す）
+	textureLeftTop = { 0.0f, 0.0f };
 }
