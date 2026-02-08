@@ -34,6 +34,8 @@
 #include"Model.h"
 #include"Audio.h"
 #include "TextureManager.h"
+#include "Object3dCommon.h"
+#include "Object3d.h"
 
 #pragma comment(lib,"Dbghelp.lib")
 #pragma comment(lib,"dxguid.lib")
@@ -507,6 +509,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	dxCommon->Initialize(winApp);
 
 	TextureManager::GetInstance()->Initialize(dxCommon);
+
+	Object3dCommon* object3dCommon = nullptr;
+	//3Dオブジェクト共通部の初期化
+	object3dCommon = new Object3dCommon;
+	object3dCommon->Initialize();
+
+	Object3d* object3d = new Object3d();
+	object3d->Initialize();
 
 	//Textureを読んで転送する
 	DirectX::ScratchImage mipImages = LoadTexture("Resources/uvChecker.png");
@@ -1254,6 +1264,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	sprites.clear();
 	TextureManager::GetInstance()->Finalize();
 	delete spriteCommon;
+
+	delete object3dCommon;
+
+	delete object3d;
 
 
 	//ImGuiの終了処理
