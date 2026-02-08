@@ -721,8 +721,54 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	assert(SUCCEEDED(hr));
 
 
+	//Sprite用のリソースを作る
+	const Microsoft::WRL::ComPtr < ID3D12Resource>& vertexResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(VertexData) * 4);
+
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
+
+
+	//リソースの先頭のアドレスから使う
+	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
+	//使用するリソースのサイズは頂点6つ分のサイズ
+	vertexBufferView.SizeInBytes = sizeof(VertexData) * 4;
+	//1頂点あたりのサイズ
+	vertexBufferView.StrideInBytes = sizeof(VertexData);
+
+	//頂点リソースにデータを書き込む
+	VertexData* vertexData = nullptr;
+
+	//書き込むためのアドレスを取得
+	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+
+	//1枚目の三角形
+	//左下
+	vertexData[0].position = { -0.5f,-0.5f,0.0f,1.0f };
+	vertexData[0].texcoord = { 0.0f,1.0f };
+	//上
+	vertexData[1].position = { 0.0f, 0.5f, 0.0f, 1.0f };
+	vertexData[1].texcoord = { 0.5f,0.0f };
+	//右下
+	vertexData[2].position = { 0.5f,-0.5f,0.0f,1.0f };
+	vertexData[2].texcoord = { 1.0f,1.0f };
+
+	//2枚目の三角形
+	//上2
+	vertexData[3].position = { 0.0f, 0.0f, 0.0f, 1.0f };
+	vertexData[3].texcoord = { 0.5f,0.0f };
+
+	//Sprite用のTransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
+	const Microsoft::WRL::ComPtr < ID3D12Resource>& transformationMatrixResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(TransformationMatrix));
+
+	//バッファリソース内のデータを指すポインタ
+	TransformationMatrix* transformationMatrixData = nullptr;
+
+	//座標変換行列リソースを作る
+	//TransformationMatrix CreateBufferResource();
+
+
 
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& directionalLightResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(DirectionalLight));
+
 
 	DirectionalLight* directionalLightData = nullptr;
 	directionalLightResource->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
@@ -744,6 +790,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	//モデル読み込み
 	ModelData modelData = LoadObjFile("Resources", "plane.obj");
+
+	//DepthStencilTextureをウィンドウのサイズで作成
+	const Microsoft::WRL::ComPtr < ID3D12Resource>& depthStencilResource = CreateDepthStencilTextureResoource(dxCommon->GetDevice(), WinApp::kClientWidth, WinApp::kClientHeight);
+
 
 	//Sphere用の頂点リソースを作る
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& vertexResourceObject = CreateBufferResources(dxCommon->GetDevice(), sizeof(VertexData) * modelData.vertices.size());
@@ -780,6 +830,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	srvDesc2.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	srvDesc2.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc2.Texture2D.MipLevels = UINT(metadata2.mipLevels);
+
+
+
+
+
+
 
 	//Sphere用のTransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
 	const Microsoft::WRL::ComPtr < ID3D12Resource>& transformationMatrixResourceSphere = CreateBufferResources(dxCommon->GetDevice(), sizeof(TransformationMatrix));
@@ -933,7 +989,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	////先頭はImGuiが使ってるのでその次を使う
 	//textureSrvHandleCPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	//textureSrvHandleGPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
+	sprite->SetTexture(textureSrvHandleGPU);
 	MSG msg{};
 	//ウィンドウのxボタンが押されるまでループ
 	while (true)
@@ -950,23 +1006,29 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::NewFrame();
 
 			ImGui::Begin("test");
-			if (ImGui::Button("Object")) {
+			if (ImGui::Button("UVTranslate")) {
 				selectedUI = 0;
 			}
 			ImGui::SameLine();
-			if (ImGui::Button("Sphere")) {
+			if (ImGui::Button("Object")) {
 				selectedUI = 1;
 			}
 			//ImGui::SameLine();
-			//if (ImGui::Button("UVTranslate")) {
-			//	selectedUI = 2;
-			//}
+			if (ImGui::Button("Sphere")) {
+				selectedUI = 2;
+			}
 
 			ImGui::Separator();
 
 			// UI選択用コンボボックス
 			switch (selectedUI) {
-			case 0: // Object
+			case 0: // Sprite
+				ImGui::Text("Editing UVTranslate");
+				ImGui::DragFloat3("Translate", &sprite->GetTransform().translate.x);
+				ImGui::DragFloat3("Rotate", &sprite->GetTransform().rotate.x, 0.01f);
+				ImGui::DragFloat3("Scale", &sprite->GetTransform().scale.x);
+				break;
+			case 1: // Object
 				ImGui::Text("Editing Object");
 				ImGui::ColorEdit4("Object Color", &(materialData->color).x);
 				ImGui::DragFloat3("Translate", &transform.translate.x);
@@ -974,21 +1036,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				ImGui::DragFloat3("Scale", &transform.scale.x);
 				break;
 
-			case 1: // Sphere
+			case 2: // Sphere
 				ImGui::Text("Editing Sphere");
 				ImGui::ColorEdit4("Sphere Color", &(materialDataSphere->color).x);
 				ImGui::DragFloat3("Translate", &transformSphere.translate.x);
 				ImGui::DragFloat3("Rotate", &transformSphere.rotate.x, 0.01f);
 				ImGui::DragFloat3("Scale", &transformSphere.scale.x);
 				break;
-
-			//case 2: // UVTranslate (Sprite)
-			//	ImGui::Text("Editing UVTransform");
-			//	ImGui::ColorEdit4("Sprite Color", &(materialDataSprite->color).x);
-			//	ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
-			//	ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
-			//	ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
-			//	break;
 			}
 			ImGui::DragFloat3("CameraTransform", &cameraTransform.translate.x);
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
@@ -1050,6 +1104,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			// 描画開始（共通設定は済んでいる前提）
 			if (selectedUI == 0) {
+				// Sprite のみ描画
+				sprite->Draw();
+			}
+			else if (selectedUI == 1) {
 				// Object のみ描画
 				dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewObj);
 				dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -1058,7 +1116,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
 				dxCommon->GetCommandList()->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
-			} else if (selectedUI == 1) {
+			} else if (selectedUI == 2) {
 				// sphere のみ描画
 				dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSphere);
 				dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSphere);
@@ -1069,9 +1127,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
 				dxCommon->GetCommandList()->DrawIndexedInstanced(sphereIndexNum, 1, 0, 0, 0);
 			}
-
-
-			sprite->Draw();
 
 
 			//実際のcommandListのImGuiの描画コマンドを積む

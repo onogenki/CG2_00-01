@@ -54,23 +54,27 @@ void Sprite::Initialize(SpriteCommon* spriteCommon)
 	//書き込むためのアドレスを取得
 	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 
-
-
 	//1枚目の三角形
 	//左下
-	vertexData[0].position = { -0.5f,-0.5f,0.0f,1.0f };
+	vertexData[0].position = { 0.0f,360.0f,0.0f,1.0f };
 	vertexData[0].texcoord = { 0.0f,1.0f };
 	//上
-	vertexData[1].position = { 0.0f, 0.5f, 0.0f, 1.0f };
-	vertexData[1].texcoord = { 0.5f,0.0f };
+	vertexData[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };
+	vertexData[1].texcoord = { 0.0f,0.0f };
 	//右下
-	vertexData[2].position = { 0.5f,-0.5f,0.0f,1.0f };
+	vertexData[2].position = { 640.0f,360.0f,0.0f,1.0f };
 	vertexData[2].texcoord = { 1.0f,1.0f };
 
 	//2枚目の三角形
 	//上2
-	vertexData[3].position = { 0.0f, 0.0f, 0.0f, 1.0f };
-	vertexData[3].texcoord = { 0.5f,0.0f };
+	vertexData[3].position = { 640.0f, 0.0f, 0.0f, 1.0f };
+	vertexData[3].texcoord = { 1.0f,0.0f };
+
+
+
+
+
+
 
 	indexResource = CreateBufferResources(device, sizeof(uint32_t) * 6);
 
@@ -105,6 +109,7 @@ void Sprite::Initialize(SpriteCommon* spriteCommon)
 	transformationMatrixData->World = MakeIdentity4x4();
 
 	transform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
+	uvTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 }
 
 void Sprite::Update()
@@ -122,89 +127,23 @@ void Sprite::Update()
 	uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransform.translate));
 	materialData->uvTransform = uvTransformMatrix;
 
-	//頂点リソースにデータを書き込む
+	//スプライト用の頂点リソースにデータを書き込む
 	VertexData* vertexData = nullptr;
-
-	//マテリアルにデータを書き込む
-	Material* materialData = nullptr;
-
-	////mapしてデータを書き込む色は白
-	//materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
-	//
+	////書き込むためのアドレスを取得
+	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 	
-	////バッファリソース
-	////座標変換行列リソース (constantBuffer)
-	////バッファリソース内のデータを指すポインタ
-	//TransformationMatrix* transformationMatrixData = nullptr;
-	//
-	////座標変換行列リソースを作る
-	//TransformationMatrix CreateBufferResource();
-	//
-	////Sprite用のリソースを作る
-	////const Microsoft::WRL::ComPtr < ID3D12Resource>& vertexResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(VertexData) * 4);
-	//
-	//
-	////リソースの先頭のアドレスから使う
-	//vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
-	////使用するリソースのサイズは頂点6つ分のサイズ
-	//vertexBufferView.SizeInBytes = sizeof(VertexData) * 4;
-	////1頂点あたりのサイズ
-	//vertexBufferView.StrideInBytes = sizeof(VertexData);
-	//
-	////書き込むためのアドレスを取得
-	//vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
-	//
-	//////スプライト用の頂点リソースにデータを書き込む
-	//VertexData* vertexDataSprite = nullptr;
-	//////書き込むためのアドレスを取得
-	////vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
-	//
-	//////1枚目の三角形
-	//////左下
-	//vertexDataSprite[0].position = { 0.0f,360.0f,0.0f,1.0f };
-	//vertexDataSprite[0].texcoord = { 0.0f,1.0f };
-	////上
-	//vertexDataSprite[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };
-	//vertexDataSprite[1].texcoord = { 0.0f,0.0f };
-	////右下
-	//vertexDataSprite[2].position = { 640.0f,360.0f,0.0f,1.0f };
-	//vertexDataSprite[2].texcoord = { 1.0f,1.0f };
-	//
-	////2枚目の三角形
-	////上2
-	//vertexDataSprite[3].position = { 640.0f, 0.0f, 0.0f, 1.0f };
-	//vertexDataSprite[3].texcoord = { 1.0f,0.0f };
-	//
-	////DepthStencilTextureをウィンドウのサイズで作成
-	//const Microsoft::WRL::ComPtr < ID3D12Resource>& depthStencilResource = CreateDepthStencilTextureResoource(dxCommon->GetDevice(), WinApp::kClientWidth, WinApp::kClientHeight);
-	//
-	////スプライト用のTransform変数を作る
-	//Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
-	//
-	////Sprite用のTransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	////const Microsoft::WRL::ComPtr < ID3D12Resource>& transformationMatrixResource = CreateBufferResources(dxCommon->GetDevice(), sizeof(TransformationMatrix));
-	//
-	////書き込むためのアドレスを取得
-
-	//uint32_t* indexData = nullptr;
 
 }
 
 void Sprite::Draw()
 {
 	ID3D12GraphicsCommandList* commandList = spriteCommon->GetCommandList();
-	//VertexBufferViewを設定
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
-	//IndexBufferViewを設定
 	commandList->IASetIndexBuffer(&indexBufferView);
-	//マテリアルCBufferの場所を設定
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-	//座標変換行列CBufferの場所を設定
 	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
-	//SRVのDescriptorTableの戦闘を設定
 	commandList->SetGraphicsRootDescriptorTable(2, textureHandle_);
-	//描画(DrawCall/ドローコール)
 	commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
-
 
 }
