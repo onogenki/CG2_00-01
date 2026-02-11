@@ -73,7 +73,6 @@ public:
 	void SetTextureSize(const Vector2& textureSize) { this->textureSize = textureSize; }
 
 
-	//void SetTexture(D3D12_GPU_DESCRIPTOR_HANDLE textureHandle) { textureHandle_ = textureHandle; }
 	Transform& GetTransform() { return transform; }
 private:
 

@@ -323,15 +323,6 @@ void DirectXCommon::DepthStencilView()
 	//DSVHeapの先頭にDSVを作る
 	device_->CreateDepthStencilView(depthStencilResource.Get(), &dsvDesc, dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
-	//Microsoft::WRL::ComPtr < ID3D12Resource> textureResource2;
-	//D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc2{};
-	//
-	////SRVを作成するDescriptorHeapの場所を決める
-	//D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2 = GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
-	//D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2 = GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
-	//
-	////SRVの生成
-	//GetDevice()->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
 }
 
 void DirectXCommon::CreateFence()

@@ -31,9 +31,9 @@ private:
 	void CreateGraphicsPipeline();
 
 	// RootSignature
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature;
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;
 	// PipelineState
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState_;
 
 };
 

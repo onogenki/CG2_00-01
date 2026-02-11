@@ -117,7 +117,7 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 	materialData->uvTransform = MakeIdentity4x4();
 
 	//TransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	transformationMatrixResource = CreateBufferResources(device, sizeof(MyMath::TransformationMatrix));
+	transformationMatrixResource = CreateBufferResources(device, sizeof(TransformationMatrix));
 	//座標変換行列リソースにデータを書き込むためのアドレスを取得してtransformationMatrixDataに割り当てる
 	transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData));
 
