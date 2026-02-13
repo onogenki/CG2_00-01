@@ -2,6 +2,7 @@
 #include "MyMath.h"
 #include "Transform.h"
 #include "Model.h"
+#include "ModelManager.h"
 #include <vector>
 #include <string>
 #include <d3d12.h>
@@ -34,7 +35,11 @@ public:
 
 	void Draw();
 
+	// モデルをポインタでセットする 
 	void SetModel(Model* model) { this->model_ = model; }
+
+	// モデルをファイルパス（文字列）でセットする
+	void SetModel(const std::string& filePath);
 
 	/// setter
 	void SetScale(const Vector3& scale) { transform.scale = scale; }

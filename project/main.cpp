@@ -38,6 +38,7 @@
 #include "TextureManager.h"
 #include "Object3dCommon.h"
 #include "Object3d.h"
+#include "ModelManager.h"
 
 #pragma comment(lib,"Dbghelp.lib")
 #pragma comment(lib,"dxguid.lib")
@@ -283,6 +284,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	TextureManager::GetInstance()->Initialize(dxCommon);
 
+	ModelManager::GetInstance()->Initialize(dxCommon);
+
 	//入力の初期化
 	Input* input = new Input();
 	input->Initialize(winApp);
@@ -303,18 +306,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Object3dCommon* object3dCommon = new Object3dCommon;
 	object3dCommon->Initialize(dxCommon);
 
-	ModelCommon* modelCommon = new ModelCommon();
-	modelCommon->Initialize(dxCommon);
-
 	SpriteCommon* spriteCommon = new SpriteCommon();
 	spriteCommon->Initialize(dxCommon);
 
-	Model* model = new Model();
-	model->Initialize(modelCommon, "Resources", "plane.obj");//obj読み込み
+	//.objファイルからモデルを読み込む
+	ModelManager::GetInstance()->LoadModel("plane.obj");
 
 	Object3d* object3d = new Object3d();
 	object3d->Initialize(object3dCommon);
-	object3d->SetModel(model);
+	//初期化済みの3Dオブジェクトにモデルを紐づける
+	object3d->SetModel("plane.obj");
 
 	Transform& objTransform = object3d->GetTransform();
 
@@ -344,7 +345,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//sprite->SetTextureSize({ 100.0f, 100.0f });
 	}
 
-	bool useMonsterBall = true;
 	int selectedUI = 0;
 
 	MSG msg{};
@@ -427,12 +427,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				ImGui::DragFloat3("Model Translate", &objTransform.translate.x, 0.01f); // 位置
 				ImGui::DragFloat3("Model Rotate", &objTransform.rotate.x, 0.01f);    // 回転
 				ImGui::DragFloat3("Model Scale", &objTransform.scale.x, 0.01f);
+				ImGui::Separator();
 			
 				break;
-				ImGui::Separator();
 			}
 			ImGui::DragFloat3("CameraTransform", &cameraTransform.translate.x);
-			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 
 			ImGui::End();
 			//開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
@@ -504,22 +503,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			dxCommon->PreDraw();
 
 			//3Dオブジェクトの描画準備3Dオブジェクトの描画に共通のグラフィックスコマンドを積む
-			//object3dCommon->SetCommonDrawSetting();
+			object3dCommon->SetCommonDrawSetting();
 
-			//RootSignatureを設定。PS0に設定しているけど別途設定が必要
+			// Object のみ描画
+			object3d->Draw();
 
 			// スプライト描画
-				//Spriteの描画準備Spriteの描画に共通のグラフィックスコマンドを積む
+			//Spriteの描画準備Spriteの描画に共通のグラフィックスコマンドを積む
 				spriteCommon->SetCommonDrawSetting();
 				for (Sprite* sprite : sprites)
 				{
 					sprite->Draw();
 				}
-				// Object のみ描画
-				object3d->Draw();
-
-			//3Dモデル描画
-			object3d->Draw();
 
 			//実際のcommandListのImGuiの描画コマンドを積む
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxCommon->GetCommandList());
@@ -539,73 +534,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	}
 	sprites.clear();
 	TextureManager::GetInstance()->Finalize();
+	ModelManager::GetInstance()->Finalize();
 	delete spriteCommon;
 	delete object3dCommon;
 	delete object3d;
-	delete model;
-	delete modelCommon;
 
 	//ImGuiの終了処理
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
 
-	//dxcUtils->Release();
-	//dxcCompiler->Release();
-	//includeHandler->Release();
-	//wvpResource->Release();
-	//materialResource->Release();
-	//vertexResource->Release();
-	//graphicsPipelineState->Release();
-	//signatureBlob->Release();
-	//if (errorBlob)
-	//{
-	//	errorBlob->Release();
-	//}
-	//rootSignature->Release();
-	//pixelShaderBlob->Release();
-	//vertexShaderBlob->Release();
-
-	//textureResource->Release();
-	//textureResource2->Release();
-
-	//fence->Release();
-	//vertexResourceObject->Release();
-
-	//transformationMatrixResource->Release();
-
-	//intermediateResource->Release();
-	//intermediateResource2->Release();
-
-	//directionalLightResourceSprite->Release();
-
-	//depthStencilResource->Release();
-
-	//materialResourceSprite->Release();
-
-	//dsvDescriptorHeap->Release();
-
-	//vertexResourceSprite->Release();
-	//transformationMatrixResourceSprite->Release();
-	// 
-	//transformationMatrixResourceSphere->Release();
-
-	//indexResourceSprite->Release();
-	//rtvDescriptorHeap->Release();
-	//srvDescriptorHeap->Release();
-	//swapChainResources[0]->Release();
-	//swapChainResources[1]->Release();
-	//swapChain->Release();
-	//commandList->Release();
-	//commandAllocator->Release();
-	//commandQueue->Release();
-	//device->Release();
-	//useAdapter->Release();
-	//dxgiFactory->Release();
-
-
 #ifdef _DEBUG
-	//debugController->Release();
 #endif
 
 

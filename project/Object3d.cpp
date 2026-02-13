@@ -1,5 +1,6 @@
 #include "Object3d.h"
 #include "Object3dCommon.h"
+#include "ModelManager.h"
 #include <cassert>
 #include "MyMath.h"
 using namespace MyMath;
@@ -46,6 +47,11 @@ void Object3d::Draw()
 	{
 		model_->Draw();
 	}
+}
+
+void Object3d::SetModel(const std::string& filePath)
+{// モデルマネージャからモデルを検索してセットする
+	model_ = ModelManager::GetInstance()->FindModel(filePath);
 }
 
 Microsoft::WRL::ComPtr<ID3D12Resource> Object3d::CreateBufferResources(ID3D12Device* device, size_t sizeInBytes)
