@@ -306,20 +306,29 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Object3dCommon* object3dCommon = new Object3dCommon;
 	object3dCommon->Initialize(dxCommon);
 
-	SpriteCommon* spriteCommon = new SpriteCommon();
-	spriteCommon->Initialize(dxCommon);
-
 	//.objファイルからモデルを読み込む
 	ModelManager::GetInstance()->LoadModel("plane.obj");
+	ModelManager::GetInstance()->LoadModel("axis.obj");
 
-	Object3d* object3d = new Object3d();
-	object3d->Initialize(object3dCommon);
-	//初期化済みの3Dオブジェクトにモデルを紐づける
-	object3d->SetModel("plane.obj");
+	std::vector<Object3d*> objects;
 
-	Transform& objTransform = object3d->GetTransform();
+	Object3d* objectPlane = new Object3d();
+	objectPlane->Initialize(object3dCommon);
+	objectPlane->SetModel("plane.obj");
+	objectPlane->GetTransform().translate = { 1.0f, 0.0f, 0.0f }; // 左に配置
+	objects.push_back(objectPlane); // リストに追加
+
+	// --- 2つ目: Axis ---
+	Object3d* objectAxis = new Object3d();
+	objectAxis->Initialize(object3dCommon);
+	objectAxis->SetModel("axis.obj");
+	objectAxis->GetTransform().translate = { 2.0f, 0.0f, 0.0f }; // 右に配置
+	objects.push_back(objectAxis); // リストに追加
 
 	Transform cameraTransform{ { 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.0f,0.0f,-10.0f } };
+
+	SpriteCommon* spriteCommon = new SpriteCommon();
+	spriteCommon->Initialize(dxCommon);
 
 	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");//1枚目
 	TextureManager::GetInstance()->LoadTexture("Resources/monsterBall.png");//2枚目
@@ -422,15 +431,28 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				ImGui::PopID(); // IDをポップ
 			}
 			break;
-			case 1: // Object
-				ImGui::Text("Editing Object");
-				ImGui::DragFloat3("Model Translate", &objTransform.translate.x, 0.01f); // 位置
-				ImGui::DragFloat3("Model Rotate", &objTransform.rotate.x, 0.01f);    // 回転
-				ImGui::DragFloat3("Model Scale", &objTransform.scale.x, 0.01f);
+		case 1: // Object
+			ImGui::Text("Editing Object");
+			// ★リスト内のすべてのオブジェクトをImGuiで表示
+			for (int i = 0; i < objects.size(); ++i) {
+				ImGui::PushID(i); // IDを分けて干渉を防ぐ
+
+				// 名前を表示 (デバッグ用に何番目のなにか表示)
+				ImGui::Text("Object %d", i);
+
+				// 各オブジェクトのTransformを取得して操作
+				Transform& transform = objects[i]->GetTransform();
+
+				ImGui::DragFloat3("Translate", &transform.translate.x, 0.01f);
+				ImGui::DragFloat3("Rotate", &transform.rotate.x, 0.01f);
+				ImGui::DragFloat3("Scale", &transform.scale.x, 0.01f);
+
 				ImGui::Separator();
-			
-				break;
+				ImGui::PopID();
+
 			}
+			break;
+		}
 			ImGui::DragFloat3("CameraTransform", &cameraTransform.translate.x);
 
 			ImGui::End();
@@ -442,9 +464,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//入力の更新
 			input->Update();
 
-			object3d->GetCameraTransform() = cameraTransform;
-
-			object3d->Update();
+			for (Object3d* object3d : objects) {
+				object3d->GetCameraTransform() = cameraTransform; // カメラ情報を渡す
+				object3d->Update();
+			}
 			
 			for (Sprite* sprite : sprites)
 			{
@@ -506,7 +529,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			object3dCommon->SetCommonDrawSetting();
 
 			// Object のみ描画
-			object3d->Draw();
+			object3dCommon->SetCommonDrawSetting();
+			for (Object3d* object3d : objects) {
+				object3d->Draw();
+			}
 
 			// スプライト描画
 			//Spriteの描画準備Spriteの描画に共通のグラフィックスコマンドを積む
@@ -533,11 +559,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		delete sprite;
 	}
 	sprites.clear();
-	TextureManager::GetInstance()->Finalize();
-	ModelManager::GetInstance()->Finalize();
+	for (Object3d* object3d : objects) {
+		delete object3d;
+	}
+	objects.clear();
 	delete spriteCommon;
 	delete object3dCommon;
-	delete object3d;
+
+	TextureManager::GetInstance()->Finalize();
+	ModelManager::GetInstance()->Finalize();
 
 	//ImGuiの終了処理
 	ImGui_ImplDX12_Shutdown();
