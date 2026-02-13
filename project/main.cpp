@@ -384,7 +384,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		// UI選択用コンボボックス
 		switch (selectedUI) {
 		case 0: // Sprite
-			ImGui::Text("Editing UVTranslate");
+			ImGui::Text("Editing UVTranslate ( Sprite )");
 			// std::vector の全要素に対して処理
 			for (int i = 0; i < sprites.size(); ++i)
 			{
@@ -433,12 +433,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			break;
 		case 1: // Object
 			ImGui::Text("Editing Object");
-			// ★リスト内のすべてのオブジェクトをImGuiで表示
+			//リスト内のすべてのオブジェクトをImGuiで表示
 			for (int i = 0; i < objects.size(); ++i) {
 				ImGui::PushID(i); // IDを分けて干渉を防ぐ
 
-				// 名前を表示 (デバッグ用に何番目のなにか表示)
-				ImGui::Text("Object %d", i);
+				if (i == 0)
+				{
+					ImGui::Text("Plane");
+				}
+				else if (i == 1)
+				{
+					ImGui::Text("Axis");
+				}
 
 				// 各オブジェクトのTransformを取得して操作
 				Transform& transform = objects[i]->GetTransform();
