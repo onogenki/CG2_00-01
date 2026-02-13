@@ -1,6 +1,7 @@
 #pragma once
 #include "MyMath.h"
 #include "Transform.h"
+#include "Model.h"
 #include <vector>
 #include <string>
 #include <d3d12.h>
@@ -12,32 +13,6 @@ class Object3dCommon;
 class Object3d
 {
 public:
-
-	//頂点データ
-	struct VertexData {
-		Vector4 position;
-		Vector2 texcoord;
-		Vector3 normal;
-	};
-
-	struct MaterialData
-	{
-		std::string textureFilePath;
-		uint32_t textureIndex = 0;
-	};
-
-	struct ModelData {
-		std::vector<VertexData> vertices;
-		MaterialData material;
-	};
-
-	struct Material
-	{
-		Vector4 color;
-		int32_t enableLighting;
-		float padding[3];
-		Matrix4x4 uvTransform;
-	};
 
 	//座標変換行列データ
 	struct TransformationMatrix
@@ -59,12 +34,21 @@ public:
 
 	void Draw();
 
-	// .objファイルの読み取り
-	void LoadObjFile(const std::string& directoryPath, const std::string& filename);
+	void SetModel(Model* model) { this->model_ = model; }
+
+	/// setter
+	void SetScale(const Vector3& scale) { transform.scale = scale; }
+	void SetRotate(const Vector3& rotate) { transform.rotate = rotate; }
+	void SetTranslate(const Vector3& translate) { transform.translate = translate; }
+
+	//getter
+	const Vector3& GetScale()const { return transform.scale; }
+	const Vector3& GetRotate()const { return transform.rotate; }
+	const Vector3& GetTranslate()const { return transform.translate; }
+
 
 	// モデル
 	Transform& GetTransform() { return transform; }
-
 
 	// カメラ
 	Transform& GetCameraTransform() { return cameraTransform; }
@@ -72,34 +56,12 @@ public:
 private:
 	Object3dCommon* object3dCommon = nullptr;
 	
+	Model* model_ = nullptr;
+
 	//3Dオブジェクト自身のトランスフォーム
 	Transform transform;
 	//カメラのトランスフォーム
 	Transform cameraTransform;
-
-	//OBJファイルのデータ
-	ModelData modelData;
-
-
-	//頂点データ作成(リソース作成、ビュー作成、データの書き込み)
-	void CreateVertexData();
-	//バッファリソース
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource;
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
-	VertexData* vertexData = nullptr;
-
-
-	//インデックス
-	Microsoft::WRL::ComPtr<ID3D12Resource> indexResource;
-	D3D12_INDEX_BUFFER_VIEW indexBufferView{};
-	uint32_t indexCount = 0; // インデックスの数
-
-
-	//マテリアル作成
-	void CreateMaterialData();
-	//マテリアル
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource;
-	Material* materialData = nullptr;
 
 	//座標変換リソース(ConstantBuffer)
 	void CreateTransformationMatrixData();
@@ -111,17 +73,8 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource;
 	DirectionalLight* directionalLightData = nullptr;
 
-
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU{};
-	//マテリアルリソース(ConstantBuffer)
-
-
 	// リソース作成のヘルパー関数 (Spriteから移植)
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResources(ID3D12Device* device, size_t sizeInBytes);
-
-	// .mtlファイルの読み取り
-	MaterialData LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename);
-
 
 };
 
