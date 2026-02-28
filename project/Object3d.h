@@ -3,6 +3,7 @@
 #include "Transform.h"
 #include "Model.h"
 #include "ModelManager.h"
+#include "Camera.h"
 #include <vector>
 #include <string>
 #include <d3d12.h>
@@ -45,6 +46,7 @@ public:
 	void SetScale(const Vector3& scale) { transform.scale = scale; }
 	void SetRotate(const Vector3& rotate) { transform.rotate = rotate; }
 	void SetTranslate(const Vector3& translate) { transform.translate = translate; }
+	void SetCamera(Camera* camera) { this->camera = camera; }
 
 	//getter
 	const Vector3& GetScale()const { return transform.scale; }
@@ -55,18 +57,15 @@ public:
 	// モデル
 	Transform& GetTransform() { return transform; }
 
-	// カメラ
-	Transform& GetCameraTransform() { return cameraTransform; }
-
 private:
 	Object3dCommon* object3dCommon = nullptr;
 	
 	Model* model_ = nullptr;
 
+	Camera* camera = nullptr;
+
 	//3Dオブジェクト自身のトランスフォーム
 	Transform transform;
-	//カメラのトランスフォーム
-	Transform cameraTransform;
 
 	//座標変換リソース(ConstantBuffer)
 	void CreateTransformationMatrixData();

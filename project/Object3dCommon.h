@@ -1,5 +1,6 @@
 #pragma once
 #include "DirectXCommon.h"
+#include "Camera.h"
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <wrl.h>
@@ -13,17 +14,21 @@ public:
 	void Initialize(DirectXCommon* dxCommon);
 
 
+	///getter
+	DirectXCommon* GetDxCommon() const { return dxCommon_; }
+	Camera* GetDefaultCamera() const { return defaultCamera_; }
+
 	//共通描画設定
 	void SetCommonDrawSetting();
 
-	///getter
-	DirectXCommon* GetDxCommon() const {
-		return dxCommon_;
-	}
+	//setter
+	void SetDefaultCamera(Camera* camera) { this->defaultCamera_ = camera; }
 
 private:
 
 	DirectXCommon* dxCommon_;
+
+	Camera* defaultCamera_ = nullptr;
 
 	// ルートシグネチャの生成
 	void CreateRootSignature();

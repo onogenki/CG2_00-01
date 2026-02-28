@@ -15,7 +15,8 @@
 #include "Input.h"
 #include "WinApp.h"
 #include "DirectXCommon.h"
-
+#include "Camera.h"
+#include "CameraManager.h"
 
 
 #include "externals/DirectXTex/DirectXTex.h"
@@ -306,6 +307,27 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Object3dCommon* object3dCommon = new Object3dCommon;
 	object3dCommon->Initialize(dxCommon);
 
+	//カメラマネージャ
+	CameraManager* cameraManager = new CameraManager();
+
+	//メインカメラ
+	Camera* mainCamera = new Camera();
+	mainCamera->SetRotate({ 0.0f,0.0f,0.0f });
+	mainCamera->SetTranslate({ 0.0f,0.0f,-10.0f });
+	cameraManager->AddCamera("MainCamera", mainCamera);
+
+	//上アングルカメラ
+	Camera* upCamera = new Camera();
+	upCamera->SetRotate({ 0.785f,0.0f,0.0f });
+	upCamera->SetTranslate({ 0.0f,5.0f,-5.0f });
+	cameraManager->AddCamera("UpCamera", upCamera);
+
+	//MainCameraをアクティブ
+	cameraManager->SetActiveCamera("MainCamera");
+
+	//共通部にはマネージャのアクティブカメラを渡す
+	object3dCommon->SetDefaultCamera(cameraManager->GetActiveCamera());
+
 	//.objファイルからモデルを読み込む
 	ModelManager::GetInstance()->LoadModel("plane.obj");
 	ModelManager::GetInstance()->LoadModel("axis.obj");
@@ -324,8 +346,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	objectAxis->SetModel("axis.obj");
 	objectAxis->GetTransform().translate = { 2.0f, 0.0f, 0.0f }; // 右に配置
 	objects.push_back(objectAxis); // リストに追加
-
-	Transform cameraTransform{ { 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.0f,0.0f,-10.0f } };
 
 	SpriteCommon* spriteCommon = new SpriteCommon();
 	spriteCommon->Initialize(dxCommon);
@@ -459,7 +479,33 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			}
 			break;
 		}
-			ImGui::DragFloat3("CameraTransform", &cameraTransform.translate.x);
+
+		//カメラ
+		Camera* activeCamera = cameraManager->GetActiveCamera();
+		if (activeCamera)
+		{//位置
+			Vector3 cameraPos = activeCamera->GetTranslate();
+			if (ImGui::DragFloat3("CameraTranslate", &cameraPos.x, 0.01f))
+			{
+				activeCamera->SetTranslate(cameraPos);
+			}//角度
+			Vector3 cameraRot = activeCamera->GetRotate();
+			if (ImGui::DragFloat3("CameraRotate", &cameraRot.x, 0.01f))
+			{
+				activeCamera->SetRotate(cameraRot);
+			}
+		}
+		ImGui::Text("Camera Control");
+		if (ImGui::Button("Use MainCamera"))
+		{//メインカメラ
+			cameraManager->SetActiveCamera("MainCamera");
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Use UpCamera"))
+		{//上空カメラ
+			cameraManager->SetActiveCamera("UpCamera");
+		}
+		ImGui::Separator();
 
 			ImGui::End();
 			//開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
@@ -467,11 +513,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//ImGuiの内部コマンドを生成する
 			ImGui::Render();
 			
+			cameraManager->Update();
+
 			//入力の更新
 			input->Update();
 
 			for (Object3d* object3d : objects) {
-				object3d->GetCameraTransform() = cameraTransform; // カメラ情報を渡す
+				//毎フレーム、マネージャから今のアクティブカメラをもらう
+				object3d->SetCamera(cameraManager->GetActiveCamera());
+
 				object3d->Update();
 			}
 			
