@@ -148,12 +148,6 @@ void DirectXCommon::InitializeDevice()//デバイスの初期化
 
 	}
 #endif
-
-	//デバックレイヤーをオンに
-	//DXGIファクトリの生成
-	//アダプターの列挙
-	//デバイス生成
-	//エラー時にブレークを発生させる設定
 }
 
 void DirectXCommon::commandList()
@@ -375,15 +369,15 @@ void DirectXCommon::ImGui()
 	//IMGUIの初期化
 	//ImGuiの初期化
 	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	ImGui::StyleColorsDark();
-	ImGui_ImplWin32_Init(winApp->GetHwnd());
-	ImGui_ImplDX12_Init(device_.Get(),
-		swapChainDesc_.BufferCount,
-		rtvDesc_.Format,
-		srvDescriptorHeap.Get(),
-		srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-		srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+	//ImGui::CreateContext();
+	//ImGui::StyleColorsDark();
+	//ImGui_ImplWin32_Init(winApp->GetHwnd());
+	//ImGui_ImplDX12_Init(device_.Get(),
+	//	swapChainDesc_.BufferCount,
+	//	rtvDesc_.Format,
+	//	srvDescriptorHeap.Get(),
+	//	srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+	//	srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 }
 
 void DirectXCommon::PreDraw()
@@ -419,8 +413,8 @@ void DirectXCommon::PreDraw()
 	commandList_->ClearDepthStencilView(dsvHandle_, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 
-	ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
-	commandList_->SetDescriptorHeaps(1, descriptorHeaps);
+	//ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
+	//commandList_->SetDescriptorHeaps(1, descriptorHeaps);
 
 	commandList_->RSSetViewports(1, &viewport_);
 

@@ -40,6 +40,8 @@
 #include "Object3dCommon.h"
 #include "Object3d.h"
 #include "ModelManager.h"
+#include "SrvManager.h"
+#include"ImGuiManager.h"
 
 #pragma comment(lib,"Dbghelp.lib")
 #pragma comment(lib,"dxguid.lib")
@@ -283,7 +285,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	dxCommon = new DirectXCommon();
 	dxCommon->Initialize(winApp);
 
-	TextureManager::GetInstance()->Initialize(dxCommon);
+	SrvManager* srvManager = nullptr;
+	//SRVマネージャの初期化
+	srvManager = new SrvManager();
+	srvManager->Initialize(dxCommon);
+
+	TextureManager::GetInstance()->Initialize(dxCommon,srvManager);
+
+	ImGuiManager* imGuiManager = new ImGuiManager();
+	imGuiManager->Initialize(winApp, dxCommon, srvManager);
+
 
 	ModelManager::GetInstance()->Initialize(dxCommon);
 
@@ -386,9 +397,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		}
 
 		//ゲームの処理
-		ImGui_ImplDX12_NewFrame();
+		imGuiManager->Begin();
+		/*ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
-		ImGui::NewFrame();
+		ImGui::NewFrame();*/
 
 		ImGui::Begin("test");
 		if (ImGui::Button("UVTranslate")) {
@@ -510,8 +522,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::End();
 			//開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
 			ImGui::ShowDemoWindow();
-			//ImGuiの内部コマンドを生成する
-			ImGui::Render();
+			imGuiManager->End();
+			////ImGuiの内部コマンドを生成する
+			//ImGui::Render();
 			
 			cameraManager->Update();
 
@@ -580,6 +593,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			//描画前処理
 			dxCommon->PreDraw();
+			srvManager->PreDraw();
 
 			//3Dオブジェクトの描画準備3Dオブジェクトの描画に共通のグラフィックスコマンドを積む
 			object3dCommon->SetCommonDrawSetting();
@@ -598,8 +612,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 					sprite->Draw();
 				}
 
-			//実際のcommandListのImGuiの描画コマンドを積む
-			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxCommon->GetCommandList());
+				imGuiManager->Draw(dxCommon);
+			////実際のcommandListのImGuiの描画コマンドを積む
+			//ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxCommon->GetCommandList());
 
 			
 			dxCommon->PostDraw();
@@ -626,9 +641,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ModelManager::GetInstance()->Finalize();
 
 	//ImGuiの終了処理
-	ImGui_ImplDX12_Shutdown();
+	imGuiManager->Finalize();
+	/*ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
-	ImGui::DestroyContext();
+	ImGui::DestroyContext();*/
+
+	delete imGuiManager;
+	delete srvManager;
 
 #ifdef _DEBUG
 #endif

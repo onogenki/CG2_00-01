@@ -110,7 +110,8 @@ private:
 	Transform uvTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 
 	//テクスチャ番号
-	uint32_t textureIndex_ = 0;
+	//uint32_t textureIndex_ = 0;
+	std::string textureFilePath_;
 
 	//基準点
 	Vector2 anchorPoint = { 0.0f,0.0f };

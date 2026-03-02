@@ -20,7 +20,7 @@ void Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPat
 	CreateMaterialData();
 	//テクスチャ読み込み
 	TextureManager::GetInstance()->LoadTexture(modelData.material.textureFilePath);
-	modelData.material.textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(modelData.material.textureFilePath);
+	//modelData.material.textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(modelData.material.textureFilePath);
 }
 
 void Model::Draw()
@@ -40,7 +40,7 @@ void Model::Draw()
 
 	// 5. SRVのDescriptorTableの先頭を設定 (RootParameter 2)
 	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle =
-		TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureIndex);
+		TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureFilePath);
 	commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
 
 	// 7. 描画 (DrawCall)
