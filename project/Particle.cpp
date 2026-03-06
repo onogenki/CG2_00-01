@@ -25,12 +25,51 @@ void Particle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
     instancingResource_ = CreateBufferResource(dxCommon->GetDevice(), sizeof(TransformationMatrix) * kNumInstance);
     instancingResource_->Map(0, nullptr, reinterpret_cast<void**>(&instancingData_));
 
+    // 6頂点分のバッファを作成
+    vertexResource_ = CreateBufferResource(dxCommon->GetDevice(), sizeof(VertexData) * 6);
+
+    // バッファビューの設定
+    vertexBufferView_.BufferLocation = vertexResource_->GetGPUVirtualAddress();
+    vertexBufferView_.SizeInBytes = sizeof(VertexData) * 6;
+    vertexBufferView_.StrideInBytes = sizeof(VertexData);
+
+    // 頂点データの書き込み（法線も含める）
+    VertexData* vertexData = nullptr;
+    vertexResource_->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+
+    // Zの法線は手前(-1.0f)を向かせる
+    Vector3 normal = { 0.0f, 0.0f, -1.0f };
+
+    // 1枚目の三角形
+    vertexData[0] = { {-1.0f, -1.0f, 0.0f, 1.0f}, {0.0f, 1.0f}, normal }; // 左下
+    vertexData[1] = { {-1.0f,  1.0f, 0.0f, 1.0f}, {0.0f, 0.0f}, normal }; // 左上
+    vertexData[2] = { { 1.0f, -1.0f, 0.0f, 1.0f}, {1.0f, 1.0f}, normal }; // 右下
+
+    // 2枚目の三角形
+    vertexData[3] = { {-1.0f,  1.0f, 0.0f, 1.0f}, {0.0f, 0.0f}, normal }; // 左上
+    vertexData[4] = { { 1.0f,  1.0f, 0.0f, 1.0f}, {1.0f, 0.0f}, normal }; // 右上
+    vertexData[5] = { { 1.0f, -1.0f, 0.0f, 1.0f}, {1.0f, 1.0f}, normal }; // 右下
+
     // 初期位置の設定など
     for (uint32_t index = 0; index < kNumInstance; ++index) {
         transforms_[index].scale = { 1.0f,1.0f,1.0f };
         transforms_[index].rotate = { 0.0f,0.0f,0.0f };
-        transforms_[index].translate = { index * 1.0f, index * 1.0f, index * 1.0f };
+        transforms_[index].translate = { index * 0.1f, index * 0.1f, index * 0.1f };
     }
+
+    // --- 変更: マテリアルデータの初期化 ---
+    materialResource_ = CreateBufferResource(dxCommon->GetDevice(), sizeof(Material));
+    materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
+
+    // 変なゴミデータが入らないようにゼロクリア
+    memset(materialData_, 0, sizeof(Material));
+
+    // 色を真っ白（不透明）に
+    materialData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+    // ライティングをオフに
+    materialData_->enableLighting = 0;
+    // UVトランスフォームを「等倍・回転なし・移動なし」の行列にする（必須）
+    materialData_->uvTransform = MakeAffineMatrix({ 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f });
 
     instancingSrvIndex_ = srvManager->Allocate();
     srvManager->CreateSRVforStructuredBuffer(
@@ -56,6 +95,12 @@ void Particle::Update(Matrix4x4 viewProjectionMatrix)
 
 void Particle::Draw(ID3D12GraphicsCommandList* commandList, SrvManager* srvManager)
 {
+
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
+
+    commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
+
     // SrvManager経由でDescriptorTableをセット
     srvManager->SetGraphicsRootDescriptorTable(1, instancingSrvIndex_);
 

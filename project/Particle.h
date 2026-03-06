@@ -17,6 +17,25 @@ public:
 
 private:
 
+	struct Material {
+		Vector4 color;
+		int32_t enableLighting;
+		float padding[3];      // サイズ合わせのダミー
+		Matrix4x4 uvTransform; // UV用（これがないとエラーになる）
+	};
+	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_;
+	Material* materialData_ = nullptr;
+
+	struct VertexData {
+		Vector4 position;
+		Vector2 texcoord;
+		Vector3 normal;
+	};
+
+	// 頂点バッファ用の変数
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource_;
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
+
 	//インスタンスの最大数
 	static const uint32_t kNumInstance = 10;
 
