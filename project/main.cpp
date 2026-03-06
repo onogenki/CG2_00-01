@@ -42,6 +42,8 @@
 #include "ModelManager.h"
 #include "SrvManager.h"
 #include"ImGuiManager.h"
+#include "Particle.h"
+#include "ParticleCommon.h"
 
 #pragma comment(lib,"Dbghelp.lib")
 #pragma comment(lib,"dxguid.lib")
@@ -318,6 +320,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Object3dCommon* object3dCommon = new Object3dCommon;
 	object3dCommon->Initialize(dxCommon);
 
+	//パーティクル
+	ParticleCommon* particleCommon = new ParticleCommon();
+	particleCommon->Initialize(dxCommon);
+
+	Particle* particle = new Particle();
+	particle->Initialize(dxCommon, srvManager);
+
 	//カメラマネージャ
 	CameraManager* cameraManager = new CameraManager();
 
@@ -528,6 +537,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			
 			cameraManager->Update();
 
+
+			//カメラのビュープロジェクション行列を渡して更新
+			Matrix4x4 viewMatrix = cameraManager->GetActiveCamera()->GetViewMatrix();
+			Matrix4x4 projectionMatrix = cameraManager->GetActiveCamera()->GetProjectionMatrix();
+			Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
+
+			particle->Update(viewProjectionMatrix);
+
 			//入力の更新
 			input->Update();
 
@@ -594,6 +611,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//描画前処理
 			dxCommon->PreDraw();
 			srvManager->PreDraw();
+
+			particleCommon->PreDraw(dxCommon->GetCommandList());
+			particle->Draw(dxCommon->GetCommandList(), srvManager);
 
 			//3Dオブジェクトの描画準備3Dオブジェクトの描画に共通のグラフィックスコマンドを積む
 			object3dCommon->SetCommonDrawSetting();
