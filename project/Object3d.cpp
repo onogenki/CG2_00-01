@@ -114,7 +114,6 @@ void Object3d::CreateDirectionalLightData()
 	directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 	// 向き: 真上から下へ照らす (X, Y, Z)
-	// ※必要に応じて {0.0f, -1.0f, 1.0f} など斜めにすると立体感が出やすいです
 	directionalLightData->direction = { 0.0f, -1.0f, 0.0f };
 
 	// 強さ: 1.0 (標準)

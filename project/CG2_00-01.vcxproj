@@ -165,7 +165,6 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">MinSpace</Optimization>
       <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</WholeProgramOptimization>
     </ClCompile>
-    <ClCompile Include="math.cpp" />
     <ClCompile Include="Matrix4x4.cpp" />
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="ModelCommon.cpp" />
@@ -225,7 +224,6 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="ImGuiManager.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="Logger.h" />
-    <ClInclude Include="math.h" />
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="ModelCommon.h" />

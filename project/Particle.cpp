@@ -3,6 +3,9 @@
 #include "TextureManager.h"
 using namespace MyMath;
 
+std::random_device seedGenerator;
+std::mt19937 randomEngine(seedGenerator());
+
 static Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(ID3D12Device* device, size_t sizeInBytes) {
     D3D12_HEAP_PROPERTIES uploadHeapProperties{};
     uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -50,14 +53,16 @@ void Particle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
     vertexData[4] = { { 1.0f,  1.0f, 0.0f, 1.0f}, {1.0f, 0.0f}, normal }; // 右上
     vertexData[5] = { { 1.0f, -1.0f, 0.0f, 1.0f}, {1.0f, 1.0f}, normal }; // 右下
 
+    std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
+
     // 初期位置の設定など
     for (uint32_t index = 0; index < kNumInstance; ++index) {
-        transforms_[index].scale = { 1.0f,1.0f,1.0f };
-        transforms_[index].rotate = { 0.0f,0.0f,0.0f };
-        transforms_[index].translate = { index * 0.1f, index * 0.1f, index * 0.1f };
+        MakeNewParticle(index);
     }
 
-    // --- 変更: マテリアルデータの初期化 ---
+
+
+    // マテリアルデータの初期化
     materialResource_ = CreateBufferResource(dxCommon->GetDevice(), sizeof(Material));
     materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
 
@@ -68,7 +73,7 @@ void Particle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
     materialData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
     // ライティングをオフに
     materialData_->enableLighting = 0;
-    // UVトランスフォームを「等倍・回転なし・移動なし」の行列にする（必須）
+    // UVトランスフォームを「等倍・回転なし・移動なし」の行列にする
     materialData_->uvTransform = MakeAffineMatrix({ 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f });
 
     instancingSrvIndex_ = srvManager->Allocate();
@@ -84,13 +89,17 @@ void Particle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 void Particle::Update(Matrix4x4 viewProjectionMatrix)
 {
     for (uint32_t index = 0; index < kNumInstance; ++index) {
+
+        transforms_[index].translate.x += velocities_[index].x * kDeltaTime_;
+        transforms_[index].translate.y += velocities_[index].y * kDeltaTime_;
+        transforms_[index].translate.z += velocities_[index].z * kDeltaTime_;
+
         Matrix4x4 worldMatrix = MakeAffineMatrix(transforms_[index].scale, transforms_[index].rotate, transforms_[index].translate);
         Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, viewProjectionMatrix);
 
         instancingData_[index].WVP = worldViewProjectionMatrix;
         instancingData_[index].World = worldMatrix;
     }
-
 }
 
 void Particle::Draw(ID3D12GraphicsCommandList* commandList, SrvManager* srvManager)
@@ -110,4 +119,22 @@ void Particle::Draw(ID3D12GraphicsCommandList* commandList, SrvManager* srvManag
 
     // 10個まとめて
     commandList->DrawInstanced(6, kNumInstance, 0, 0);
+}
+
+void Particle::MakeNewParticle(uint32_t index)
+{
+    std::uniform_real_distribution<float>distribution(-1.0f, 1.0f);
+    transforms_[index].scale = { 1.0f, 1.0f, 1.0f };
+    transforms_[index].rotate = { 0.0f, 0.0f, 0.0f };
+    transforms_[index].translate = {
+        distribution(randomEngine),
+        distribution(randomEngine),
+        distribution(randomEngine)
+    };
+
+    velocities_[index] = {
+        distribution(randomEngine),
+        distribution(randomEngine),
+        distribution(randomEngine)
+    };
 }

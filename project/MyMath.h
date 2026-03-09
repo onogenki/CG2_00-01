@@ -89,8 +89,6 @@ namespace MyMath {
 	inline constexpr int kRowHeight = 20;
 	inline constexpr int kColumnWidth = 60;
 
-	// --- 補助関数 ---
-
 	// cot 関数
 	float Cot(float x);
 

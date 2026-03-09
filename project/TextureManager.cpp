@@ -111,7 +111,7 @@ void TextureManager::LoadTexture(const std::string& filePath)
 		CloseHandle(fenceEvent);
 
 		//実行が完了したので、allocatorとcommandListをResetsして次のコマンドを積めるようにする。 
-		hr = dxCommon_->GetCommandAllocator()->Reset(); // ※要GetCommandAllocator()
+		hr = dxCommon_->GetCommandAllocator()->Reset();
 		assert(SUCCEEDED(hr));
 		hr = dxCommon_->GetCommandList()->Reset(dxCommon_->GetCommandAllocator(), nullptr);
 		assert(SUCCEEDED(hr));

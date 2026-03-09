@@ -85,7 +85,7 @@ void DirectXCommon::InitializeDevice()//デバイスの初期化
 		DXGI_ADAPTER_DESC3 adapterDesc{};
 		hr = useAdapter->GetDesc3(&adapterDesc);
 		assert(SUCCEEDED(hr));//取得できないのは一大事
-		//ソフトウェアアダプタでなければ採用!
+		//ソフトウェアアダプタでなければ採用
 		if (!(adapterDesc.Flags & DXGI_ADAPTER_FLAG3_SOFTWARE))
 		{
 			//採用したアダプタの情報をログに出力。wstringの方なので注意
@@ -94,7 +94,6 @@ void DirectXCommon::InitializeDevice()//デバイスの初期化
 		}
 		useAdapter = nullptr;//ソフトウェアアダプタの場合は見なかったことにする
 	}
-	//適切なアダプタが見つからなかったので起動できない
 	assert(useAdapter != nullptr);
 
 	//機能レベルとログ出力用の文字列
@@ -157,7 +156,6 @@ void DirectXCommon::commandList()
 		D3D12_COMMAND_LIST_TYPE_DIRECT, 
 		IID_PPV_ARGS(commandAllocator.GetAddressOf())
 	);
-	//コマンドアロケータの生成がうまくいかなかったので起動できない
 	assert(SUCCEEDED(hr));
 
 	hr = device_->CreateCommandList(
@@ -194,7 +192,6 @@ void DirectXCommon::SwapChain()
 	//コマンドを生成する
 	hr = device_->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator.Get(), nullptr,
 		IID_PPV_ARGS(&commandList_));
-	//コマンドリストの生成がうまくいかなかったので起動できない
 	assert(SUCCEEDED(hr));
 	swapChainDesc_.Width = WinApp::kClientWidth;//画面の幅。ウィンドウのクライアント領域を同じものにしておく
 	swapChainDesc_.Height = WinApp::kClientHeight;//画面の高さ。ウィンドウのクライアント領域を同じものにしておく
@@ -576,9 +573,6 @@ Microsoft::WRL::ComPtr < IDxcBlob> DirectXCommon::CompileShader(
 	assert(SUCCEEDED(hr));
 	//成功したログを出す
 	Log(StringUtility::ConvertString(std::format(L"Compile,Succeeded,path:{},profile:{}\n", filePath, profile)));
-	//もう使わないリソースを解散
-	//shaderSource->Release();
-	//shaderResult->Release();
 	//実行用のバイナリを返却
 	return shaderBlob;
 }
@@ -639,7 +633,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateTextureResource(cons
 	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
 	HRESULT hr = device_->CreateCommittedResource(
 		&heapProperties, // Heapの設定
-		D3D12_HEAP_FLAG_NONE, // Heapの特殊な設定。特になし。
+		D3D12_HEAP_FLAG_NONE, // Heapの特殊な設定。
 		&resourceDesc, // Resourceの設定
 		D3D12_RESOURCE_STATE_COPY_DEST, // データ転送される前提の初期状態
 		nullptr, // Clear最適化設定。使わないのでnullptr。
@@ -689,7 +683,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::UploadTextureData(const Mi
 	barrier.Transition.pResource = texture.Get();
 	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ; // PixelShaderで使うならこれ
+	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ; // PixelShaderで使うなら
 	commandList_->ResourceBarrier(1, &barrier);
 
 	return intermediateResource;

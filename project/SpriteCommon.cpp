@@ -84,8 +84,6 @@ void SpriteCommon::CreateRootSignature()
 		D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
 	if (FAILED(hr))
 	{
-		// Log関数が定義されていない場合は OutputDebugStringA などで代用するか、Logの実装を確認してください
-		// Log(logStream, reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
 		assert(false);
 	}
 
@@ -135,8 +133,6 @@ void SpriteCommon::CreateGraphicsPipeline()
 	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 
 	// shaderをコンパイルする
-	// ※シェーダーコンパイル用のメンバ関数 CompileShader がある前提で呼び出します
-	// もしコンパイルエラーになる場合は、dxCommon_->CompileShader(...) としてください
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = dxCommon_->CompileShader(L"resources/shaders/Object3d.VS.hlsl",
 		L"vs_6_0");
 	assert(vertexShaderBlob != nullptr);
