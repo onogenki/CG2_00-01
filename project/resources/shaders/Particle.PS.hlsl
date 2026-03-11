@@ -37,14 +37,14 @@ PixelShaderOutput main(VertexShaderOutput input)
         float3 normal = normalize(input.normal);
         float3 lightDir = normalize(-gDirectionalLight.direction);
         float NdotL = saturate(dot(normal, lightDir));
-        float3 diffuse = gMaterial.color.rgb * tex.rgb * gDirectionalLight.color.rgb * NdotL * gDirectionalLight.intensity;
+        float3 diffuse = gMaterial.color.rgb * tex.rgb * input.color.rgb * gDirectionalLight.color.rgb * NdotL * gDirectionalLight.intensity;
         output.color.rgb = diffuse;
-        output.color.a = gMaterial.color.a * tex.a;
+        output.color.a = gMaterial.color.a * tex.a * input.color.a;
 
     }
     else
     {
-        output.color = gMaterial.color * tex;
+        output.color = gMaterial.color * tex * input.color;
     }
     
     if (tex.a <= 0.5f)

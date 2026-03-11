@@ -25,7 +25,7 @@ static Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(ID3D12Device*
 void Particle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 {
 
-    instancingResource_ = CreateBufferResource(dxCommon->GetDevice(), sizeof(TransformationMatrix) * kNumInstance);
+    instancingResource_ = CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleForGPU) * kNumMaxInstance);
     instancingResource_->Map(0, nullptr, reinterpret_cast<void**>(&instancingData_));
 
     // 6頂点分のバッファを作成
@@ -53,10 +53,13 @@ void Particle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
     vertexData[4] = { { 1.0f,  1.0f, 0.0f, 1.0f}, {1.0f, 0.0f}, normal }; // 右上
     vertexData[5] = { { 1.0f, -1.0f, 0.0f, 1.0f}, {1.0f, 1.0f}, normal }; // 右下
 
+    //ランダム
     std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
+    std::uniform_real_distribution<float>distColor(0.0f, 1.0f);
+    std::uniform_real_distribution<float>distTime(1.0f, 3.0f);
 
     // 初期位置の設定など
-    for (uint32_t index = 0; index < kNumInstance; ++index) {
+    for (uint32_t index = 0; index < kNumMaxInstance; ++index) {
         MakeNewParticle(index);
     }
 
@@ -70,7 +73,7 @@ void Particle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
     memset(materialData_, 0, sizeof(Material));
 
     // 色を真っ白（不透明）に
-    materialData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+    materialData_->color = { distColor(randomEngine), distColor(randomEngine), distColor(randomEngine),1.0f };
     // ライティングをオフに
     materialData_->enableLighting = 0;
     // UVトランスフォームを「等倍・回転なし・移動なし」の行列にする
@@ -80,25 +83,47 @@ void Particle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
     srvManager->CreateSRVforStructuredBuffer(
         instancingSrvIndex_,
         instancingResource_.Get(),
-        kNumInstance,
-        sizeof(TransformationMatrix)
+        kNumMaxInstance,
+        sizeof(ParticleForGPU)
     );
 
 }
 
 void Particle::Update(Matrix4x4 viewProjectionMatrix)
 {
-    for (uint32_t index = 0; index < kNumInstance; ++index) {
+    numInstance = 0;
+
+    std::uniform_real_distribution<float>distTime(1.0f, 3.0f);
+
+    for (uint32_t index = 0; index < kNumMaxInstance; ++index) {
+
+        if (currentTimes_[index] >= lifeTimes_[index])//時間経過したら描画させない
+        {
+            continue;
+        }
+
+        Matrix4x4 worldMatrix = MakeAffineMatrix(transforms_[index].scale, transforms_[index].rotate, transforms_[index].translate);
+        Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, viewProjectionMatrix);
 
         transforms_[index].translate.x += velocities_[index].x * kDeltaTime_;
         transforms_[index].translate.y += velocities_[index].y * kDeltaTime_;
         transforms_[index].translate.z += velocities_[index].z * kDeltaTime_;
 
-        Matrix4x4 worldMatrix = MakeAffineMatrix(transforms_[index].scale, transforms_[index].rotate, transforms_[index].translate);
-        Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, viewProjectionMatrix);
+        currentTimes_[index] += kDeltaTime_;//経過時間を足す
 
-        instancingData_[index].WVP = worldViewProjectionMatrix;
-        instancingData_[index].World = worldMatrix;
+        //徐々に消す(イージングここで取り入れる)
+        float alpha = 1.0f - (currentTimes_[index] / lifeTimes_[index]);
+
+        instancingData_[numInstance].WVP = worldViewProjectionMatrix;
+        instancingData_[numInstance].World = worldMatrix;
+
+        instancingData_[numInstance].color = colors_[index];
+        instancingData_[numInstance].color.w = alpha; //(消えるイージングここで取り入れる)
+
+        ++numInstance;
+
+
+
     }
 }
 
@@ -114,16 +139,23 @@ void Particle::Draw(ID3D12GraphicsCommandList* commandList, SrvManager* srvManag
     srvManager->SetGraphicsRootDescriptorTable(1, instancingSrvIndex_);
 
     D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle =
-        TextureManager::GetInstance()->GetSrvHandleGPU("Resources/uvChecker.png");
+        TextureManager::GetInstance()->GetSrvHandleGPU("Resources/circle.png");
     commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
 
     // 10個まとめて
-    commandList->DrawInstanced(6, kNumInstance, 0, 0);
+    if (numInstance > 0)
+    {
+
+        commandList->DrawInstanced(6, numInstance, 0, 0);
+    }
 }
 
 void Particle::MakeNewParticle(uint32_t index)
 {
     std::uniform_real_distribution<float>distribution(-1.0f, 1.0f);
+    std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
+    std::uniform_real_distribution<float>distTime(1.0f, 3.0f);
+
     transforms_[index].scale = { 1.0f, 1.0f, 1.0f };
     transforms_[index].rotate = { 0.0f, 0.0f, 0.0f };
     transforms_[index].translate = {
@@ -137,4 +169,15 @@ void Particle::MakeNewParticle(uint32_t index)
         distribution(randomEngine),
         distribution(randomEngine)
     };
+
+    colors_[index] = {
+        distColor(randomEngine),
+        distColor(randomEngine),
+        distColor(randomEngine),
+        1.0f
+    };
+
+    lifeTimes_[index] = distTime(randomEngine);
+    currentTimes_[index] = 0.0f;
+
 }
