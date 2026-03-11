@@ -320,13 +320,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Object3dCommon* object3dCommon = new Object3dCommon;
 	object3dCommon->Initialize(dxCommon);
 
-	//パーティクル
-	ParticleCommon* particleCommon = new ParticleCommon();
-	particleCommon->Initialize(dxCommon);
-
-	Particle* particle = new Particle();
-	particle->Initialize(dxCommon, srvManager);
-
 	//カメラマネージャ
 	CameraManager* cameraManager = new CameraManager();
 
@@ -372,6 +365,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");//1枚目
 	TextureManager::GetInstance()->LoadTexture("Resources/monsterBall.png");//2枚目
+	TextureManager::GetInstance()->LoadTexture("Resources/circle.png");
 
 	std::vector<Sprite*>sprites;
 	for (uint32_t i = 0; i < 1; ++i)
@@ -393,6 +387,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//sprite->SetTextureLeftTop({ 0.0f, 0.0f });
 		//sprite->SetTextureSize({ 100.0f, 100.0f });
 	}
+
+	//パーティクル
+	ParticleCommon* particleCommon = new ParticleCommon();
+	particleCommon->Initialize(dxCommon);
+
+	Particle* particle = new Particle();
+	particle->Initialize(dxCommon, srvManager, "Resources/circle.png");
 
 	int selectedUI = 0;
 
@@ -612,9 +613,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			dxCommon->PreDraw();
 			srvManager->PreDraw();
 
-			particleCommon->PreDraw(dxCommon->GetCommandList());
-			particle->Draw(dxCommon->GetCommandList(), srvManager);
-
 			//3Dオブジェクトの描画準備3Dオブジェクトの描画に共通のグラフィックスコマンドを積む
 			object3dCommon->SetCommonDrawSetting();
 
@@ -623,6 +621,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			for (Object3d* object3d : objects) {
 				object3d->Draw();
 			}
+
+			//パーティクル描画
+			particleCommon->PreDraw(dxCommon->GetCommandList());
+			particle->Draw(dxCommon->GetCommandList(), srvManager);
 
 			// スプライト描画
 			//Spriteの描画準備Spriteの描画に共通のグラフィックスコマンドを積む

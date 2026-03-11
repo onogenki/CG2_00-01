@@ -22,7 +22,7 @@ static Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(ID3D12Device*
     return resource;
 }
 
-void Particle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
+void Particle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager, const std::string& filePath)
 {
 
     instancingResource_ = CreateBufferResource(dxCommon->GetDevice(), sizeof(ParticleForGPU) * kNumMaxInstance);
@@ -87,6 +87,8 @@ void Particle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
         sizeof(ParticleForGPU)
     );
 
+    textureFilePath_ = filePath;
+
 }
 
 void Particle::Update(Matrix4x4 viewProjectionMatrix)
@@ -139,7 +141,8 @@ void Particle::Draw(ID3D12GraphicsCommandList* commandList, SrvManager* srvManag
     srvManager->SetGraphicsRootDescriptorTable(1, instancingSrvIndex_);
 
     D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle =
-        TextureManager::GetInstance()->GetSrvHandleGPU("Resources/circle.png");
+        TextureManager::GetInstance()->GetSrvHandleGPU(textureFilePath_);
+
     commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
 
     // 10個まとめて

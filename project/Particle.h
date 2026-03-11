@@ -12,11 +12,13 @@ class Particle
 {
 public:
 
-	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
+	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager, const std::string& filePath);
 	void Update(Matrix4x4 viewProjectionMatrix);
 	void Draw(ID3D12GraphicsCommandList* commandList, SrvManager* srvManager);
 
 	void MakeNewParticle(uint32_t index);
+
+	void SetTextureFilePath(const std::string& filePath) { textureFilePath_ = filePath; }
 
 	struct Material {
 		Vector4 color;
@@ -47,6 +49,8 @@ private:
 	// 頂点バッファ用の変数
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource_;
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
+
+	std::string textureFilePath_;
 
 	//インスタンスの最大数
 	static const uint32_t kNumMaxInstance = 10;
