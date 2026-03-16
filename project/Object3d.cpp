@@ -17,6 +17,8 @@ void Object3d::Initialize(Object3dCommon* object3dCommon)
 	CreateTransformationMatrixData();
 	//平行光源データ作成
 	CreateDirectionalLightData();
+	//カメラデータ作成
+	CreateCameraData();
 
 	//Transform変数を作る
 	transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
@@ -32,6 +34,7 @@ void Object3d::Update()
 	{
 		const Matrix4x4& viewProjectionMatrix = camera->GetViewProjectionMatrix();
 		worldViewProjectionMatrix = Multiply(worldMatrix, viewProjectionMatrix);
+		cameraData->worldPosition = camera->GetTranslate();
 	} else
 	{
 		worldViewProjectionMatrix = worldMatrix;
@@ -48,6 +51,8 @@ void Object3d::Draw()
 	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
 
 	commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
+
+	commandList->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
 
 	if (model_)
 	{
@@ -118,4 +123,15 @@ void Object3d::CreateDirectionalLightData()
 
 	// 強さ: 1.0 (標準)
 	directionalLightData->intensity = 1.0f;
+}
+
+void Object3d::CreateCameraData()
+{
+	//カメラ
+	cameraResource = CreateBufferResources(object3dCommon->GetDxCommon()->GetDevice(), sizeof(CameraForGPU));
+
+
+	cameraResource->Map(0, nullptr, reinterpret_cast<void**>(&cameraData));
+
+	cameraData->worldPosition = { 0.0f, 0.0f, 10.0f };
 }

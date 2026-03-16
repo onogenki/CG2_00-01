@@ -30,6 +30,11 @@ public:
 		float intensity;
 	};
 
+	struct CameraForGPU
+	{
+		Vector3 worldPosition;
+	};
+
 	void Initialize(Object3dCommon* object3dCommon);
 
 	void Update();
@@ -76,6 +81,11 @@ private:
 	void CreateDirectionalLightData();
 	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource;
 	DirectionalLight* directionalLightData = nullptr;
+
+	// カメラデータ作成関数
+	void CreateCameraData();
+	Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource;
+	CameraForGPU* cameraData = nullptr;
 
 	// リソース作成のヘルパー関数 (Spriteから移植)
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResources(ID3D12Device* device, size_t sizeInBytes);
