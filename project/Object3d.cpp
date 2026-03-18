@@ -119,7 +119,7 @@ void Object3d::CreateDirectionalLightData()
 	directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 	// 向き: 真上から下へ照らす (X, Y, Z)
-	directionalLightData->direction = { 0.0f, -1.0f, 0.0f };
+	directionalLightData->direction = { 0.0f, 1.0f, 0.0f };
 
 	// 強さ: 1.0 (標準)
 	directionalLightData->intensity = 1.0f;

@@ -23,7 +23,7 @@ public:
 	struct Material {
 		Vector4 color;
 		int32_t enableLighting;
-		float padding[3];      // サイズ合わせのダミー
+		float padding[3];      
 		Matrix4x4 uvTransform; // UV用（これがないとエラーになる）
 	};
 

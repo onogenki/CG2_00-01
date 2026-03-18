@@ -52,12 +52,14 @@ public:
 	void SetRotate(const Vector3& rotate) { transform.rotate = rotate; }
 	void SetTranslate(const Vector3& translate) { transform.translate = translate; }
 	void SetCamera(Camera* camera) { this->camera = camera; }
+	void SetDirectionalLight(DirectionalLight* directionalRight) { directionalLightData = directionalRight; };
+
 
 	//getter
 	const Vector3& GetScale()const { return transform.scale; }
 	const Vector3& GetRotate()const { return transform.rotate; }
 	const Vector3& GetTranslate()const { return transform.translate; }
-
+	const DirectionalLight& GetDirectionalLight()const { return *directionalLightData; }
 
 	// モデル
 	Transform& GetTransform() { return transform; }

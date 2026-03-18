@@ -292,7 +292,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	srvManager = new SrvManager();
 	srvManager->Initialize(dxCommon);
 
-	TextureManager::GetInstance()->Initialize(dxCommon,srvManager);
+	TextureManager::GetInstance()->Initialize(dxCommon, srvManager);
 
 	ImGuiManager* imGuiManager = new ImGuiManager();
 	imGuiManager->Initialize(winApp, dxCommon, srvManager);
@@ -360,6 +360,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	objectAxis->GetTransform().translate = { 2.0f, 0.0f, 0.0f }; // 右に配置
 	objects.push_back(objectAxis); // リストに追加
 
+
+	Object3d::DirectionalLight lightData;
+
 	SpriteCommon* spriteCommon = new SpriteCommon();
 	spriteCommon->Initialize(dxCommon);
 
@@ -382,7 +385,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Vector2 pos = { 0.0f + i * 0.0f,0.0f + i * 50.0f };
 		sprite->SetPosition(pos);
 		sprites.push_back(sprite);
-		
+
 		//切り取り
 		//sprite->SetTextureLeftTop({ 0.0f, 0.0f });
 		//sprite->SetTextureSize({ 100.0f, 100.0f });
@@ -406,6 +409,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			break;
 		}
 
+		lightData = objectAxis->GetDirectionalLight();
 		//ゲームの処理
 		imGuiManager->Begin();
 		/*ImGui_ImplDX12_NewFrame();
@@ -482,8 +486,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				if (i == 0)
 				{
 					ImGui::Text("Plane");
-				}
-				else if (i == 1)
+				} else if (i == 1)
 				{
 					ImGui::Text("Axis");
 				}
@@ -501,6 +504,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			}
 			break;
 		}
+		ImGui::DragFloat3("DirectoinalLight:direction", &lightData.direction.x, 0.01f);
+		ImGui::DragFloat("DirectoinalLight:intensity", &lightData.intensity, 0.01f);
+		ImGui::DragFloat3("DirectoinalLight:color", &lightData.color.x, 0.01f);
 
 		//カメラ
 		Camera* activeCamera = cameraManager->GetActiveCamera();
@@ -529,117 +535,120 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		}
 		ImGui::Separator();
 
-			ImGui::End();
-			//開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
-			ImGui::ShowDemoWindow();
-			imGuiManager->End();
-			////ImGuiの内部コマンドを生成する
-			//ImGui::Render();
-			
-			cameraManager->Update();
+		ImGui::End();
+		//開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
+		ImGui::ShowDemoWindow();
+		imGuiManager->End();
+		////ImGuiの内部コマンドを生成する
+		//ImGui::Render();
+
+		cameraManager->Update();
 
 
-			//カメラのビュープロジェクション行列を渡して更新
-			Matrix4x4 viewMatrix = cameraManager->GetActiveCamera()->GetViewMatrix();
-			Matrix4x4 projectionMatrix = cameraManager->GetActiveCamera()->GetProjectionMatrix();
-			Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
+		//カメラのビュープロジェクション行列を渡して更新
+		Matrix4x4 viewMatrix = cameraManager->GetActiveCamera()->GetViewMatrix();
+		Matrix4x4 projectionMatrix = cameraManager->GetActiveCamera()->GetProjectionMatrix();
+		Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 
-			particle->Update(viewProjectionMatrix);
+		particle->Update(viewProjectionMatrix);
 
-			//入力の更新
-			input->Update();
-
-			for (Object3d* object3d : objects) {
-				//毎フレーム、マネージャから今のアクティブカメラをもらう
-				object3d->SetCamera(cameraManager->GetActiveCamera());
-
-				object3d->Update();
-			}
-			
-			for (Sprite* sprite : sprites)
-			{
-				sprite->Update();
-			}
-
-			////数字の0キーが押されていたら
-			if(input->PushKey(DIK_0))
-			{
-				OutputDebugStringA("Hit 0\n");//出力ウィンドウに「Hit 0」と表示
-			}
-
-			////数字の0キーが押されていたら
-			if (input->TriggerKey(DIK_P))
-			{
-				OutputDebugStringA("Hit p\n");//出力ウィンドウに「Hit p」と表示
-			}
-
-			///
-			///デバック確認
-			///
-			
-			////現在の座標を変数で受ける
-			//Vector2 position = sprite->GetPosition();
-			////座標を変更する
-			//position += Vector2{ 0.1f,0.1f };
-			////変更を反映する
-			//sprite->SetPosition(position);
-			//
-			////回転
-			//float rotation = sprite->GetRotation();
-			//rotation += 0.01f;
-			//sprite->SetRotation(rotation);
-			//
-			////色
-			//Vector4 color = sprite->GetColor();
-			//color.x += 0.01f;
-			//if (color.x > 1.0f)
-			//{
-			//	color.x -= 1.0f;
-			//}
-			//sprite->SetColor(color);
-			//
-			//サイズ
-			//Vector2 size = sprite->GetSize();
-			//size.x += 0.1f;
-			//size.y += 0.1f;
-			//sprite->SetSize(size);
+		//入力の更新
+		input->Update();
 
 
-			///
-			///
-			///
+		for (Object3d* object3d : objects) {
+			//毎フレーム、マネージャから今のアクティブカメラをもらう
+			object3d->SetCamera(cameraManager->GetActiveCamera());
+			object3d->SetDirectionalLight(&lightData);
 
-			//描画前処理
-			dxCommon->PreDraw();
-			srvManager->PreDraw();
+			object3d->Update();
 
-			//3Dオブジェクトの描画準備3Dオブジェクトの描画に共通のグラフィックスコマンドを積む
-			object3dCommon->SetCommonDrawSetting();
+		}
 
-			// Object のみ描画
-			object3dCommon->SetCommonDrawSetting();
-			for (Object3d* object3d : objects) {
-				object3d->Draw();
-			}
+		for (Sprite* sprite : sprites)
+		{
+			sprite->Update();
+		}
 
-			//パーティクル描画
-			particleCommon->PreDraw(dxCommon->GetCommandList());
-			particle->Draw(dxCommon->GetCommandList(), srvManager);
+		////数字の0キーが押されていたら
+		if (input->PushKey(DIK_0))
+		{
+			OutputDebugStringA("Hit 0\n");//出力ウィンドウに「Hit 0」と表示
+		}
 
-			// スプライト描画
-			//Spriteの描画準備Spriteの描画に共通のグラフィックスコマンドを積む
-				spriteCommon->SetCommonDrawSetting();
-				for (Sprite* sprite : sprites)
-				{
-					sprite->Draw();
-				}
+		////数字の0キーが押されていたら
+		if (input->TriggerKey(DIK_P))
+		{
+			OutputDebugStringA("Hit p\n");//出力ウィンドウに「Hit p」と表示
+		}
 
-				imGuiManager->Draw(dxCommon);
-			////実際のcommandListのImGuiの描画コマンドを積む
-			//ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxCommon->GetCommandList());
+		///
+		///デバック確認
+		///
 
-			
-			dxCommon->PostDraw();
+		////現在の座標を変数で受ける
+		//Vector2 position = sprite->GetPosition();
+		////座標を変更する
+		//position += Vector2{ 0.1f,0.1f };
+		////変更を反映する
+		//sprite->SetPosition(position);
+		//
+		////回転
+		//float rotation = sprite->GetRotation();
+		//rotation += 0.01f;
+		//sprite->SetRotation(rotation);
+		//
+		////色
+		//Vector4 color = sprite->GetColor();
+		//color.x += 0.01f;
+		//if (color.x > 1.0f)
+		//{
+		//	color.x -= 1.0f;
+		//}
+		//sprite->SetColor(color);
+		//
+		//サイズ
+		//Vector2 size = sprite->GetSize();
+		//size.x += 0.1f;
+		//size.y += 0.1f;
+		//sprite->SetSize(size);
+
+
+		///
+		///
+		///
+
+		//描画前処理
+		dxCommon->PreDraw();
+		srvManager->PreDraw();
+
+		//3Dオブジェクトの描画準備3Dオブジェクトの描画に共通のグラフィックスコマンドを積む
+		object3dCommon->SetCommonDrawSetting();
+
+		// Object のみ描画
+		object3dCommon->SetCommonDrawSetting();
+		for (Object3d* object3d : objects) {
+			object3d->Draw();
+		}
+
+		//パーティクル描画
+		particleCommon->PreDraw(dxCommon->GetCommandList());
+		particle->Draw(dxCommon->GetCommandList(), srvManager);
+
+		// スプライト描画
+		//Spriteの描画準備Spriteの描画に共通のグラフィックスコマンドを積む
+		spriteCommon->SetCommonDrawSetting();
+		for (Sprite* sprite : sprites)
+		{
+			sprite->Draw();
+		}
+
+		imGuiManager->Draw(dxCommon);
+		////実際のcommandListのImGuiの描画コマンドを積む
+		//ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxCommon->GetCommandList());
+
+
+		dxCommon->PostDraw();
 
 	}
 	//XAudio2解放
@@ -675,7 +684,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 #endif
 
 
-		winApp->Finalize();
+	winApp->Finalize();
 
 	return 0;
 }

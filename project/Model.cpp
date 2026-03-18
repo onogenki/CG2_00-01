@@ -109,7 +109,9 @@ void Model::CreateMaterialData()
 	// 3. マテリアルデータの初期値を書き込む
 	materialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
-	materialData->enableLighting = false;
+	materialData->enableLighting = true;
+
+	materialData->shininess = 50.0f;
 
 	materialData->uvTransform = MakeIdentity4x4();
 }
