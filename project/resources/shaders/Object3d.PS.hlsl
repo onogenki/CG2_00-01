@@ -65,8 +65,6 @@ PixelShaderOutput main(VertexShaderOutput input)
     float RdotE = dot(reflectLight, toEye);
     float specularPow =
         pow(saturate(RdotE), gMaterial.shininess);
-
-    //‹¾–Ê”½ŽË
     float3 specular =
         gDirectionalLight.color.rgb *
         gDirectionalLight.intensity *

@@ -80,6 +80,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <TreatWarningAsError>true</TreatWarningAsError>
+      <AdditionalIncludeDirectories>\(ProjectDir);\(ProjectDir)\engine\2d;\(ProjectDir)\engine\3d;\(ProjectDir)\engine\audio;\(ProjectDir)\engine\base;\(ProjectDir)\engine\ImGui;\(ProjectDir)\engine\math;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -104,6 +105,7 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>\(ProjectDir);\(ProjectDir)\engine\2d;\(ProjectDir)\engine\3d;\(ProjectDir)\engine\audio;\(ProjectDir)\engine\base;\(ProjectDir)\engine\ImGui;\(ProjectDir)\engine\math;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -131,6 +133,7 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>Disabled</Optimization>
       <WholeProgramOptimization>false</WholeProgramOptimization>
+      <AdditionalIncludeDirectories>\(ProjectDir);\(ProjectDir)\engine\2d;\(ProjectDir)\engine\3d;\(ProjectDir)\engine\audio;\(ProjectDir)\engine\base;\(ProjectDir)\engine\ImGui;\(ProjectDir)\engine\math;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -146,11 +149,32 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Audio.cpp" />
-    <ClCompile Include="Camera.cpp" />
-    <ClCompile Include="CameraManager.cpp" />
-    <ClCompile Include="D3DResourceLeakChecker.cpp" />
-    <ClCompile Include="DirectXCommon.cpp" />
+    <ClCompile Include="engine\2d\Particle.cpp" />
+    <ClCompile Include="engine\2d\ParticleCommon.cpp" />
+    <ClCompile Include="engine\2d\Sprite.cpp" />
+    <ClCompile Include="engine\2d\SpriteCommon.cpp" />
+    <ClCompile Include="engine\2d\TextureManager.cpp" />
+    <ClCompile Include="engine\3d\Camera.cpp" />
+    <ClCompile Include="engine\3d\CameraManager.cpp" />
+    <ClCompile Include="engine\3d\Model.cpp" />
+    <ClCompile Include="engine\3d\ModelCommon.cpp" />
+    <ClCompile Include="engine\3d\ModelManager.cpp" />
+    <ClCompile Include="engine\3d\Object3d.cpp" />
+    <ClCompile Include="engine\3d\Object3dCommon.cpp" />
+    <ClCompile Include="engine\audio\Audio.cpp" />
+    <ClCompile Include="engine\base\DirectXCommon.cpp" />
+    <ClCompile Include="engine\base\Input.cpp" />
+    <ClCompile Include="engine\base\Logger.cpp" />
+    <ClCompile Include="engine\base\SrvManager.cpp" />
+    <ClCompile Include="engine\base\StringUtility.cpp" />
+    <ClCompile Include="engine\base\WinApp.cpp" />
+    <ClCompile Include="engine\ImGui\ImGuiManager.cpp" />
+    <ClCompile Include="engine\math\Matrix4x4.cpp" />
+    <ClCompile Include="engine\math\MyMath.cpp" />
+    <ClCompile Include="engine\math\Transform.cpp" />
+    <ClCompile Include="engine\math\Vector2.cpp" />
+    <ClCompile Include="engine\math\Vector3.cpp" />
+    <ClCompile Include="engine\math\Vector4.cpp" />
     <ClCompile Include="externals\imgui\imgui.cpp" />
     <ClCompile Include="externals\imgui\imgui_demo.cpp" />
     <ClCompile Include="externals\imgui\imgui_draw.cpp" />
@@ -158,32 +182,10 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="externals\imgui\imgui_impl_win32.cpp" />
     <ClCompile Include="externals\imgui\imgui_tables.cpp" />
     <ClCompile Include="externals\imgui\imgui_widgets.cpp" />
-    <ClCompile Include="ImGuiManager.cpp" />
-    <ClCompile Include="Input.cpp" />
-    <ClCompile Include="Logger.cpp" />
     <ClCompile Include="main.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">MinSpace</Optimization>
       <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</WholeProgramOptimization>
     </ClCompile>
-    <ClCompile Include="Matrix4x4.cpp" />
-    <ClCompile Include="Model.cpp" />
-    <ClCompile Include="ModelCommon.cpp" />
-    <ClCompile Include="ModelManager.cpp" />
-    <ClCompile Include="MyMath.cpp" />
-    <ClCompile Include="Object3d.cpp" />
-    <ClCompile Include="Object3dCommon.cpp" />
-    <ClCompile Include="Particle.cpp" />
-    <ClCompile Include="ParticleCommon.cpp" />
-    <ClCompile Include="Sprite.cpp" />
-    <ClCompile Include="SpriteCommon.cpp" />
-    <ClCompile Include="SrvManager.cpp" />
-    <ClCompile Include="StringUtility.cpp" />
-    <ClCompile Include="TextureManager.cpp" />
-    <ClCompile Include="Transform.cpp" />
-    <ClCompile Include="Vector2.cpp" />
-    <ClCompile Include="Vector3.cpp" />
-    <ClCompile Include="Vector4.cpp" />
-    <ClCompile Include="WinApp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="resources\shaders\Object3d.PS.hlsl">
@@ -206,29 +208,34 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
-    <FxCompile Include="Sprite.PS.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Pixel</ShaderType>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </FxCompile>
-    <FxCompile Include="Sprite.VS.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Vertex</ShaderType>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Audio.h" />
-    <ClInclude Include="Camera.h" />
-    <ClInclude Include="CameraManager.h" />
-    <ClInclude Include="D3DResourceLeakChecker.h" />
-    <ClInclude Include="DirectXCommon.h" />
+    <ClInclude Include="engine\2d\Particle.h" />
+    <ClInclude Include="engine\2d\ParticleCommon.h" />
+    <ClInclude Include="engine\2d\Sprite.h" />
+    <ClInclude Include="engine\2d\SpriteCommon.h" />
+    <ClInclude Include="engine\2d\TextureManager.h" />
+    <ClInclude Include="engine\3d\Camera.h" />
+    <ClInclude Include="engine\3d\CameraManager.h" />
+    <ClInclude Include="engine\3d\Model.h" />
+    <ClInclude Include="engine\3d\ModelCommon.h" />
+    <ClInclude Include="engine\3d\ModelManager.h" />
+    <ClInclude Include="engine\3d\Object3d.h" />
+    <ClInclude Include="engine\3d\Object3dCommon.h" />
+    <ClInclude Include="engine\audio\Audio.h" />
+    <ClInclude Include="engine\base\DirectXCommon.h" />
+    <ClInclude Include="engine\base\Input.h" />
+    <ClInclude Include="engine\base\Logger.h" />
+    <ClInclude Include="engine\base\SrvManager.h" />
+    <ClInclude Include="engine\base\StringUtility.h" />
+    <ClInclude Include="engine\base\WinApp.h" />
+    <ClInclude Include="engine\ImGui\ImGuiManager.h" />
+    <ClInclude Include="engine\math\Matrix4x4.h" />
+    <ClInclude Include="engine\math\MyMath.h" />
+    <ClInclude Include="engine\math\Transform.h" />
+    <ClInclude Include="engine\math\Vector2.h" />
+    <ClInclude Include="engine\math\Vector3.h" />
+    <ClInclude Include="engine\math\Vector4.h" />
     <ClInclude Include="externals\imgui\imconfig.h" />
     <ClInclude Include="externals\imgui\imgui.h" />
     <ClInclude Include="externals\imgui\imgui_impl_dx12.h" />
@@ -237,29 +244,7 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="externals\imgui\imstb_rectpack.h" />
     <ClInclude Include="externals\imgui\imstb_textedit.h" />
     <ClInclude Include="externals\imgui\imstb_truetype.h" />
-    <ClInclude Include="ImGuiManager.h" />
-    <ClInclude Include="Input.h" />
-    <ClInclude Include="Logger.h" />
-    <ClInclude Include="Matrix4x4.h" />
-    <ClInclude Include="Model.h" />
-    <ClInclude Include="ModelCommon.h" />
-    <ClInclude Include="ModelManager.h" />
-    <ClInclude Include="MyMath.h" />
-    <ClInclude Include="Object3d.h" />
-    <ClInclude Include="Object3dCommon.h" />
-    <ClInclude Include="Particle.h" />
-    <ClInclude Include="ParticleCommon.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="Sprite.h" />
-    <ClInclude Include="SpriteCommon.h" />
-    <ClInclude Include="SrvManager.h" />
-    <ClInclude Include="StringUtility.h" />
-    <ClInclude Include="TextureManager.h" />
-    <ClInclude Include="Transform.h" />
-    <ClInclude Include="Vector2.h" />
-    <ClInclude Include="Vector3.h" />
-    <ClInclude Include="Vector4.h" />
-    <ClInclude Include="WinApp.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />
@@ -272,11 +257,6 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
   <ItemGroup>
     <None Include="resources\shaders\Object3d.hlsli" />
     <None Include="resources\shaders\Particle.hlsli" />
-    <None Include="Sprite.hlsli">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="CG2_00-01.rc" />

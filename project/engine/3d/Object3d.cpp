@@ -15,10 +15,10 @@ void Object3d::Initialize(Object3dCommon* object3dCommon)
 
 	//座標変換行列データ作成
 	CreateTransformationMatrixData();
-	//平行光源データ作成
-	CreateDirectionalLightData();
 	//カメラデータ作成
 	CreateCameraData();
+	//平行光源データ作成
+	CreateDirectionalLightData();
 
 	//Transform変数を作る
 	transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
@@ -120,6 +120,8 @@ void Object3d::CreateDirectionalLightData()
 
 	// 向き: 真上から下へ照らす (X, Y, Z)
 	directionalLightData->direction = { 0.0f, 1.0f, 0.0f };
+
+	directionalLightData->direction = Normalize(directionalLightData->direction);
 
 	// 強さ: 1.0 (標準)
 	directionalLightData->intensity = 1.0f;

@@ -559,6 +559,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		for (Object3d* object3d : objects) {
 			//毎フレーム、マネージャから今のアクティブカメラをもらう
 			object3d->SetCamera(cameraManager->GetActiveCamera());
+			lightData.direction = Normalize(lightData.direction);
 			object3d->SetDirectionalLight(&lightData);
 
 			object3d->Update();
