@@ -118,8 +118,8 @@ void Object3d::CreateDirectionalLightData()
 	// 色: 白 (R, G, B, A)
 	directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
-	// 向き: 真上から下へ照らす (X, Y, Z)
-	directionalLightData->direction = { 0.0f, 1.0f, 0.0f };
+	// 向き: 斜めの光 (X, Y, Z)
+	directionalLightData->direction = { 1.0f, -1.0f, 1.0f };
 
 	directionalLightData->direction = Normalize(directionalLightData->direction);
 

@@ -504,8 +504,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			}
 			break;
 		}
-		ImGui::DragFloat3("DirectoinalLight:direction", &lightData.direction.x, 0.01f);
-		ImGui::DragFloat("DirectoinalLight:intensity", &lightData.intensity, 0.01f);
+		ImGui::DragFloat3("DirectoinalLight:direction", &lightData.direction.x, 0.01f);//ハイライトの位置
+		ImGui::DragFloat("DirectoinalLight:intensity", &lightData.intensity, 0.01f);//全体の明るさ
 		ImGui::DragFloat3("DirectoinalLight:color", &lightData.color.x, 0.01f);
 
 		//カメラ
@@ -560,7 +560,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//毎フレーム、マネージャから今のアクティブカメラをもらう
 			object3d->SetCamera(cameraManager->GetActiveCamera());
 			lightData.direction = Normalize(lightData.direction);
-			object3d->SetDirectionalLight(&lightData);
+			object3d->SetDirectionalLight(lightData);//光を他のモデルにも分け与える
 
 			object3d->Update();
 

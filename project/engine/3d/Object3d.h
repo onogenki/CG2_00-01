@@ -26,8 +26,8 @@ public:
 	// 平行光源データ
 	struct DirectionalLight {
 		Vector4 color;
-		Vector3 direction;
-		float intensity;
+		Vector3 direction;//ハイライトの位置
+		float intensity;//明るさの強さ
 	};
 
 	struct CameraForGPU
@@ -52,7 +52,10 @@ public:
 	void SetRotate(const Vector3& rotate) { transform.rotate = rotate; }
 	void SetTranslate(const Vector3& translate) { transform.translate = translate; }
 	void SetCamera(Camera* camera) { this->camera = camera; }
-	void SetDirectionalLight(DirectionalLight* directionalRight) { directionalLightData = directionalRight; };
+	//構造体(color,direction,intensity)全部入ってるsetter
+	void SetDirectionalLight(const DirectionalLight& light) {
+		*directionalLightData = light;
+	};
 
 
 	//getter
