@@ -42,8 +42,8 @@
 #include "ModelManager.h"
 #include "SrvManager.h"
 #include"ImGuiManager.h"
-#include "Particle.h"
-#include "ParticleCommon.h"
+#include "ParticleManager.h"
+#include "ParticleEmitter.h"
 
 #pragma comment(lib,"Dbghelp.lib")
 #pragma comment(lib,"dxguid.lib")
@@ -392,11 +392,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	}
 
 	//パーティクル
-	ParticleCommon* particleCommon = new ParticleCommon();
-	particleCommon->Initialize(dxCommon);
+	// マネージャの初期化（シングルトンなのでGetInstanceを使う）
+	ParticleManager::GetInstance()->Initialize(dxCommon, srvManager);
+	//座標、1回の発生数、発生頻度[秒]
+	Transform emitterTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 
-	Particle* particle = new Particle();
-	particle->Initialize(dxCommon, srvManager, "Resources/circle.png");
+	//Circleパーティクル
+	ParticleManager::GetInstance()->CreateParticleGroup("Circle", "Resources/circle.png");
+	ParticleEmitter* emitterCircle = new ParticleEmitter("Circle", emitterTransform, 1, 0.1f);
+
+	//四角形のパーティクル
+	ParticleManager::GetInstance()->CreateParticleGroup("Plane", "Resources/uvChecker.png");
+	ParticleEmitter* emitterPlane = new ParticleEmitter("Plane", emitterTransform, 1, 0.1f);
+
+	//最初はcircleにする
+	ParticleEmitter* activeEmitter = new ParticleEmitter("Circle", emitterTransform, 1, 0.1f);
 
 	int selectedUI = 0;
 
@@ -424,6 +434,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		if (ImGui::Button("Object3d")) {
 			selectedUI = 1;
 		}
+		ImGui::SameLine();
+		if (ImGui::Button("Particle"))
+		{
+			selectedUI = 2;
+		}
+
 
 		ImGui::Separator();
 
@@ -503,10 +519,33 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			}
 			break;
+		case 2://Particle
+			ImGui::Text("Editing Particle");
+			static int particleType = 0;
+
+			if (ImGui::Button("Circle Texture"))
+			{
+				delete activeEmitter;
+				activeEmitter = new ParticleEmitter("Circle", emitterTransform, 5, 0.1f);
+			}
+			ImGui::SameLine();
+
+			if (ImGui::Button("Plane Texture"))
+			{
+				delete activeEmitter;
+				activeEmitter = new ParticleEmitter("Plane", emitterTransform, 5, 0.1f);
+			}
+
+			break;
 		}
+
 		ImGui::DragFloat3("DirectoinalLight:direction", &lightData.direction.x, 0.01f);//ハイライトの位置
 		ImGui::DragFloat("DirectoinalLight:intensity", &lightData.intensity, 0.01f);//全体の明るさ
 		ImGui::DragFloat3("DirectoinalLight:color", &lightData.color.x, 0.01f);
+		
+		ImGui::Separator();
+
+
 
 		//カメラ
 		Camera* activeCamera = cameraManager->GetActiveCamera();
@@ -550,7 +589,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Matrix4x4 projectionMatrix = cameraManager->GetActiveCamera()->GetProjectionMatrix();
 		Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 
-		particle->Update(viewProjectionMatrix);
+		//時間がきたら自動でパーティクル発生
+		activeEmitter->Update();
+		//パーティクル全体の更新
+		ParticleManager::GetInstance()->Update(viewProjectionMatrix);
 
 		//入力の更新
 		input->Update();
@@ -633,8 +675,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		}
 
 		//パーティクル描画
-		particleCommon->PreDraw(dxCommon->GetCommandList());
-		particle->Draw(dxCommon->GetCommandList(), srvManager);
+		ParticleManager::GetInstance()->Draw();
 
 		// スプライト描画
 		//Spriteの描画準備Spriteの描画に共通のグラフィックスコマンドを積む
@@ -656,6 +697,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	xAudio2.Reset();
 	//音声データ解放
 	SoundUnload(&soundData1);
+
+	//パーティクル全体解放
+	delete activeEmitter;
 
 	for (Sprite* sprite : sprites)
 	{
