@@ -403,7 +403,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	//四角形のパーティクル
 	ParticleManager::GetInstance()->CreateParticleGroup("Plane", "Resources/uvChecker.png");
-	ParticleEmitter* emitterPlane = new ParticleEmitter("Plane", emitterTransform, 1, 0.1f);
+	ParticleEmitter* emitterPlane = new ParticleEmitter("Plane", emitterTransform, 1, 10.0f);
 
 	//最初はcircleにする
 	ParticleEmitter* activeEmitter = new ParticleEmitter("Circle", emitterTransform, 1, 0.1f);
