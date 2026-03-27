@@ -13,6 +13,7 @@
 #include<xaudio2.h>
 #include <format>
 #include "Input.h"
+#include"Logger.h"
 #include "WinApp.h"
 #include "DirectXCommon.h"
 #include "Camera.h"
@@ -92,12 +93,6 @@ std::wstring ConvertString(const std::string& str) {
 	std::wstring result(sizeNeeded, 0);
 	MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), &result[0], sizeNeeded);
 	return result;
-}
-
-void Log(std::ostream& os, const std::string& message)
-{
-	os << message << std::endl;
-	OutputDebugStringA(message.c_str());
 }
 
 Microsoft::WRL::ComPtr < ID3D12Resource> CreateDepthStencilTextureResoource(Microsoft::WRL::ComPtr < ID3D12Device> device, int32_t width, int32_t height)
@@ -253,7 +248,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	{
 		~D3DResourceLeakChecker()
 		{
-			D3DResourceLeakChecker leakCheck;
 			Microsoft::WRL::ComPtr<IDXGIFactory7>dxgiFactory;
 			Microsoft::WRL::ComPtr<ID3D12Device>device;
 		}
@@ -275,6 +269,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	std::string logFilePath = std::string("logs/") + dateString + ".log";
 	//ファイルを作って書き込み準備
 	std::ofstream logStream(logFilePath);
+
+	Logger::Log("\nHello DirectX!\n");
 
 	//ポインタ
 	WinApp* winApp = nullptr;
