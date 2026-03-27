@@ -86,6 +86,11 @@ public:
 	//最大SRV数(最大テクスチャ枚数)
 	static const uint32_t kMaxSRVCount;
 
+	//スワップチェーンリソースの数を取得
+	size_t GetSwapChainResourcesNum() const { return 2;}
+
+
+
 	//GPU待ち関数
 	void WaitForGPU();
 

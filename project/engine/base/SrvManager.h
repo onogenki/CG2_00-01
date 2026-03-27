@@ -7,6 +7,9 @@ class SrvManager
 {
 public:
 
+	// シングルトンインスタンスの取得
+	static SrvManager* GetInstance();
+
 	//初期化
 	void Initialize(DirectXCommon* dxCommon);
 

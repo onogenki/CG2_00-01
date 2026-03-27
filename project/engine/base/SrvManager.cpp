@@ -97,3 +97,9 @@ void SrvManager::SetGraphicsRootDescriptorTable(UINT RootParameterIndex, uint32_
 {
 	directXCommon->GetCommandList()->SetGraphicsRootDescriptorTable(RootParameterIndex, GetGPUDescriptorHandle(srvIndex));
 }
+
+// シングルトンの実装
+SrvManager* SrvManager::GetInstance() {
+	static SrvManager instance;
+	return &instance;
+}
