@@ -86,6 +86,11 @@ public:
 	//最大SRV数(最大テクスチャ枚数)
 	static const uint32_t kMaxSRVCount;
 
+	//GPU待ち関数
+	void WaitForGPU();
+
+	~DirectXCommon();
+
 private:
 
 	Microsoft::WRL::ComPtr<ID3D12Device>device_;

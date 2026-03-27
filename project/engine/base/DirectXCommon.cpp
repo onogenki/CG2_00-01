@@ -518,6 +518,18 @@ void DirectXCommon::UpdateFixFPS()
 }
 
 
+void DirectXCommon::WaitForGPU() {
+	// 1. フェンス値を加算してシグナルを送る
+	fenceVal++;
+	commandQueue->Signal(fence.Get(), fenceVal);
+
+	// 2. GPUがその値に到達するまで待機する
+	if (fence->GetCompletedValue() < fenceVal) {
+		fence->SetEventOnCompletion(fenceVal, fenceEvent_);
+		WaitForSingleObject(fenceEvent_, INFINITE);
+	}
+}
+
 
 Microsoft::WRL::ComPtr < IDxcBlob> DirectXCommon::CompileShader(
 	//CompilerするShaderファイルへのパス
@@ -687,4 +699,10 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::UploadTextureData(const Mi
 	commandList_->ResourceBarrier(1, &barrier);
 
 	return intermediateResource;
+}
+
+DirectXCommon::~DirectXCommon() {
+	if (fenceEvent_) {
+		CloseHandle(fenceEvent_);
+	}
 }

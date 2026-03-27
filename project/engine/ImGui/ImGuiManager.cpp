@@ -4,9 +4,16 @@ void ImGuiManager::Initialize(WinApp* winApp, DirectXCommon* dxCommon, SrvManage
 {
 	ImGui::CreateContext();
 	ImGui::StyleColorsDark();
+
+	//フォントビルドの強制
+	ImGuiIO& io = ImGui::GetIO();
+	io.Fonts->Build();
+
 	ImGui_ImplWin32_Init(winApp->GetHwnd());
 
 	int index = srvManager->Allocate();
+
+	assert(srvManager->GetDescriptorHeap() != nullptr && "SRV Descriptor Heap is null!");
 
 	ImGui_ImplDX12_Init(dxCommon->GetDevice(),
 		2, // ダブルバッファリングなら2（Swapchainの数に合わせる）

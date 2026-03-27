@@ -53,7 +53,6 @@
 #pragma comment(lib,"dinput8.lib")
 #pragma comment(lib,"dxguid.lib")
 
-
 using namespace Microsoft::WRL;
 using namespace MyMath;
 
@@ -197,7 +196,6 @@ SoundData SoundLoadWave(const char* filename)
 	return soundData;
 }
 
-
 //音声データ解放
 void SoundUnload(SoundData* soundData)
 {
@@ -208,7 +206,6 @@ void SoundUnload(SoundData* soundData)
 	soundData->bufferSize = 0;
 	soundData->wfex = {};
 }
-
 
 //音声再生
 void SoundPlayWave(IXAudio2* xAudio2, const SoundData& soundData)
@@ -371,7 +368,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	{
 		Sprite* sprite = new Sprite();
 		sprite->Initialize(spriteCommon, "Resources/monsterBall.png");
-		//sprite->SetTexture(textureSrvHandleGPU);
 
 		if (i % 2 == 0) {
 			// 偶数にモンスターボールpng
@@ -435,7 +431,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		{
 			selectedUI = 2;
 		}
-
 
 		ImGui::Separator();
 
@@ -541,8 +536,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		
 		ImGui::Separator();
 
-
-
 		//カメラ
 		Camera* activeCamera = cameraManager->GetActiveCamera();
 		if (activeCamera)
@@ -621,42 +614,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			OutputDebugStringA("Hit p\n");//出力ウィンドウに「Hit p」と表示
 		}
 
-		///
-		///デバック確認
-		///
-
-		////現在の座標を変数で受ける
-		//Vector2 position = sprite->GetPosition();
-		////座標を変更する
-		//position += Vector2{ 0.1f,0.1f };
-		////変更を反映する
-		//sprite->SetPosition(position);
-		//
-		////回転
-		//float rotation = sprite->GetRotation();
-		//rotation += 0.01f;
-		//sprite->SetRotation(rotation);
-		//
-		////色
-		//Vector4 color = sprite->GetColor();
-		//color.x += 0.01f;
-		//if (color.x > 1.0f)
-		//{
-		//	color.x -= 1.0f;
-		//}
-		//sprite->SetColor(color);
-		//
-		//サイズ
-		//Vector2 size = sprite->GetSize();
-		//size.x += 0.1f;
-		//size.y += 0.1f;
-		//sprite->SetSize(size);
-
-
-		///
-		///
-		///
-
 		//描画前処理
 		dxCommon->PreDraw();
 		srvManager->PreDraw();
@@ -689,6 +646,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		dxCommon->PostDraw();
 
 	}
+
+	//GPUの完了待ち
+	dxCommon->WaitForGPU();
+
 	//XAudio2解放
 	xAudio2.Reset();
 	//音声データ解放
@@ -706,18 +667,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		delete object3d;
 	}
 	objects.clear();
-	delete spriteCommon;
-	delete object3dCommon;
 
+	if (imGuiManager) {
+		imGuiManager->Finalize();
+	}
 	TextureManager::GetInstance()->Finalize();
 	ModelManager::GetInstance()->Finalize();
 
-	//ImGuiの終了処理
-	imGuiManager->Finalize();
-	/*ImGui_ImplDX12_Shutdown();
-	ImGui_ImplWin32_Shutdown();
-	ImGui::DestroyContext();*/
-
+	delete spriteCommon;
+	delete object3dCommon;
 	delete imGuiManager;
 	delete srvManager;
 
@@ -726,6 +684,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 	winApp->Finalize();
+
+	delete dxCommon;
 
 	return 0;
 }
