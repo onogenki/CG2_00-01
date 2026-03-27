@@ -403,7 +403,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	//四角形のパーティクル
 	ParticleManager::GetInstance()->CreateParticleGroup("Plane", "Resources/uvChecker.png");
-	ParticleEmitter* emitterPlane = new ParticleEmitter("Plane", emitterTransform, 1, 10.0f);
+	ParticleEmitter* emitterPlane = new ParticleEmitter("Plane", emitterTransform, 1, 0.1f);
 
 	//最初はcircleにする
 	ParticleEmitter* activeEmitter = new ParticleEmitter("Circle", emitterTransform, 1, 0.1f);
@@ -526,14 +526,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			if (ImGui::Button("Circle Texture"))
 			{
 				delete activeEmitter;
-				activeEmitter = new ParticleEmitter("Circle", emitterTransform, 5, 0.1f);
+				activeEmitter = new ParticleEmitter("Circle", emitterTransform, 1, 0.1f);
 			}
 			ImGui::SameLine();
 
 			if (ImGui::Button("Plane Texture"))
 			{
 				delete activeEmitter;
-				activeEmitter = new ParticleEmitter("Plane", emitterTransform, 5, 0.1f);
+				activeEmitter = new ParticleEmitter("Plane", emitterTransform, 1, 0.1f);
 			}
 
 			break;
