@@ -280,7 +280,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	SrvManager* srvManager = nullptr;
 	//SRVマネージャの初期化
-	srvManager = new SrvManager();
+	srvManager = SrvManager::GetInstance();
 	srvManager->Initialize(dxCommon);
 
 	TextureManager::GetInstance()->Initialize(dxCommon, srvManager);
@@ -675,7 +675,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	delete spriteCommon;
 	delete object3dCommon;
 	delete imGuiManager;
-	delete srvManager;
 
 #ifdef _DEBUG
 #endif

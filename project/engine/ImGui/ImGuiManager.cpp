@@ -2,6 +2,7 @@
 #include "externals/imgui/imgui.h"
 #include "externals/imgui/imgui_impl_win32.h"
 #include "externals/imgui/imgui_impl_dx12.h"
+#include "SrvManager.h"
 
 void ImGuiManager::Initialize(WinApp* winApp, DirectXCommon* dxCommon, SrvManager* srvManager)
 {
@@ -9,10 +10,6 @@ void ImGuiManager::Initialize(WinApp* winApp, DirectXCommon* dxCommon, SrvManage
 	ImGui::CreateContext();
 	//ImGuiのスタイルを設定
 	ImGui::StyleColorsDark();
-
-	//フォントビルドの強制
-	ImGuiIO& io = ImGui::GetIO();
-	io.Fonts->Build();
 
 	ImGui_ImplWin32_Init(winApp->GetHwnd());
 
@@ -49,13 +46,6 @@ void ImGuiManager::Initialize(WinApp* winApp, DirectXCommon* dxCommon, SrvManage
 	//DirectX12用の初期化を行う
 	ImGui_ImplDX12_Init(&initInfo);
 
-	//ImGui_ImplDX12_Init(dxCommon->GetDevice(),
-	//	2, // ダブルバッファリングなら2（Swapchainの数に合わせる）
-	//	DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, // バックバッファのフォーマット
-	//	srvManager->GetDescriptorHeap(),
-	//	srvManager->GetCPUDescriptorHandle(index),
-	//	srvManager->GetGPUDescriptorHandle(index)
-	//);
 }
 
 void ImGuiManager::Begin()
@@ -74,8 +64,16 @@ void ImGuiManager::End()
 
 void ImGuiManager::Draw(DirectXCommon* dxCommon)
 {
-	//実際のcommandListのImGuiの描画コマンドを積む
-	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxCommon->GetCommandList());
+
+	ID3D12GraphicsCommandList* commandList = dxCommon->GetCommandList();
+
+	//デスクリプタヒープの配列をセットするコマンド
+	SrvManager* srvManager = SrvManager::GetInstance();
+	ID3D12DescriptorHeap* ppHeaps[] = { srvManager->GetDescriptorHeap() };
+
+	commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+	//描画コマンドを発行
+	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
 }
 
 void ImGuiManager::Finalize()

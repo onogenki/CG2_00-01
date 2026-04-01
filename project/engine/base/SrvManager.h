@@ -33,6 +33,14 @@ public:
 	ID3D12DescriptorHeap* GetDescriptorHeap() { return descriptorHeap.Get(); }
 
 private:
+
+	//シングルトン
+	SrvManager() = default;
+	~SrvManager() = default;
+	SrvManager(const SrvManager&) = delete;
+	SrvManager& operator=(const SrvManager&) = delete;
+
+
 	DirectXCommon* directXCommon = nullptr;
 
 	//最大SRV数(最大テクスチャ枚数)
@@ -43,9 +51,6 @@ private:
 
 	//SRV用デスクリプタヒープ
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap;
-
-	//次に使用するSRVインデックス
-	//uint32_t useIndex = 0;
 
 	//空き番号を管理するキュー
 	std::queue<uint32_t> freeList_;

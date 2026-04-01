@@ -2,6 +2,7 @@
 #include <cstdint>
 #include "externals/imgui/imgui.h"
 #include "SpriteCommon.h"
+#include <imgui_impl_win32.h>
 
 #pragma comment(lib,"winmm.lib")
 
