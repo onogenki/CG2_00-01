@@ -1,11 +1,11 @@
 #include "ImGuiManager.h"
-#include "externals/imgui/imgui.h"
-#include "externals/imgui/imgui_impl_win32.h"
-#include "externals/imgui/imgui_impl_dx12.h"
 #include "SrvManager.h"
 
-void ImGuiManager::Initialize(WinApp* winApp, DirectXCommon* dxCommon, SrvManager* srvManager)
+
+void ImGuiManager::Initialize([[maybe_unused]] WinApp* winApp, [[maybe_unused]]DirectXCommon* directXCommon, [[maybe_unused]]SrvManager* srvManager)
 {
+#ifdef USE_IMGUI
+
 	//ImGuiのコンテキストを生成
 	ImGui::CreateContext();
 	//ImGuiのスタイルを設定
@@ -19,9 +19,9 @@ void ImGuiManager::Initialize(WinApp* winApp, DirectXCommon* dxCommon, SrvManage
 	ImGui_ImplDX12_InitInfo initInfo = {};
 
 	//初期化情報を設定する
-	initInfo.Device = dxCommon->GetDevice();
-	initInfo.CommandQueue = dxCommon->GetCommandQueue();
-	initInfo.NumFramesInFlight = static_cast<int>(dxCommon->GetSwapChainResourcesNum());
+	initInfo.Device = directXCommon->GetDevice();
+	initInfo.CommandQueue = directXCommon->GetCommandQueue();
+	initInfo.NumFramesInFlight = static_cast<int>(directXCommon->GetSwapChainResourcesNum());
 	initInfo.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	initInfo.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	initInfo.SrvDescriptorHeap = srvManager->GetDescriptorHeap();
@@ -46,24 +46,31 @@ void ImGuiManager::Initialize(WinApp* winApp, DirectXCommon* dxCommon, SrvManage
 	//DirectX12用の初期化を行う
 	ImGui_ImplDX12_Init(&initInfo);
 
+#endif
+
 }
 
 void ImGuiManager::Begin()
 {
+#ifdef USE_IMGUI
 	//ゲームの処理
 	ImGui_ImplDX12_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
+#endif
 }
 
 void ImGuiManager::End()
 {
+#ifdef USE_IMGUI
 	//ImGuiの内部コマンドを生成する
 	ImGui::Render();
+#endif
 }
 
 void ImGuiManager::Draw(DirectXCommon* dxCommon)
 {
+#ifdef USE_IMGUI
 
 	ID3D12GraphicsCommandList* commandList = dxCommon->GetCommandList();
 
@@ -74,12 +81,16 @@ void ImGuiManager::Draw(DirectXCommon* dxCommon)
 	commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 	//描画コマンドを発行
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
+#endif
 }
 
 void ImGuiManager::Finalize()
 {
+#ifdef USE_IMGUI
+
 	//ImGuiの終了処理
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
+#endif
 }

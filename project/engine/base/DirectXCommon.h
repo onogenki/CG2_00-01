@@ -38,8 +38,6 @@ public:
 
 	void CreateDxcCompiler();
 
-	void ImGui();
-
 	//描画前処理
 	void PreDraw();
 	//描画後処理

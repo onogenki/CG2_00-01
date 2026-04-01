@@ -3,10 +3,6 @@
 #include "Input.h"
 #include"Logger.h"
 #include"StringUtility.h"
-
-#include "externals/imgui/imgui.h"
-#include "externals/imgui/imgui_impl_win32.h"
-#include "externals/imgui/imgui_impl_dx12.h"
 #include <thread>
 #include "externals/DirectXTex/d3dx12.h"
 using namespace Logger;
@@ -49,8 +45,6 @@ void DirectXCommon::Initialize(WinApp* winApp)
 	scissorRect();
 	//DXCコンパイラの生成();
 	CreateDxcCompiler();
-	//ImGuiの初期化();
-	ImGui();
 }
 
 void DirectXCommon::InitializeDevice()//デバイスの初期化
@@ -359,22 +353,6 @@ void DirectXCommon::CreateDxcCompiler()
 
 	hr = dxcUtils->CreateDefaultIncludeHandler(&includeHandler);
 	assert(SUCCEEDED(hr));
-}
-
-void DirectXCommon::ImGui()
-{
-	//IMGUIの初期化
-	//ImGuiの初期化
-	IMGUI_CHECKVERSION();
-	//ImGui::CreateContext();
-	//ImGui::StyleColorsDark();
-	//ImGui_ImplWin32_Init(winApp->GetHwnd());
-	//ImGui_ImplDX12_Init(device_.Get(),
-	//	swapChainDesc_.BufferCount,
-	//	rtvDesc_.Format,
-	//	srvDescriptorHeap.Get(),
-	//	srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-	//	srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 }
 
 void DirectXCommon::PreDraw()

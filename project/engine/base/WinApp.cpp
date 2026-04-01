@@ -1,20 +1,21 @@
 #include "WinApp.h"
 #include <cstdint>
-#include "externals/imgui/imgui.h"
 #include "SpriteCommon.h"
-#include <imgui_impl_win32.h>
-
+#include"ImGuiManager.h"
 #pragma comment(lib,"winmm.lib")
-
+#ifdef USE_IMGUI
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wPARAM, LPARAM lParam);
+#endif
 
 //ウィンドウプロシージャ
 LRESULT CALLBACK WinApp::WindowProc(HWND hwnd, UINT  msg, WPARAM wparam, LPARAM lparam)
 {
+#ifdef USE_IMGUI
 	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam))
 	{
 		return true;
 	}
+#endif
 	//メッセージに応じてゲーム固有の処理を行う
 	switch (msg)
 	{
@@ -72,10 +73,7 @@ void WinApp::Initialize() {
 	timeBeginPeriod(1);
 }
 
-void WinApp::Update()
-{
-
-}
+void WinApp::Update() {}
 
 void WinApp::Finalize()
 {

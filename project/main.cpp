@@ -415,7 +415,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/*ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();*/
-
+#ifdef USE_IMGUI
 		ImGui::Begin("test");
 		if (ImGui::Button("UVTranslate")) {
 			selectedUI = 0;
@@ -569,7 +569,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//ImGui::Render();
 
 		cameraManager->Update();
-
+#endif
 
 		//カメラのビュープロジェクション行列を渡して更新
 		Matrix4x4 viewMatrix = cameraManager->GetActiveCamera()->GetViewMatrix();
@@ -637,8 +637,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		}
 
 		imGuiManager->Draw(dxCommon);
-		////実際のcommandListのImGuiの描画コマンドを積む
-		//ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxCommon->GetCommandList());
 
 
 		dxCommon->PostDraw();
