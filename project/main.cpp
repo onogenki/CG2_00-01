@@ -568,9 +568,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		////ImGuiの内部コマンドを生成する
 		//ImGui::Render();
 
-		cameraManager->Update();
 #endif
 
+		cameraManager->Update();
 		//カメラのビュープロジェクション行列を渡して更新
 		Matrix4x4 viewMatrix = cameraManager->GetActiveCamera()->GetViewMatrix();
 		Matrix4x4 projectionMatrix = cameraManager->GetActiveCamera()->GetProjectionMatrix();
