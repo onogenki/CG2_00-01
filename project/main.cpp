@@ -221,7 +221,6 @@ void SoundPlayWave(IXAudio2* xAudio2, const SoundData& soundData)
 	buf.Flags = XAUDIO2_END_OF_STREAM;
 
 	//波形データの再生
-
 	result = pSourceVoice->SubmitSourceBuffer(&buf);
 	result = pSourceVoice->Start();
 
@@ -295,7 +294,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	input->Initialize(winApp);
 
 	//Audio初期化
-	Microsoft::WRL::ComPtr <IXAudio2> xAudio2;
+	Microsoft::WRL::ComPtr<IXAudio2> xAudio2;
 	IXAudio2MasteringVoice* masterVoice;
 	//XAudioエンジンのインスタンスを生成
 	HRESULT result = XAudio2Create(&xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
