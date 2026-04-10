@@ -1,6 +1,10 @@
 #include "ImGuiManager.h"
 #include "SrvManager.h"
-
+#include "Sprite.h"
+#include "ImGuiManager.h"
+#include "Object3d.h"
+#include "ParticleEmitter.h"
+#include "CameraManager.h"
 
 void ImGuiManager::Initialize([[maybe_unused]] WinApp* winApp, [[maybe_unused]]DirectXCommon* directXCommon, [[maybe_unused]]SrvManager* srvManager)
 {
@@ -65,6 +69,229 @@ void ImGuiManager::End()
 #ifdef USE_IMGUI
 	//ImGuiの内部コマンドを生成する
 	ImGui::Render();
+#endif
+}
+
+void ImGuiManager::DemoWindow()
+{
+#ifdef USE_IMGUI
+	ImGui::ShowDemoWindow();
+#endif
+}
+
+//FPS
+void ImGuiManager::FPSWindow()
+{
+
+#ifdef USE_IMGUI
+	// ウィンドウ作成
+	ImGui::Begin("FPS");
+
+	// FPS波形グラフの描画
+	static float fps_values[90] = {};
+	static int values_offset = 0;
+
+	// ImGuiの便利機能で、現在のFPS（1秒間のコマ数）を取得して配列に保存
+	fps_values[values_offset] = ImGui::GetIO().Framerate;
+
+	// 90個データを入れたらまた0番目から古いデータを上書きしていく(配列にデータを追加し続けるとパンクするため）
+	values_offset = (values_offset + 1) % 90;
+
+	// グラフの上に表示するテキスト（現在のFPS）を作成
+	char overlay[32];
+	snprintf(overlay, sizeof(overlay), "FPS: %.1f", ImGui::GetIO().Framerate);//FPSの計算
+
+	// グラフ描画（0.0f〜120.0f の範囲で表示。サイズは横幅おまかせ、縦幅80ピクセル）
+	ImGui::PlotLines("Performance", fps_values, 90, values_offset, overlay, 0.0f, 120.0f, ImVec2(0, 80));
+
+	ImGui::End();
+#endif
+
+}
+
+//スプライトデバック
+void ImGuiManager::SpriteWindow(std::vector<Sprite*>& sprites)
+{
+#ifdef USE_IMGUI
+
+	static float my_color[4] = { 1.0f, 1.0f, 1.0f, 1.0f }; // カラーピッカーの色
+
+	// ウィンドウ作成
+	ImGui::Begin("Editing UVTranslate ( Sprite )");
+	ImGui::Separator();
+
+	// ここで色を変えたら、配列内の全スプライトに色を適用する
+	if (ImGui::ColorEdit4("Color", my_color)) {
+		for (Sprite* sprite : sprites) {
+			sprite->SetColor({ my_color[0], my_color[1], my_color[2], my_color[3] });
+		}
+	}
+
+	ImGui::Separator();
+
+	// std::vector の全要素に対して処理
+	for (int i = 0; i < sprites.size(); ++i)
+	{
+		// IDをプッシュ（これが無いと全部のスプライトが同時に動いてしまう）
+		ImGui::PushID(i);
+		ImGui::Text("Sprite %d", i); // 番号表示
+		//座標
+		Vector2 pos = sprites[i]->GetPosition();
+		if (ImGui::DragFloat2("Pos", &pos.x, 1.0f)) {
+			sprites[i]->SetPosition(pos);
+		}//回転
+		float rot = sprites[i]->GetRotation();
+		if (ImGui::DragFloat("Rot", &rot, 0.01f)) {
+			sprites[i]->SetRotation(rot);
+		}//サイズ
+		Vector2 size = sprites[i]->GetSize();
+		if (ImGui::DragFloat2("Size", &size.x, 1.0f)) {
+			sprites[i]->SetSize(size);
+		}//アンカーポイント
+		Vector2 anchor = sprites[i]->GetAnchorPoint();
+		// 0.0～1.0 の範囲で動かす
+		if (ImGui::DragFloat2("Anchor", &anchor.x, 0.01f, 0.0f, 1.0f)) {
+			sprites[i]->SetAnchorPoint(anchor);
+		}//左右反転
+		bool isFlipX = sprites[i]->GetIsFlipX();
+		if (ImGui::Checkbox("isFlipX", &isFlipX)) {
+			sprites[i]->SetIsFlipX(isFlipX);
+		}
+		//上下反転
+		bool isFlipY = sprites[i]->GetIsFlipY();
+		if (ImGui::Checkbox("isFlipY", &isFlipY)) {
+			sprites[i]->SetIsFlipY(isFlipY);
+		}//左上座標
+		Vector2 texBase = sprites[i]->GetTextureLeftTop();
+		if (ImGui::DragFloat2("TexLeftTop", &texBase.x, 1.0f)) {
+			sprites[i]->SetTextureLeftTop(texBase);
+		}//切り出しサイズ
+		Vector2 texSize = sprites[i]->GetTextureSize();
+		if (ImGui::DragFloat2("TexSize", &texSize.x, 1.0f)) {
+			sprites[i]->SetTextureSize(texSize);
+		}
+
+		ImGui::Separator();
+		ImGui::PopID(); // IDをポップ
+	}
+
+	ImGui::End();
+#endif
+}
+
+void ImGuiManager::ModelWindow(std::vector<Object3d*>& objects, Object3d::DirectionalLight& lightData)
+{
+#ifdef USE_IMGUI
+
+	static int selectedIndex = 0; //選択されている番号
+
+	// ウィンドウ作成
+	ImGui::Begin("Editing Object");
+
+	if (ImGui::Button("Select Plane")) {
+		selectedIndex = 0;
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Select Axis")) {
+		selectedIndex = 1;
+	}
+
+	ImGui::Separator();
+
+	// 配列の範囲外エラーを防ぐ
+	if (selectedIndex >= 0 && selectedIndex < objects.size()) {
+		ImGui::PushID(selectedIndex); // IDを分けて干渉を防ぐ
+
+		if (selectedIndex == 0) {
+			ImGui::Text("Plane");
+		} else if (selectedIndex == 1) {
+			ImGui::Text("Axis");
+		}
+
+		Transform& transform = objects[selectedIndex]->GetTransform();
+		ImGui::Separator();
+
+		// 各オブジェクトのTransformを取得して操作
+		ImGui::DragFloat3("Translate", &transform.translate.x, 0.01f);
+		ImGui::DragFloat3("Rotate", &transform.rotate.x, 0.01f);
+		ImGui::DragFloat3("Scale", &transform.scale.x, 0.01f);
+
+		ImGui::Separator();
+
+		ImGui::Text("Light Settings");
+		ImGui::DragFloat3("DirectoinalLight:direction", &lightData.direction.x, 0.01f);//ハイライトの位置
+		ImGui::DragFloat("DirectoinalLight:intensity", &lightData.intensity, 0.01f);//全体の明るさ
+		ImGui::DragFloat3("DirectoinalLight:color", &lightData.color.x, 0.01f);
+
+		ImGui::PopID();
+	}
+	ImGui::End();
+#endif
+}
+
+void ImGuiManager::ParticleWindow(ParticleEmitter*& activeEmitter, Transform& emitterTransform)
+{
+#ifdef USE_IMGUI
+	// ウィンドウ作成
+	ImGui::Begin("Editing Particle");
+	ImGui::Separator();
+
+	static int particleType = 0;
+
+	if (ImGui::Button("Circle Texture"))
+	{
+		delete activeEmitter;
+		activeEmitter = new ParticleEmitter("Circle", emitterTransform, 1, 0.1f);
+	}
+	ImGui::SameLine();
+
+	if (ImGui::Button("Plane Texture"))
+	{
+		delete activeEmitter;
+		activeEmitter = new ParticleEmitter("Plane", emitterTransform, 1, 0.1f);
+	}
+
+	ImGui::End();
+#endif
+}
+
+void ImGuiManager::CameraWindow(CameraManager* cameraManager)
+{
+#ifdef USE_IMGUI
+
+	// ウィンドウ作成
+	ImGui::Begin("Camera Control");
+	ImGui::Separator();
+
+	//カメラ
+	Camera* activeCamera = cameraManager->GetActiveCamera();
+	if (activeCamera)
+	{//位置
+		Vector3 cameraPos = activeCamera->GetTranslate();
+		if (ImGui::DragFloat3("CameraTranslate", &cameraPos.x, 0.01f))
+		{
+			activeCamera->SetTranslate(cameraPos);
+		}//角度
+		Vector3 cameraRot = activeCamera->GetRotate();
+		if (ImGui::DragFloat3("CameraRotate", &cameraRot.x, 0.01f))
+		{
+			activeCamera->SetRotate(cameraRot);
+		}
+	}
+
+	ImGui::Separator();
+
+	if (ImGui::Button("Use MainCamera"))
+	{//メインカメラ
+		cameraManager->SetActiveCamera("MainCamera");
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Use UpCamera"))
+	{//上空カメラ
+		cameraManager->SetActiveCamera("UpCamera");
+	}
+
+	ImGui::End();
 #endif
 }
 

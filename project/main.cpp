@@ -19,7 +19,6 @@
 #include "Camera.h"
 #include "CameraManager.h"
 
-
 #include "externals/DirectXTex/DirectXTex.h"
 #include"externals/DirectXTex/d3dx12.h"
 
@@ -412,164 +411,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		lightData = objectAxis->GetDirectionalLight();
 		//ゲームの処理
 		imGuiManager->Begin();
-		/*ImGui_ImplDX12_NewFrame();
-		ImGui_ImplWin32_NewFrame();
-		ImGui::NewFrame();*/
-#ifdef USE_IMGUI
-		ImGui::Begin("test");
-		if (ImGui::Button("UVTranslate")) {
-			selectedUI = 0;
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Object3d")) {
-			selectedUI = 1;
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Particle"))
-		{
-			selectedUI = 2;
-		}
-
-		ImGui::Separator();
-
-		// UI選択用コンボボックス
-		switch (selectedUI) {
-		case 0: // Sprite
-			ImGui::Text("Editing UVTranslate ( Sprite )");
-			// std::vector の全要素に対して処理
-			for (int i = 0; i < sprites.size(); ++i)
-			{
-				// IDをプッシュ（これが無いと全部のスプライトが同時に動いてしまう）
-				ImGui::PushID(i);
-				ImGui::Text("Sprite %d", i); // 番号表示
-				//座標
-				Vector2 pos = sprites[i]->GetPosition();
-				if (ImGui::DragFloat2("Pos", &pos.x, 1.0f)) {
-					sprites[i]->SetPosition(pos);
-				}//回転
-				float rot = sprites[i]->GetRotation();
-				if (ImGui::DragFloat("Rot", &rot, 0.01f)) {
-					sprites[i]->SetRotation(rot);
-				}//サイズ
-				Vector2 size = sprites[i]->GetSize();
-				if (ImGui::DragFloat2("Size", &size.x, 1.0f)) {
-					sprites[i]->SetSize(size);
-				}//アンカーポイント
-				Vector2 anchor = sprites[i]->GetAnchorPoint();
-				// 0.0～1.0 の範囲で動かす
-				if (ImGui::DragFloat2("Anchor", &anchor.x, 0.01f, 0.0f, 1.0f)) {
-					sprites[i]->SetAnchorPoint(anchor);
-				}//左右反転
-				bool isFlipX = sprites[i]->GetIsFlipX();
-				if (ImGui::Checkbox("isFlipX", &isFlipX)) {
-					sprites[i]->SetIsFlipX(isFlipX);
-				}
-				//上下反転
-				bool isFlipY = sprites[i]->GetIsFlipY();
-				if (ImGui::Checkbox("isFlipY", &isFlipY)) {
-					sprites[i]->SetIsFlipY(isFlipY);
-				}//左上座標
-				Vector2 texBase = sprites[i]->GetTextureLeftTop();
-				if (ImGui::DragFloat2("TexLeftTop", &texBase.x, 1.0f)) {
-					sprites[i]->SetTextureLeftTop(texBase);
-				}//切り出しサイズ
-				Vector2 texSize = sprites[i]->GetTextureSize();
-				if (ImGui::DragFloat2("TexSize", &texSize.x, 1.0f)) {
-					sprites[i]->SetTextureSize(texSize);
-				}
-
-				ImGui::Separator();
-				ImGui::PopID(); // IDをポップ
-			}
-			break;
-		case 1: // Object
-			ImGui::Text("Editing Object");
-			//リスト内のすべてのオブジェクトをImGuiで表示
-			for (int i = 0; i < objects.size(); ++i) {
-				ImGui::PushID(i); // IDを分けて干渉を防ぐ
-
-				if (i == 0)
-				{
-					ImGui::Text("Plane");
-				} else if (i == 1)
-				{
-					ImGui::Text("Axis");
-				}
-
-				// 各オブジェクトのTransformを取得して操作
-				Transform& transform = objects[i]->GetTransform();
-
-				ImGui::DragFloat3("Translate", &transform.translate.x, 0.01f);
-				ImGui::DragFloat3("Rotate", &transform.rotate.x, 0.01f);
-				ImGui::DragFloat3("Scale", &transform.scale.x, 0.01f);
-
-				ImGui::Separator();
-				ImGui::PopID();
-
-			}
-			break;
-		case 2://Particle
-			ImGui::Text("Editing Particle");
-			static int particleType = 0;
-
-			if (ImGui::Button("Circle Texture"))
-			{
-				delete activeEmitter;
-				activeEmitter = new ParticleEmitter("Circle", emitterTransform, 1, 0.1f);
-			}
-			ImGui::SameLine();
-
-			if (ImGui::Button("Plane Texture"))
-			{
-				delete activeEmitter;
-				activeEmitter = new ParticleEmitter("Plane", emitterTransform, 1, 0.1f);
-			}
-
-			break;
-		}
-
-		ImGui::DragFloat3("DirectoinalLight:direction", &lightData.direction.x, 0.01f);//ハイライトの位置
-		ImGui::DragFloat("DirectoinalLight:intensity", &lightData.intensity, 0.01f);//全体の明るさ
-		ImGui::DragFloat3("DirectoinalLight:color", &lightData.color.x, 0.01f);
-		
-		ImGui::Separator();
-
-		//カメラ
-		Camera* activeCamera = cameraManager->GetActiveCamera();
-		if (activeCamera)
-		{//位置
-			Vector3 cameraPos = activeCamera->GetTranslate();
-			if (ImGui::DragFloat3("CameraTranslate", &cameraPos.x, 0.01f))
-			{
-				activeCamera->SetTranslate(cameraPos);
-			}//角度
-			Vector3 cameraRot = activeCamera->GetRotate();
-			if (ImGui::DragFloat3("CameraRotate", &cameraRot.x, 0.01f))
-			{
-				activeCamera->SetRotate(cameraRot);
-			}
-		}
-		ImGui::Text("Camera Control");
-		if (ImGui::Button("Use MainCamera"))
-		{//メインカメラ
-			cameraManager->SetActiveCamera("MainCamera");
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Use UpCamera"))
-		{//上空カメラ
-			cameraManager->SetActiveCamera("UpCamera");
-		}
-		ImGui::Separator();
-
-		ImGui::End();
-		//開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
-		ImGui::ShowDemoWindow();
+		imGuiManager->DemoWindow();
+		imGuiManager->FPSWindow();
+		imGuiManager->SpriteWindow(sprites);
+		imGuiManager->ModelWindow(objects, lightData);
+		imGuiManager->ParticleWindow(activeEmitter, emitterTransform);
+		imGuiManager->CameraWindow(cameraManager);
 		imGuiManager->End();
-		////ImGuiの内部コマンドを生成する
-		//ImGui::Render();
-
-#endif
-
 		cameraManager->Update();
 		//カメラのビュープロジェクション行列を渡して更新
 		Matrix4x4 viewMatrix = cameraManager->GetActiveCamera()->GetViewMatrix();

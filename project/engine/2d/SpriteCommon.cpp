@@ -121,6 +121,18 @@ void SpriteCommon::CreateGraphicsPipeline()
 
 	// BlendStateの設定
 	D3D12_BLEND_DESC blendDesc{};
+
+	// ブレンドを有効にする
+	blendDesc.RenderTarget[0].BlendEnable = TRUE;
+	// ソースのアルファ値を使う設定
+	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	// アルファ値自体の合成設定
+	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+	blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+
 	// すべての色要素を書き込む
 	blendDesc.RenderTarget[0].RenderTargetWriteMask =
 		D3D12_COLOR_WRITE_ENABLE_ALL;
