@@ -12,6 +12,9 @@
 #include<sstream>
 #include<xaudio2.h>
 #include <format>
+#include<mfapi.h>
+#include <mfidl.h>
+#include<mfreadwrite.h>
 #include "Input.h"
 #include"Logger.h"
 #include "WinApp.h"
@@ -49,6 +52,9 @@
 #pragma comment(lib,"xaudio2.lib")
 #pragma comment(lib,"dinput8.lib")
 #pragma comment(lib,"dxguid.lib")
+#pragma comment(lib,"mfplat.lib")
+#pragma comment(lib,"Mfreadwrite.lib")
+#pragma comment(lib,"mfuuid.lib")
 
 using namespace Microsoft::WRL;
 using namespace MyMath;
@@ -75,20 +81,6 @@ static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception)
 	MiniDumpWriteDump(GetCurrentProcess(), processId, dumpFileHandle, MiniDumpNormal, &minidumpInformation, nullptr, nullptr);
 	//他に関連づけられていSEH例外ハンドラあれば実行。通常はプロセスを終了する
 	return EXCEPTION_EXECUTE_HANDLER;
-}
-
-std::wstring ConvertString(const std::string& str) {
-	if (str.empty()) {
-		return std::wstring();
-	}
-
-	auto sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), NULL, 0);
-	if (sizeNeeded == 0) {
-		return std::wstring();
-	}
-	std::wstring result(sizeNeeded, 0);
-	MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), &result[0], sizeNeeded);
-	return result;
 }
 
 Microsoft::WRL::ComPtr < ID3D12Resource> CreateDepthStencilTextureResoource(Microsoft::WRL::ComPtr < ID3D12Device> device, int32_t width, int32_t height)
@@ -125,105 +117,6 @@ Microsoft::WRL::ComPtr < ID3D12Resource> CreateDepthStencilTextureResoource(Micr
 	assert(SUCCEEDED(hr));
 
 	return resource;
-}
-
-SoundData SoundLoadWave(const char* filename)
-{
-
-	//ファイル入力ストリームのインスタンス
-	std::ifstream file;
-	//.wavファイルをバイナリモードで開く
-	file.open(filename, std::ios_base::binary);
-	//ファイルオープン失敗を検出する
-	assert(file.is_open());
-
-	//RIFFヘッダーの読み込み
-	RiffHeader riff;
-	file.read((char*)&riff, sizeof(riff));
-	//ファイルがRIFFかチェック
-	if (strncmp(riff.chunk.id, "RIFF", 4) != 0)
-	{
-		assert(0);
-	}//タイプがWAVEかチェック
-	if (strncmp(riff.type, "WAVE", 4) != 0)
-	{
-		assert(0);
-	}
-
-	//Formatチャンクの読み込み
-	FormatChunk format = {};
-	//チャンクヘッダーの確認
-	file.read((char*)&format, sizeof(ChunkHeader));
-	if (strncmp(format.chunk.id, "fmt ", 4) != 0)
-	{
-		assert(0);
-	}
-
-	//チャンク本体の読み込み
-	assert(format.chunk.size <= sizeof(format.fmt));
-	file.read((char*)&format.fmt, format.chunk.size);
-
-	//Dataチャンクの読み込み
-	ChunkHeader data;
-	file.read((char*)&data, sizeof(data));
-	//JUNKチャンクを検出した場合
-	if (strncmp(data.id, "JUNK", 4) == 0)
-	{//読み取り位置をJUNKチャンクの終わりまで進める
-		file.seekg(data.size, std::ios_base::cur);
-		//再読み込み
-		file.read((char*)&data, sizeof(data));
-	}
-	if (strncmp(data.id, "data", 4) != 0)
-	{
-		assert(0);
-	}
-	//Dataチャンクのデータ部(波形データ)の読み込み
-	char* pBuffer = new char[data.size];
-	file.read(pBuffer, data.size);
-	//Waveファイルを閉じる
-	file.close();
-
-	//returnする為の音声データ
-	SoundData soundData = {};
-
-	soundData.wfex = format.fmt;
-	soundData.pBuffer = reinterpret_cast<BYTE*>(pBuffer);
-	soundData.bufferSize = data.size;
-
-	return soundData;
-}
-
-//音声データ解放
-void SoundUnload(SoundData* soundData)
-{
-	//バッファのメモリを解放
-	delete[] soundData->pBuffer;
-
-	soundData->pBuffer = 0;
-	soundData->bufferSize = 0;
-	soundData->wfex = {};
-}
-
-//音声再生
-void SoundPlayWave(IXAudio2* xAudio2, const SoundData& soundData)
-{
-	HRESULT result;
-
-	//波形フォーマットを先にSourceVoiceの生成
-	IXAudio2SourceVoice* pSourceVoice = nullptr;
-	result = xAudio2->CreateSourceVoice(&pSourceVoice, &soundData.wfex);
-	assert(SUCCEEDED(result));
-
-	//再生する波形データの設定
-	XAUDIO2_BUFFER buf{};
-	buf.pAudioData = soundData.pBuffer;
-	buf.AudioBytes = soundData.bufferSize;
-	buf.Flags = XAUDIO2_END_OF_STREAM;
-
-	//波形データの再生
-	result = pSourceVoice->SubmitSourceBuffer(&buf);
-	result = pSourceVoice->Start();
-
 }
 
 HRESULT Present(
@@ -300,8 +193,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	HRESULT result = XAudio2Create(&xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
 	//マスターボイスを生成
 	result = xAudio2->CreateMasteringVoice(&masterVoice);
+	//Windows Media Foundationの初期化(ローカルファイル版)
+	result = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
+	assert(SUCCEEDED(result));
 	//音声読み込み
-	SoundData soundData1 = SoundLoadWave("Resources/Alarm01.wav");
+	SoundData soundData1 = SoundLoadFile("Resources/Alarm01.wav");
 	//音声再生
 	SoundPlayWave(xAudio2.Get(), soundData1);
 
@@ -498,6 +394,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//音声データ解放
 	SoundUnload(&soundData1);
 
+	//Windows Media Foundationの処理
+	result = MFShutdown();
+	assert(SUCCEEDED(result));
+
 	//パーティクル全体解放
 	delete activeEmitter;
 
@@ -527,7 +427,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	winApp->Finalize();
 
+	delete input;
+	delete cameraManager;
 	delete dxCommon;
+	delete winApp;
 
 	return 0;
 }
