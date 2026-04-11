@@ -70,6 +70,10 @@ public:
     void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
     void Update(Matrix4x4 viewProjectionMatrix);
     void Draw();
+    void Finalize() {
+        // インスタンス自体を消すのではなく、中身（グループリストなど）を掃除する
+        particleGroups_.clear();
+    }
 
 	//パーティクルの発生
 	void Emit(const std::string name, const Vector3& position, uint32_t count);

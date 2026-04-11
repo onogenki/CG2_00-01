@@ -8,6 +8,7 @@
 #include "Sprite.h"
 #include "ParticleEmitter.h"
 #include "Transform.h"
+#include "Framework.h"
 
 class WinApp;
 class DirectXCommon;
@@ -19,28 +20,17 @@ class CameraManager;
 class Camera;
 class SpriteCommon;
 
-class Game
+class Game : public Framework
 {
 public:
 
-	void Initialize();
-	void Finalize();
-	void Update();
-	void Draw();
-	//終了フラグのチェック
-	bool IsEndRequest() { return endRequest_; }
+	void Initialize() override;
+	void Finalize()override;
+	void Update()override;
+	void Draw()override;
 
 private:
-	// --- 基盤システム・マネージャー系 ---
-	WinApp* winApp = nullptr;
-	DirectXCommon* dxCommon = nullptr;
-	SrvManager* srvManager = nullptr;
-	ImGuiManager* imGuiManager = nullptr;
-	Input* input = nullptr;
-
 	// --- オーディオ系 ---
-	Microsoft::WRL::ComPtr<IXAudio2> xAudio2;
-	IXAudio2MasteringVoice* masterVoice = nullptr;
 	SoundData soundData1;
 
 	// --- 3Dオブジェクト・カメラ系 ---
@@ -66,8 +56,5 @@ private:
 
 	// --- UI・その他 ---
 	int selectedUI = 0;
-
-	//ゲーム終了フラグ
-	bool endRequest_ = false;
 };
 

@@ -1,19 +1,7 @@
 #include "Game.h"
 
-#include <filesystem>
-#include <chrono>
-#include <fstream>
-#include <format>
-#include <mfapi.h>
-#include <cassert>
-#include <dbghelp.h>
-#include <strsafe.h>
-
-#include "WinApp.h"
-#include "DirectXCommon.h"
 #include "SrvManager.h"
 #include "ImGuiManager.h"
-#include "Input.h"
 #include "Logger.h"
 #include "TextureManager.h"
 #include "ModelManager.h"
@@ -22,95 +10,22 @@
 #include "CameraManager.h"
 #include "Camera.h"
 #include "SpriteCommon.h"
-using namespace MyMath;
 
-static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception)
-{
-	//時刻を取得して、時刻を名前に入れたファイルを作成。
-	// Dumpsディレクトリ以下に出力
-	SYSTEMTIME time;
-	GetLocalTime(&time);
-	wchar_t filePath[MAX_PATH] = { 0 };
-	CreateDirectory(L"./Dumps", nullptr);
-	StringCchPrintfW(filePath, MAX_PATH, L"./Dumps/%04d-%02d%02d-%02d%02d.dmp", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute);
-	HANDLE dumpFileHandle = CreateFile(filePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
-	//processId(このexeのID)とクラッシュ(例外)の発生したthreadIdを取得
-	DWORD processId = GetCurrentProcessId();
-	DWORD threadId = GetCurrentThreadId();
-	//設定情報を入力
-	MINIDUMP_EXCEPTION_INFORMATION minidumpInformation{ 0 };
-	minidumpInformation.ThreadId = threadId;
-	minidumpInformation.ExceptionPointers = exception;
-	minidumpInformation.ClientPointers = TRUE;
-	//Dumpを出力。MiniDumpNormalは最低限の情報を出力するフラグ
-	MiniDumpWriteDump(GetCurrentProcess(), processId, dumpFileHandle, MiniDumpNormal, &minidumpInformation, nullptr, nullptr);
-	//他に関連づけられていSEH例外ハンドラあれば実行。通常はプロセスを終了する
-	return EXCEPTION_EXECUTE_HANDLER;
-}
+using namespace MyMath;
 
 void Game::Initialize()
 {
-	//ログのディレクトリを用意
-	std::filesystem::create_directory("logs");
-
-	//ここからファイルを作成し
-	//現在時刻を取得(UTC時刻)
-	std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-	//ログファイルの名前にコンマ何秒はいらないので削って秒にする
-	std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>
-		nowSeconds = std::chrono::time_point_cast<std::chrono::seconds>(now);
-	//日本時間(pcの設定時間)に変換
-	std::chrono::zoned_time localTime{ std::chrono::current_zone(),nowSeconds };
-	//formatを使って年月日_時分秒の文字列に変換
-	std::string dateString = std::format("{:%Y%m%d_%H%M%S}", localTime);
-	//時刻を使ってファイル名を決定
-	std::string logFilePath = std::string("logs/") + dateString + ".log";
-	//ファイルを作って書き込み準備
-	std::ofstream logStream(logFilePath);
-
-	Logger::Log("\nHello DirectX!\n");
-
-	// クラッシュ時にExportDumpを呼ぶように登録
-	SetUnhandledExceptionFilter(ExportDump);
-
-	winApp = new WinApp();
-	winApp->Initialize();
-
-	//DirectXの初期化
-	dxCommon = new DirectXCommon();
-	dxCommon->Initialize(winApp);
-
-	//SRVマネージャの初期化
-	srvManager = SrvManager::GetInstance();
-	srvManager->Initialize(dxCommon);
-
-	TextureManager::GetInstance()->Initialize(dxCommon, srvManager);
-
-	imGuiManager = new ImGuiManager();
-	imGuiManager->Initialize(winApp, dxCommon, srvManager);
-
-	ModelManager::GetInstance()->Initialize(dxCommon);
-
-	//入力の初期化
-	input = new Input();
-	input->Initialize(winApp);
-
-	//XAudioエンジンのインスタンスを生成
-	HRESULT result = XAudio2Create(&xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
-	//マスターボイスを生成
-	result = xAudio2->CreateMasteringVoice(&masterVoice);
-	//Windows Media Foundationの初期化(ローカルファイル版)
-	result = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
-	assert(SUCCEEDED(result));
+	Framework::Initialize();
 
 	//音声読み込み
 	soundData1 = SoundLoadFile("Resources/Alarm01.wav");
 	//音声再生
-	SoundPlayWave(xAudio2.Get(), soundData1);
+	SoundPlayWave(xAudio2_.Get(), soundData1);
+
 
 	//3Dオブジェクト共通部の初期化
 	object3dCommon = new Object3dCommon;
-	object3dCommon->Initialize(dxCommon);
+	object3dCommon->Initialize(dxCommon_);
 
 	//カメラマネージャ
 	cameraManager = new CameraManager();
@@ -150,7 +65,7 @@ void Game::Initialize()
 	objects.push_back(objectAxis); // リストに追加
 
 	spriteCommon = new SpriteCommon();
-	spriteCommon->Initialize(dxCommon);
+	spriteCommon->Initialize(dxCommon_);
 
 	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");//1枚目
 	TextureManager::GetInstance()->LoadTexture("Resources/monsterBall.png");//2枚目
@@ -172,8 +87,6 @@ void Game::Initialize()
 	}
 
 	//パーティクル
-	// マネージャの初期化（シングルトンなのでGetInstanceを使う）
-	ParticleManager::GetInstance()->Initialize(dxCommon, srvManager);
 	//座標、1回の発生数、発生頻度[秒]
 	emitterTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 
@@ -193,25 +106,21 @@ void Game::Initialize()
 
 void Game::Update()
 {
-	//ウィンドウにメッセージが来てたら最優先で処理される
-	if (winApp->ProcessMessage())
-	{
-		//終了フラグを立てて、このフレームの更新処理をする抜ける
-		endRequest_ = true;
-		return;
-	}
 
 	//UIの更新
 	lightData = objectAxis->GetDirectionalLight();
+
+	Framework::Update();
+
 	//ゲームの処理
-	imGuiManager->Begin();
-	imGuiManager->DemoWindow();
-	imGuiManager->FPSWindow();
-	imGuiManager->SpriteWindow(sprites);
-	imGuiManager->ModelWindow(objects, lightData);
-	imGuiManager->ParticleWindow(activeEmitter, emitterTransform);
-	imGuiManager->CameraWindow(cameraManager);
-	imGuiManager->End();
+	imGuiManager_->Begin();
+	imGuiManager_->DemoWindow();
+	imGuiManager_->FPSWindow();
+	imGuiManager_->SpriteWindow(sprites);
+	imGuiManager_->ModelWindow(objects, lightData);
+	imGuiManager_->ParticleWindow(activeEmitter, emitterTransform);
+	imGuiManager_->CameraWindow(cameraManager);
+	imGuiManager_->End();
 
 	//カメラの更新
 	cameraManager->Update();
@@ -224,9 +133,6 @@ void Game::Update()
 	activeEmitter->Update();
 	//パーティクル全体の更新
 	ParticleManager::GetInstance()->Update(viewProjectionMatrix);
-
-	//入力の更新
-	input->Update();
 
 	//3Dオブジェクトの更新
 	for (Object3d* object3d : objects) {
@@ -245,13 +151,13 @@ void Game::Update()
 	}
 
 	////数字の0キーが押されていたら
-	if (input->PushKey(DIK_0))
+	if (input_->PushKey(DIK_0))
 	{
 		OutputDebugStringA("Hit 0\n");//出力ウィンドウに「Hit 0」と表示
 	}
 
 	////数字の0キーが押されていたら
-	if (input->TriggerKey(DIK_P))
+	if (input_->TriggerKey(DIK_P))
 	{
 		OutputDebugStringA("Hit p\n");//出力ウィンドウに「Hit p」と表示
 	}
@@ -261,8 +167,8 @@ void Game::Update()
 void Game::Draw()
 {
 	//描画前処理
-	dxCommon->PreDraw();
-	srvManager->PreDraw();
+	dxCommon_->PreDraw();
+	srvManager_->PreDraw();
 
 	//3Dオブジェクトの描画準備3Dオブジェクトの描画に共通のグラフィックスコマンドを積む
 	object3dCommon->SetCommonDrawSetting();
@@ -282,25 +188,19 @@ void Game::Draw()
 		sprite->Draw();
 	}
 
-	imGuiManager->Draw(dxCommon);
+	imGuiManager_->Draw(dxCommon_);
 
 
-	dxCommon->PostDraw();
+	dxCommon_->PostDraw();
 }
 
 void Game::Finalize()
 {
 	//GPUの完了待ち
-	dxCommon->WaitForGPU();
+	dxCommon_->WaitForGPU();
 
-	//XAudio2解放
-	xAudio2.Reset();
 	//音声データ解放
 	SoundUnload(&soundData1);
-
-	//Windows Media Foundationの処理
-	HRESULT result = MFShutdown();
-	assert(SUCCEEDED(result));
 
 	//パーティクル全体解放
 	delete activeEmitter;
@@ -315,20 +215,10 @@ void Game::Finalize()
 	}
 	objects.clear();
 
-	if (imGuiManager) {
-		imGuiManager->Finalize();
-	}
-	TextureManager::GetInstance()->Finalize();
-	ModelManager::GetInstance()->Finalize();
-
 	delete spriteCommon;
 	delete object3dCommon;
-	delete imGuiManager;
 
-	winApp->Finalize();
-
-	delete input;
 	delete cameraManager;
-	delete dxCommon;
-	delete winApp;
+
+	Framework::Finalize();
 }
