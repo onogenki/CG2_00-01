@@ -26,7 +26,7 @@ public:
 
 private:
 
-	DirectXCommon* dxCommon_;
+	DirectXCommon* dxCommon_ = nullptr;
 
 	Camera* defaultCamera_ = nullptr;
 

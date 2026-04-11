@@ -75,7 +75,7 @@ private:
 	Camera* camera = nullptr;
 
 	//3Dオブジェクト自身のトランスフォーム
-	Transform transform;
+	Transform transform{};
 
 	//座標変換リソース(ConstantBuffer)
 	void CreateTransformationMatrixData();

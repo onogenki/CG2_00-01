@@ -9,9 +9,9 @@
 //音声データ
 struct SoundData {
 	//波形フォーマット
-	WAVEFORMATEX wfex;
+	WAVEFORMATEX wfex{};
 	//バッファ
-	std::vector<BYTE>buffer;
+	std::vector<BYTE>buffer{};
 };
 
 SoundData SoundLoadFile(const std::string& filename);

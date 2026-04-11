@@ -14,7 +14,7 @@ class SpriteCommon
 	ID3D12GraphicsCommandList* GetCommandList() const { return dxCommon_->GetCommandList(); }
 
 private:
-	DirectXCommon* dxCommon_;
+	DirectXCommon* dxCommon_ = nullptr;
 
 	// ルートシグネチャ
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;

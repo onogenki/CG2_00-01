@@ -62,17 +62,11 @@ public:
 	//スワップチェーンリソース
 	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, 2>swapChainResource;
 
-	//バッファリソースの生成
-	Microsoft::WRL::ComPtr<ID3D12Resource>CreateBufferResource(size_t sizeInBytes);
-
 	//テクスチャリソースの生成
 	Microsoft::WRL::ComPtr<ID3D12Resource>CreateTextureResource(const DirectX::TexMetadata& metadata);
 
 	//テクスチャデータの転送
 	Microsoft::WRL::ComPtr<ID3D12Resource> UploadTextureData(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages);
-
-	//テクスチャファイルの読み込み
-	static DirectX::ScratchImage UploadTexture(const std::string& filePath);
 
 	//getter
 	ID3D12Device* GetDevice() const { return device_.Get(); }
@@ -133,12 +127,12 @@ private:
 	//フェンス生成
 	uint64_t fenceValue_ = 0;
 
-	HANDLE fenceEvent_;
+	HANDLE fenceEvent_ = nullptr;
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource;
-	UINT descriptorSizeSRV;
-	UINT descriptorSizeRTV;
-	UINT descriptorSizeDSV;
+	UINT descriptorSizeSRV = 0;
+	UINT descriptorSizeRTV = 0;
+	UINT descriptorSizeDSV = 0;
 
 	//描画先のRTVとDSVを設定する
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle_;
@@ -148,7 +142,7 @@ private:
 	//ビューポート
 	D3D12_VIEWPORT viewport_;
 
-	HRESULT hr;
+	HRESULT hr = S_OK;
 
 	//シザー短形
 	D3D12_RECT scissorRect_;

@@ -6,6 +6,8 @@
 #include <format>
 #include <mfapi.h>
 #include <cassert>
+#include <dbghelp.h>
+#include <strsafe.h>
 
 #include "WinApp.h"
 #include "DirectXCommon.h"
@@ -20,6 +22,31 @@
 #include "CameraManager.h"
 #include "Camera.h"
 #include "SpriteCommon.h"
+using namespace MyMath;
+
+static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception)
+{
+	//時刻を取得して、時刻を名前に入れたファイルを作成。
+	// Dumpsディレクトリ以下に出力
+	SYSTEMTIME time;
+	GetLocalTime(&time);
+	wchar_t filePath[MAX_PATH] = { 0 };
+	CreateDirectory(L"./Dumps", nullptr);
+	StringCchPrintfW(filePath, MAX_PATH, L"./Dumps/%04d-%02d%02d-%02d%02d.dmp", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute);
+	HANDLE dumpFileHandle = CreateFile(filePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
+	//processId(このexeのID)とクラッシュ(例外)の発生したthreadIdを取得
+	DWORD processId = GetCurrentProcessId();
+	DWORD threadId = GetCurrentThreadId();
+	//設定情報を入力
+	MINIDUMP_EXCEPTION_INFORMATION minidumpInformation{ 0 };
+	minidumpInformation.ThreadId = threadId;
+	minidumpInformation.ExceptionPointers = exception;
+	minidumpInformation.ClientPointers = TRUE;
+	//Dumpを出力。MiniDumpNormalは最低限の情報を出力するフラグ
+	MiniDumpWriteDump(GetCurrentProcess(), processId, dumpFileHandle, MiniDumpNormal, &minidumpInformation, nullptr, nullptr);
+	//他に関連づけられていSEH例外ハンドラあれば実行。通常はプロセスを終了する
+	return EXCEPTION_EXECUTE_HANDLER;
+}
 
 void Game::Initialize()
 {
@@ -42,6 +69,9 @@ void Game::Initialize()
 	std::ofstream logStream(logFilePath);
 
 	Logger::Log("\nHello DirectX!\n");
+
+	// クラッシュ時にExportDumpを呼ぶように登録
+	SetUnhandledExceptionFilter(ExportDump);
 
 	winApp = new WinApp();
 	winApp->Initialize();
@@ -159,4 +189,146 @@ void Game::Initialize()
 	activeEmitter = new ParticleEmitter("Circle", emitterTransform, 1, 0.1f);
 
 	selectedUI = 0;
+}
+
+void Game::Update()
+{
+	//ウィンドウにメッセージが来てたら最優先で処理される
+	if (winApp->ProcessMessage())
+	{
+		//終了フラグを立てて、このフレームの更新処理をする抜ける
+		endRequest_ = true;
+		return;
+	}
+
+	//UIの更新
+	lightData = objectAxis->GetDirectionalLight();
+	//ゲームの処理
+	imGuiManager->Begin();
+	imGuiManager->DemoWindow();
+	imGuiManager->FPSWindow();
+	imGuiManager->SpriteWindow(sprites);
+	imGuiManager->ModelWindow(objects, lightData);
+	imGuiManager->ParticleWindow(activeEmitter, emitterTransform);
+	imGuiManager->CameraWindow(cameraManager);
+	imGuiManager->End();
+
+	//カメラの更新
+	cameraManager->Update();
+	//カメラのビュープロジェクション行列を渡して更新
+	Matrix4x4 viewMatrix = cameraManager->GetActiveCamera()->GetViewMatrix();
+	Matrix4x4 projectionMatrix = cameraManager->GetActiveCamera()->GetProjectionMatrix();
+	Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
+
+	//時間がきたら自動でパーティクル発生
+	activeEmitter->Update();
+	//パーティクル全体の更新
+	ParticleManager::GetInstance()->Update(viewProjectionMatrix);
+
+	//入力の更新
+	input->Update();
+
+	//3Dオブジェクトの更新
+	for (Object3d* object3d : objects) {
+		//毎フレーム、マネージャから今のアクティブカメラをもらう
+		object3d->SetCamera(cameraManager->GetActiveCamera());
+		lightData.direction = Normalize(lightData.direction);
+		object3d->SetDirectionalLight(lightData);//光を他のモデルにも分け与える
+		object3d->Update();
+
+	}
+
+	//スプライトの更新
+	for (Sprite* sprite : sprites)
+	{
+		sprite->Update();
+	}
+
+	////数字の0キーが押されていたら
+	if (input->PushKey(DIK_0))
+	{
+		OutputDebugStringA("Hit 0\n");//出力ウィンドウに「Hit 0」と表示
+	}
+
+	////数字の0キーが押されていたら
+	if (input->TriggerKey(DIK_P))
+	{
+		OutputDebugStringA("Hit p\n");//出力ウィンドウに「Hit p」と表示
+	}
+
+}
+
+void Game::Draw()
+{
+	//描画前処理
+	dxCommon->PreDraw();
+	srvManager->PreDraw();
+
+	//3Dオブジェクトの描画準備3Dオブジェクトの描画に共通のグラフィックスコマンドを積む
+	object3dCommon->SetCommonDrawSetting();
+
+	for (Object3d* object3d : objects) {
+		object3d->Draw();
+	}
+
+	//パーティクル描画
+	ParticleManager::GetInstance()->Draw();
+
+	// スプライト描画
+	//Spriteの描画準備Spriteの描画に共通のグラフィックスコマンドを積む
+	spriteCommon->SetCommonDrawSetting();
+	for (Sprite* sprite : sprites)
+	{
+		sprite->Draw();
+	}
+
+	imGuiManager->Draw(dxCommon);
+
+
+	dxCommon->PostDraw();
+}
+
+void Game::Finalize()
+{
+	//GPUの完了待ち
+	dxCommon->WaitForGPU();
+
+	//XAudio2解放
+	xAudio2.Reset();
+	//音声データ解放
+	SoundUnload(&soundData1);
+
+	//Windows Media Foundationの処理
+	HRESULT result = MFShutdown();
+	assert(SUCCEEDED(result));
+
+	//パーティクル全体解放
+	delete activeEmitter;
+
+	for (Sprite* sprite : sprites)
+	{
+		delete sprite;
+	}
+	sprites.clear();
+	for (Object3d* object3d : objects) {
+		delete object3d;
+	}
+	objects.clear();
+
+	if (imGuiManager) {
+		imGuiManager->Finalize();
+	}
+	TextureManager::GetInstance()->Finalize();
+	ModelManager::GetInstance()->Finalize();
+
+	delete spriteCommon;
+	delete object3dCommon;
+	delete imGuiManager;
+
+	winApp->Finalize();
+
+	delete input;
+	delete cameraManager;
+	delete dxCommon;
+	delete winApp;
 }
