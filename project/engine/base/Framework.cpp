@@ -13,6 +13,7 @@
 #include "TextureManager.h"
 #include "ModelManager.h"
 #include "ParticleManager.h"
+#include "Audio.h"
 
 #pragma comment(lib, "Dbghelp.lib")
 
@@ -66,7 +67,7 @@ void Framework::Initialize()
 	winApp_->Initialize();
 
 	//DirectXの初期化
-	dxCommon_ = new DirectXCommon();
+	dxCommon_ = DirectXCommon::GetInstance();
 	dxCommon_->Initialize(winApp_);
 
 	//SRVマネージャの初期化
@@ -76,21 +77,14 @@ void Framework::Initialize()
 	TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
 	ModelManager::GetInstance()->Initialize(dxCommon_);
 	ParticleManager::GetInstance()->Initialize(dxCommon_, srvManager_);
+	Audio::GetInstance()->Initialize();
 
 	//入力の初期化
-	input_ = new Input();
+	input_ = Input::GetInstance();
 	input_->Initialize(winApp_);
 
-	imGuiManager_ = new ImGuiManager();
+	imGuiManager_ = ImGuiManager::GetInstance();
 	imGuiManager_->Initialize(winApp_, dxCommon_, srvManager_);
-
-	//XAudioエンジンのインスタンスを生成
-	HRESULT result = XAudio2Create(&xAudio2_, 0, XAUDIO2_DEFAULT_PROCESSOR);
-	//マスターボイスを生成
-	result = xAudio2_->CreateMasteringVoice(&masterVoice_);
-	//Windows Media Foundationの初期化(ローカルファイル版)
-	result = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
-	assert(SUCCEEDED(result));
 
 	// クラッシュ時にExportDumpを呼ぶように登録
 	SetUnhandledExceptionFilter(ExportDump);
@@ -119,9 +113,6 @@ void Framework::Finalize()
 	xAudio2_.Reset();
 	MFShutdown();
 
-	delete imGuiManager_;
-	delete input_;
-	delete dxCommon_;
 	winApp_->Finalize();
 	delete winApp_;
 }

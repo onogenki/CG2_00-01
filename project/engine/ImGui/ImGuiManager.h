@@ -24,6 +24,14 @@ class ImGuiManager
 {
 public:
 
+	static ImGuiManager* GetInstance() {
+		static ImGuiManager instance;
+		return &instance;
+	}
+
+	ImGuiManager(const ImGuiManager&) = delete;
+	ImGuiManager& operator=(const ImGuiManager&) = delete;
+
 	//初期化
 	void Initialize(WinApp* winApp, DirectXCommon* dxCommon, SrvManager* srvManager);
 	//受付開始
@@ -47,5 +55,8 @@ public:
 	//終了処理
 	void Finalize();
 
+private:
+	ImGuiManager() = default;
+	~ImGuiManager() = default;
 };
 

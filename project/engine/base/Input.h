@@ -9,6 +9,15 @@ class Input
 {
 public:
 
+	static Input* GetInstance()
+	{
+		static Input instance;
+		return& instance;
+	}
+
+	Input(const Input&) = delete;
+	Input& operator=(const Input&) = delete;
+
 	//namespace省略
 	template<class T>using ComPtr = Microsoft::WRL::ComPtr <T>;
 
@@ -23,6 +32,10 @@ public:
 	bool TriggerKey(BYTE keyNumber);
 
 private:
+
+	Input() = default;
+	~Input() = default;
+
 	//DirectInputのインスタンス
 	ComPtr<IDirectInput8>directInput;
 

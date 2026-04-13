@@ -6,6 +6,14 @@ class SpriteCommon
 {
 	public:
 
+		static SpriteCommon* GetInstance() {
+			static SpriteCommon instance;
+			return &instance;
+		}
+
+		SpriteCommon(const SpriteCommon&) = delete;
+		SpriteCommon& operator=(const SpriteCommon&) = delete;
+
 	void Initialize(DirectXCommon* dxCommon);
 
 	void SetCommonDrawSetting();
@@ -14,6 +22,9 @@ class SpriteCommon
 	ID3D12GraphicsCommandList* GetCommandList() const { return dxCommon_->GetCommandList(); }
 
 private:
+	SpriteCommon() = default;
+	~SpriteCommon() = default;
+
 	DirectXCommon* dxCommon_ = nullptr;
 
 	// ルートシグネチャ

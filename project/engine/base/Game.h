@@ -9,6 +9,7 @@
 #include "ParticleEmitter.h"
 #include "Transform.h"
 #include "Framework.h"
+#include "GamePlayScene.h"
 
 class WinApp;
 class DirectXCommon;
@@ -30,6 +31,9 @@ public:
 	void Draw()override;
 
 private:
+
+	GamePlayScene* scene_ = nullptr;
+
 	// --- オーディオ系 ---
 	SoundData soundData1;
 

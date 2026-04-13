@@ -43,6 +43,15 @@ public:
 	//描画後処理
 	void PostDraw();
 
+	static DirectXCommon* GetInstance() {
+		static DirectXCommon instance;
+		return &instance;
+	}
+
+	DirectXCommon(const DirectXCommon&) = delete;
+	DirectXCommon& operator=(const DirectXCommon&) = delete;
+
+
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors, bool shaderVisible);
 
 	//SRVの指定番号のCPUデスクリプタハンドルを取得する
@@ -86,9 +95,10 @@ public:
 	//GPU待ち関数
 	void WaitForGPU();
 
-	~DirectXCommon();
-
 private:
+
+	DirectXCommon() = default;
+	~DirectXCommon();
 
 	Microsoft::WRL::ComPtr<ID3D12Device>device_;
 	Microsoft::WRL::ComPtr<IDXGIFactory7>dxgiFactory;

@@ -26,8 +26,21 @@ std::wstring ConvertString(const std::string& str) {
 	return result;
 }
 
+void Audio::Initialize()
+{
+	//初期化処理
+	HRESULT result = XAudio2Create(&xAudio2_, 0, XAUDIO2_DEFAULT_PROCESSOR);
+	assert(SUCCEEDED(result));
+
+	result = xAudio2_->CreateMasteringVoice(&masterVoice_);
+	assert(SUCCEEDED(result));
+
+	result = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
+	assert(SUCCEEDED(result));
+}
+
 //音声データの読み込み
-SoundData SoundLoadFile(const std::string& filename)
+SoundData Audio::LoadFile(const std::string& filename)
 {
 	HRESULT result;
 
@@ -92,7 +105,7 @@ SoundData SoundLoadFile(const std::string& filename)
 }
 
 //音声データ解放
-void SoundUnload(SoundData* soundData)
+void Audio::Unload(SoundData* soundData)
 {
 	//バッファのメモリを解放
 	soundData->buffer.clear();
@@ -100,13 +113,13 @@ void SoundUnload(SoundData* soundData)
 }
 
 //音声再生
-void SoundPlayWave(IXAudio2* xAudio2, const SoundData& soundData)
+void Audio::PlayWave(const SoundData& soundData)
 {
 	HRESULT result;
 
 	//波形フォーマットを先にSourceVoiceの生成
 	IXAudio2SourceVoice* pSourceVoice = nullptr;
-	result = xAudio2->CreateSourceVoice(&pSourceVoice, &soundData.wfex);
+	result = xAudio2_->CreateSourceVoice(&pSourceVoice, &soundData.wfex);
 	assert(SUCCEEDED(result));
 
 	//再生する波形データの設定
