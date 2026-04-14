@@ -11,12 +11,15 @@
 #include "Camera.h"
 #include "SpriteCommon.h"
 #include "GamePlayScene.h"
+#include "TitleScene.h"
 
 using namespace MyMath;
 
 void Game::Initialize()
 {
 	Framework::Initialize();
+
+	scene_ = new TitleScene();
 
 	scene_ = new GamePlayScene();
 	scene_->Initialize();

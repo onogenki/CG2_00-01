@@ -55,13 +55,14 @@ void GamePlayScene::Initialize()
 	//音声再生
 	Audio::GetInstance()->PlayWave(soundData1);
 
+	//1つ目Plane
 	objectPlane = new Object3d();
 	objectPlane->Initialize(object3dCommon);
 	objectPlane->SetModel("plane.obj");
 	objectPlane->GetTransform().translate = { 1.0f, 0.0f, 0.0f }; // 左に配置
 	objects.push_back(objectPlane); // リストに追加
 
-	// --- 2つ目: Axis ---
+	//2つ目Axis
 	objectAxis = new Object3d();
 	objectAxis->Initialize(object3dCommon);
 	objectAxis->SetModel("axis.obj");
@@ -142,13 +143,13 @@ void GamePlayScene::Update()
 		sprite->Update();
 	}
 
-	////数字の0キーが押されていたら
+	//数字の0キーが押されていたら
 	if (Input::GetInstance()->PushKey(DIK_0))
 	{
 		OutputDebugStringA("Hit 0\n");//出力ウィンドウに「Hit 0」と表示
 	}
 
-	////数字の0キーが押されていたら
+	//数字の0キーが押されていたら
 	if (Input::GetInstance()->TriggerKey(DIK_P))
 	{
 		OutputDebugStringA("Hit p\n");//出力ウィンドウに「Hit p」と表示
