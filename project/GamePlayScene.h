@@ -9,24 +9,21 @@
 #include "ParticleEmitter.h"
 #include "Audio.h" // SoundDataを使うために必要
 #include <vector>
+#include"BaseScene.h"
 
-class GamePlayScene
+//BaseSceneを継承する(publicをつけることで公認の親子関係)
+class GamePlayScene : public BaseScene
 {
 public:
-	void Initialize();
-
-	void Finalize();
-
-	void Update();
-
-	void Draw();
+    // overrideをつけて、親の純粋仮想関数を実装する
+    void Initialize()override;
+	void Finalize()override;
+	void Update()override;
+	void Draw()override;
 
 private:
-	Object3dCommon* object3dCommon = nullptr;
-    SpriteCommon* spriteCommon = nullptr;
+    //ゲームプレイシーン固有のデータ
 
-    CameraManager* cameraManager = nullptr;
-    Camera* mainCamera = nullptr;
     Camera* upCamera = nullptr;
 
     Object3d* objectPlane = nullptr;
@@ -45,9 +42,6 @@ private:
     Transform emitterTransform{};
 
     int selectedUI = 0;
-
-    // 音声
-    SoundData soundData1;
-
+   
 };
 

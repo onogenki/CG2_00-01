@@ -58,8 +58,6 @@ void DirectXCommon::InitializeDevice()//デバイスの初期化
 	{
 		//デバックレイヤーを有効化する
 		debugController->EnableDebugLayer();
-		//さらにGPU側でもチェックを行うようにする
-		debugController->SetEnableGPUBasedValidation(TRUE);
 	}
 #endif
 	//HRESULTはWindows系のエラーコードであり、

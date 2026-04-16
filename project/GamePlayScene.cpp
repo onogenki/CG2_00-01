@@ -51,14 +51,16 @@ void GamePlayScene::Initialize()
 	ModelManager::GetInstance()->LoadModel("axis.obj");
 
 	//音声読み込み
-	soundData1 = Audio::GetInstance()->LoadFile("Resources/Alarm01.wav");
+	Audio::GetInstance()->LoadFile("Resources/Alarm01.wav");
 	//音声再生
-	Audio::GetInstance()->PlayWave(soundData1);
+	Audio::GetInstance()->PlayWave("Resources/Alarm01.wav");
 
 	//1つ目Plane
 	objectPlane = new Object3d();
 	objectPlane->Initialize(object3dCommon);
 	objectPlane->SetModel("plane.obj");
+	objectPlane->GetTransform().scale = { 1.0f, 1.0f, 1.0f };
+	objectPlane->GetTransform().rotate = { 0.0f, 0.0f, 0.0f };
 	objectPlane->GetTransform().translate = { 1.0f, 0.0f, 0.0f }; // 左に配置
 	objects.push_back(objectPlane); // リストに追加
 
@@ -66,6 +68,8 @@ void GamePlayScene::Initialize()
 	objectAxis = new Object3d();
 	objectAxis->Initialize(object3dCommon);
 	objectAxis->SetModel("axis.obj");
+	objectAxis->GetTransform().scale = { 1.0f, 1.0f, 1.0f };
+	objectAxis->GetTransform().rotate = { 0.0f, 0.0f, 0.0f };
 	objectAxis->GetTransform().translate = { 2.0f, 0.0f, 0.0f }; // 右に配置
 	objects.push_back(objectAxis); // リストに追加
 
@@ -103,6 +107,7 @@ void GamePlayScene::Initialize()
 
 void GamePlayScene::Update()
 {
+
 	//UIの更新
 	lightData = objectAxis->GetDirectionalLight();
 	//ゲームの処理
@@ -131,7 +136,13 @@ void GamePlayScene::Update()
 	for (Object3d* object3d : objects) {
 		//毎フレーム、マネージャから今のアクティブカメラをもらう
 		object3d->SetCamera(cameraManager->GetActiveCamera());
-		lightData.direction = Normalize(lightData.direction);
+		float length = Length(lightData.direction);
+		if (length > 0.0f) {
+			lightData.direction = Normalize(lightData.direction);
+		} else {
+			// 0の場合は適当な下向きにするなど、エラーを回避する
+			lightData.direction = { 0.0f, -1.0f, 0.0f };
+		}
 		object3d->SetDirectionalLight(lightData);//光を他のモデルにも分け与える
 		object3d->Update();
 
@@ -192,9 +203,6 @@ void GamePlayScene::Finalize()
 {
 	//GPUの完了待ち
 	DirectXCommon::GetInstance()->WaitForGPU();
-
-	//音声データ解放
-	Audio::GetInstance()->Unload(&soundData1);
 
 	//パーティクル全体解放
 	delete activeEmitter;

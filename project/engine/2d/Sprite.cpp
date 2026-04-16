@@ -51,7 +51,13 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 	//Sprite* sprite = new Sprite();
 	//sprite->Initialize();
 	 
-	
+	position = { 0.0f, 0.0f };
+	rotation = 0.0f;
+	anchorPoint = { 0.0f, 0.0f }; // 左上を基準（または0.5fで中心）
+	isFlipX_ = false;
+	isFlipY_ = false;
+	textureLeftTop = { 0.0f, 0.0f };
+
 	//引数で受け取ってメンバ変数に記録する
 	this->spriteCommon = spriteCommon;
 

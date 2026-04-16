@@ -19,6 +19,12 @@ void TitleScene::Initialize()
 	spriteCommon = SpriteCommon::GetInstance();
 	spriteCommon->Initialize(dxCommon);
 
+	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
+
+	sprite_ = new Sprite();
+	sprite_->Initialize(spriteCommon, "Resources/uvChecker.png");
+	sprite_->SetPosition({ 0.0f, 0.0f });
+
 	cameraManager = new CameraManager();
 	mainCamera = new Camera();
 	mainCamera->SetRotate({ 0.0f,0.0f,0.0f });
@@ -27,16 +33,12 @@ void TitleScene::Initialize()
 	cameraManager->SetActiveCamera("MainCamera");
 	object3dCommon->SetDefaultCamera(cameraManager->GetActiveCamera());
 
-	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
-
-	Sprite* sprite = new Sprite();
-	sprite->Initialize(spriteCommon, "Resources/monsterBall.png");
-
 	//音声読み込み
-	soundData1 = Audio::GetInstance()->LoadFile("Resources/Alarm01.wav");
+	Audio::GetInstance()->LoadFile("Resources/Alarm01.wav");
 	//音声再生
-	Audio::GetInstance()->PlayWave(soundData1);
+	Audio::GetInstance()->PlayWave("Resources/Alarm01.wav");
 
+	isFinished_ = false;
 }
 
 void TitleScene::Update()
@@ -49,13 +51,14 @@ void TitleScene::Update()
 	Matrix4x4 projectionMatrix = cameraManager->GetActiveCamera()->GetProjectionMatrix();
 	Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 
-	Sprite* sprite;
-	sprite->Update();
+	sprite_->Update();
 
+	ImGuiManager::GetInstance()->Begin();
+	ImGuiManager::GetInstance()->End();
 	//sapceキーが押されていたら
 	if (Input::GetInstance()->PushKey(DIK_SPACE))
 	{
-		GamePlayScene;
+		isFinished_ = true;;
 	}
 }
 
@@ -71,24 +74,17 @@ void TitleScene::Draw()
 	ImGuiManager::GetInstance()->Draw(DirectXCommon::GetInstance());
 
 	spriteCommon->SetCommonDrawSetting();
-	Sprite* sprite;
-	sprite->Draw();
+	sprite_->Draw();
 
 	DirectXCommon::GetInstance()->PostDraw();
-
+	
 }
 
 void TitleScene::Finalize()
 {
 	//GPUの完了待ち
 	DirectXCommon::GetInstance()->WaitForGPU();
-
-	//音声データ解放
-	Audio::GetInstance()->Unload(&soundData1);
-
-
-	Sprite* sprite;
-	delete sprite;
-
+	
+	delete sprite_;
 	delete cameraManager;
 }

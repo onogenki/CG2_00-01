@@ -9,6 +9,7 @@
 #include "ParticleEmitter.h"
 #include "Transform.h"
 #include "Framework.h"
+#include "TitleScene.h"
 #include "GamePlayScene.h"
 
 class WinApp;
@@ -21,6 +22,11 @@ class CameraManager;
 class Camera;
 class SpriteCommon;
 
+enum class SceneType {
+	TITLE,
+	GAMEPLAY
+};
+
 class Game : public Framework
 {
 public:
@@ -32,33 +38,8 @@ public:
 
 private:
 
-	GamePlayScene* scene_ = nullptr;
+	SceneType currentScene_ = SceneType::TITLE;
 
-	// --- オーディオ系 ---
-	SoundData soundData1;
-
-	// --- 3Dオブジェクト・カメラ系 ---
-	Object3dCommon* object3dCommon = nullptr;
-	CameraManager* cameraManager = nullptr;
-	Camera* mainCamera = nullptr;
-	Camera* upCamera = nullptr;
-
-	std::vector<Object3d*> objects;
-	Object3d* objectPlane = nullptr;
-	Object3d* objectAxis = nullptr;
-	Object3d::DirectionalLight lightData{};
-
-	// --- スプライト系 ---
-	SpriteCommon* spriteCommon = nullptr;
-	std::vector<Sprite*> sprites;
-
-	// --- パーティクル系 ---
-	Transform emitterTransform{};
-	ParticleEmitter* emitterCircle = nullptr;
-	ParticleEmitter* emitterPlane = nullptr;
-	ParticleEmitter* activeEmitter = nullptr;
-
-	// --- UI・その他 ---
 	int selectedUI = 0;
 };
 

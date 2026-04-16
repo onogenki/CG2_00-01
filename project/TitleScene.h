@@ -9,44 +9,26 @@
 #include "ParticleEmitter.h"
 #include "Audio.h" // SoundDataを使うために必要
 #include <vector>
+#include "BaseScene.h"
 
-class TitleScene
+//BaseSceneを継承する(publicをつけることで公認の親子関係)
+class TitleScene : public BaseScene
 {
 public:
-    void Initialize();
+    //overrideをつけて、親の純粋仮想関数を実装
+    void Initialize()override;
+    void Finalize()override;
+    void Update()override;
+    void Draw()override;
 
-    void Finalize();
-
-    void Update();
-
-    void Draw();
+    //タイトルシーン独自の関数
+    bool IsFinished() const { return isFinished_; }
 
 private:
-    Object3dCommon* object3dCommon = nullptr;
-    SpriteCommon* spriteCommon = nullptr;
+    //タイトルシーン固有のデータ
 
-    CameraManager* cameraManager = nullptr;
-    Camera* mainCamera = nullptr;
-    Camera* upCamera = nullptr;
+    Sprite* sprite_ = nullptr;
 
-    Object3d* objectPlane = nullptr;
-    Object3d* objectAxis = nullptr;
-    std::vector<Object3d*> objects;
-    Object3d::DirectionalLight lightData;
-
-    std::vector<Sprite*> sprites;
-
-    // パーティクル関連
-    ParticleEmitter* emitterCircle = nullptr;
-    ParticleEmitter* emitterPlane = nullptr;
-    ParticleEmitter* activeEmitter = nullptr;
-
-    // パーティクルのトランスフォーム
-    Transform emitterTransform{};
-
-    int selectedUI = 0;
-
-    // 音声
-    SoundData soundData1;
+    bool isFinished_ = false;
 
 };

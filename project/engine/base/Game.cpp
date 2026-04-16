@@ -19,19 +19,29 @@ void Game::Initialize()
 {
 	Framework::Initialize();
 
+	//タイトルシーン
 	scene_ = new TitleScene();
 
-	scene_ = new GamePlayScene();
 	scene_->Initialize();
+	currentScene_ = SceneType::TITLE;
+
 }
 
 void Game::Update()
 {
 	Framework::Update();
 
-	//ゲーム落ち対策
-	if (scene_) {
-		scene_->Update();
+	//今のシーンのupdateが呼ばれる
+	scene_->Update();
+
+	if (currentScene_ == SceneType::TITLE && scene_->IsFinished())
+	{
+		scene_->Finalize();
+		delete scene_;
+
+		scene_ = new GamePlayScene();
+		scene_->Initialize();
+		currentScene_ = SceneType::GAMEPLAY;
 	}
 }
 
@@ -42,6 +52,7 @@ void Game::Draw()
 
 void Game::Finalize()
 {
+	//最後に残っているシーンを消す
 	scene_->Finalize();
 	delete scene_;
 

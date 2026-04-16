@@ -4,6 +4,7 @@
 #include "SrvManager.h"
 #include "Input.h"
 #include "ImGuiManager.h"
+#include "BaseScene.h"
 #include <xaudio2.h>
 #include <wrl.h>    
 //ゲーム全体
@@ -34,5 +35,8 @@ protected:// 派生クラス（Game）からアクセス可能にする
 	ImGuiManager* imGuiManager_ = nullptr;
 	Microsoft::WRL::ComPtr<IXAudio2> xAudio2_;
 	IXAudio2MasteringVoice* masterVoice_ = nullptr;
+
+	//ポリモーフィズム　どのシーンでもこの1つの箱に入る
+	BaseScene* scene_ = nullptr;
 };
 

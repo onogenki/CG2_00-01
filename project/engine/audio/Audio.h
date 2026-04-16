@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <xaudio2.h>
 #include <wrl.h>
+#include <unordered_map>
 
 //音声データ
 struct SoundData {
@@ -32,9 +33,9 @@ public:
 
 	void Initialize();
 
-	SoundData LoadFile(const std::string& filename);
-	void Unload(SoundData* soundData);
-	void PlayWave(const SoundData& soundData);
+	void LoadFile(const std::string& filename);
+	void PlayWave(const std::string& filename);
+	void Unload();
 
 private:
 	Audio() = default;
@@ -44,4 +45,5 @@ private:
 	Microsoft::WRL::ComPtr<IXAudio2> xAudio2_;
 	IXAudio2MasteringVoice* masterVoice_ = nullptr;
 
+	std::unordered_map<std::string, SoundData> soundDatas_;
 };

@@ -40,8 +40,14 @@ void Audio::Initialize()
 }
 
 //音声データの読み込み
-SoundData Audio::LoadFile(const std::string& filename)
+void Audio::LoadFile(const std::string& filename)
 {
+
+	// 既に読み込み済みなら何もしない（二重読み込み防止）
+	if (soundDatas_.find(filename) != soundDatas_.end()) {
+		return;
+	}
+
 	HRESULT result;
 
 	// ファイルパスをワイド文字列に変換
@@ -71,7 +77,6 @@ SoundData Audio::LoadFile(const std::string& filename)
 	//コンテナに格納する音声データ
 	SoundData soundData = {};
 	soundData.wfex = *waveFormat;
-
 	//生成したWaveフォーマットを開放
 	CoTaskMemFree(waveFormat);
 
@@ -101,21 +106,24 @@ SoundData Audio::LoadFile(const std::string& filename)
 		}
 	}
 
-	return soundData;
+	soundDatas_[filename] = soundData;
 }
 
 //音声データ解放
-void Audio::Unload(SoundData* soundData)
+void Audio::Unload()
 {
 	//バッファのメモリを解放
-	soundData->buffer.clear();
-	soundData->wfex = {};
+	soundDatas_.clear();
 }
 
 //音声再生
-void Audio::PlayWave(const SoundData& soundData)
+void Audio::PlayWave(const std::string& filename)
 {
 	HRESULT result;
+
+	// 本棚から音声データを探し出す
+	assert(soundDatas_.find(filename) != soundDatas_.end() && "その音はまだロードされていません！");
+	SoundData& soundData = soundDatas_[filename];
 
 	//波形フォーマットを先にSourceVoiceの生成
 	IXAudio2SourceVoice* pSourceVoice = nullptr;
