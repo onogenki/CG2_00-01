@@ -5,6 +5,7 @@
 #include "ParticleManager.h"
 #include "ImGuiManager.h"
 #include "Input.h"
+#include"SceneManager.h"
 #include <dinput.h>
 using namespace MyMath;
 
@@ -55,10 +56,12 @@ void TitleScene::Update()
 
 	ImGuiManager::GetInstance()->Begin();
 	ImGuiManager::GetInstance()->End();
+
 	//sapceキーが押されていたら
-	if (Input::GetInstance()->PushKey(DIK_SPACE))
+	if (Input::GetInstance()->TriggerKey(DIK_SPACE))
 	{
-		isFinished_ = true;;
+		//シーン切り替え
+		SceneManager::GetInstance()->SetNextScene(new GamePlayScene());
 	}
 }
 

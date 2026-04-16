@@ -10,6 +10,9 @@
 #include "Audio.h"
 #include <vector>
 
+//前方宣言(クラスがあることだけ伝える)
+class SceneManager;
+
 class BaseScene
 {
 public:

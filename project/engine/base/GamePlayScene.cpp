@@ -4,6 +4,7 @@
 #include "ParticleManager.h"
 #include "ImGuiManager.h"
 #include "Input.h"
+#include"SceneManager.h"
 #include <dinput.h>
 using namespace MyMath;
 

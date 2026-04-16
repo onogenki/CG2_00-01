@@ -100,6 +100,9 @@ void Framework::Update()
 		endRequest_ = true;
 	}
 	input_->Update();
+
+	//マネージャーにシーンの更新(と切り替え)を任せる
+	SceneManager::GetInstance()->Update();
 }
 
 void Framework::Finalize()

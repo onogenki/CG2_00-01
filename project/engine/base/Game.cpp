@@ -19,42 +19,26 @@ void Game::Initialize()
 {
 	Framework::Initialize();
 
-	//タイトルシーン
-	scene_ = new TitleScene();
+	//ゲーム固有の最初のシーン
+	BaseScene* scene = new TitleScene();
 
-	scene_->Initialize();
-	currentScene_ = SceneType::TITLE;
+	//マネージャーに最初のシーンを予約
+	SceneManager::GetInstance()->SetNextScene(scene);
 
 }
 
 void Game::Update()
 {
+	//基底クラスのUpdateを呼ぶだけで、マネージャー経由でシーンを更新
 	Framework::Update();
-
-	//今のシーンのupdateが呼ばれる
-	scene_->Update();
-
-	if (currentScene_ == SceneType::TITLE && scene_->IsFinished())
-	{
-		scene_->Finalize();
-		delete scene_;
-
-		scene_ = new GamePlayScene();
-		scene_->Initialize();
-		currentScene_ = SceneType::GAMEPLAY;
-	}
 }
 
 void Game::Draw()
 {
-	scene_->Draw();
+	SceneManager::GetInstance()->Draw();
 }
 
 void Game::Finalize()
 {
-	//最後に残っているシーンを消す
-	scene_->Finalize();
-	delete scene_;
-
 	Framework::Finalize();
 }
