@@ -95,12 +95,11 @@ void GamePlayScene::Initialize()
 
 	//Circleパーティクル
 	emitterCircle = new ParticleEmitter("Circle", emitterTransform, 1, 0.1f);
-
 	//四角形のパーティクル
 	emitterPlane = new ParticleEmitter("Plane", emitterTransform, 1, 0.1f);
 
 	//最初はcircleにする
-	activeEmitter = new ParticleEmitter("Circle", emitterTransform, 1, 0.1f);
+	activeEmitter = emitterCircle;
 
 	selectedUI = 0;
 
@@ -130,6 +129,11 @@ void GamePlayScene::Update()
 
 	//時間がきたら自動でパーティクル発生
 	activeEmitter->Update();
+
+	// 安全のために Nullチェックを追加
+	if (activeEmitter) {
+		activeEmitter->Update();
+	}
 	//パーティクル全体の更新
 	ParticleManager::GetInstance()->Update(viewProjectionMatrix);
 
@@ -205,8 +209,21 @@ void GamePlayScene::Finalize()
 	//GPUの完了待ち
 	DirectXCommon::GetInstance()->WaitForGPU();
 
-	//パーティクル全体解放
-	delete activeEmitter;
+	// これにより、中途半端に生き残っている粒子が原因のアクセス違反を防げます
+	ParticleManager::GetInstance()->ClearAllParticles();
+
+	if (emitterCircle) {
+		delete emitterCircle;
+		emitterCircle = nullptr;
+	}
+	if (emitterPlane) {
+		delete emitterPlane;
+		emitterPlane = nullptr;
+	}
+
+	// activeEmitter は「今どれを使っているか」の参照なので、
+	// 実体を消した後は nullptr にしておくだけでOK（deleteは不要）
+	activeEmitter = nullptr;
 
 	for (Sprite* sprite : sprites)
 	{

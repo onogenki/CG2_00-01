@@ -41,6 +41,15 @@ void SceneManager::Draw()
 	}
 }
 
+void SceneManager::ChangeScene(const std::string& sceneName)
+{
+	assert(sceneFactory_);// ファクトリーがセットされているか（nullptrじゃないか）チェック
+	assert(nextScene_ == nullptr);// すでに次のシーンが予約済みでないかチェック
+
+	//次シーンを生成
+	nextScene_ = sceneFactory_->CreateScene(sceneName);
+}
+
 SceneManager::~SceneManager()
 {
 	//最後のシーンの終了と開放

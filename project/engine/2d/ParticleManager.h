@@ -80,6 +80,11 @@ public:
 
 	void CreateParticleGroup(const std::string name, const std::string textureFilePath);
 
+    // 全てのパーティクル（粒子）を削除する
+    void ClearAllParticles();
+
+    // 特定のグループのパーティクルだけを削除する
+    void ClearAllGroups();
 
 private:
     ParticleManager() = default;

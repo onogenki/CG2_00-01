@@ -1,8 +1,7 @@
 #pragma once
 #include "BaseScene.h"
-#include"TitleScene.h"
-#include"GamePlayScene.h"
-
+#include "AbstractSceneFactory.h"
+#include<string>
 
 class SceneManager
 {
@@ -14,8 +13,11 @@ public:
 	void Update();
 	void Draw();
 
+	//シーンファクトリーのsetter
+	void SetSceneFactory(AbstractSceneFactory* sceneFactory) { sceneFactory_ = sceneFactory; }
+
 	//次シーン予約
-	void SetNextScene(BaseScene* nextScene) { nextScene_ = nextScene; }
+	void ChangeScene(const std::string& sceneName);
 
 private:
 	// シングルトン化：コンストラクタとデストラクタをprivateにする
@@ -29,5 +31,8 @@ private:
 	BaseScene* scene_ = nullptr;
 	//次のシーン
 	BaseScene* nextScene_ = nullptr;
+
+	//シーンファクトリー(借りてくる)
+	AbstractSceneFactory* sceneFactory_ = nullptr;
 };
 

@@ -8,6 +8,9 @@
 #include "SceneManager.h"
 #include <xaudio2.h>
 #include <wrl.h>    
+
+class AbstractSceneFactory;
+
 //ゲーム全体
 class Framework
 {
@@ -28,6 +31,10 @@ public:
 
 protected:// 派生クラス（Game）からアクセス可能にする
 	bool endRequest_ = false;
+
+	//シーンファクトリー
+	AbstractSceneFactory* sceneFactory_ = nullptr;
+
 	// どのゲームでも使う汎用インスタンス
 	WinApp* winApp_ = nullptr;
 	DirectXCommon* dxCommon_ = nullptr;

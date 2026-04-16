@@ -14,6 +14,7 @@
 #include "ModelManager.h"
 #include "ParticleManager.h"
 #include "Audio.h"
+#include "AbstractSceneFactory.h"
 
 #pragma comment(lib, "Dbghelp.lib")
 
@@ -117,6 +118,9 @@ void Framework::Finalize()
 	MFShutdown();
 
 	winApp_->Finalize();
+
+	//シーンファクトリー解放
+	delete sceneFactory_;
 	delete winApp_;
 }
 

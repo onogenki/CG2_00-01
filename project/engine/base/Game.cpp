@@ -10,8 +10,7 @@
 #include "CameraManager.h"
 #include "Camera.h"
 #include "SpriteCommon.h"
-#include "GamePlayScene.h"
-#include "TitleScene.h"
+#include"SceneFactory.h"
 
 using namespace MyMath;
 
@@ -19,12 +18,11 @@ void Game::Initialize()
 {
 	Framework::Initialize();
 
-	//ゲーム固有の最初のシーン
-	BaseScene* scene = new TitleScene();
+	//シーンファクトリーを生成し、マネージャにセット
+	sceneFactory_ = new SceneFactory();
+	SceneManager::GetInstance()->SetSceneFactory(sceneFactory_);
 
-	//マネージャーに最初のシーンを予約
-	SceneManager::GetInstance()->SetNextScene(scene);
-
+	SceneManager::GetInstance()->ChangeScene("TITLE");
 }
 
 void Game::Update()

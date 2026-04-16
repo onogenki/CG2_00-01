@@ -6,6 +6,7 @@ class CameraManager
 {
 
 public:
+
 	//カメラ登録
 	void AddCamera(const std::string& name, Camera* camera);
 	//使うカメラを切り替える
@@ -13,6 +14,8 @@ public:
 	Camera* GetActiveCamera() { return activeCamera_; }
 	void Update();
 
+	// デストラクタを追加
+	~CameraManager();
 private:
 	//文字列とカメラをセットで保存
 	std::unordered_map<std::string, Camera*> cameras_;

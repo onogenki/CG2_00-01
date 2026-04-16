@@ -1,5 +1,4 @@
 #include "TitleScene.h"
-#include "GamePlayScene.h"
 #include "TextureManager.h"
 #include "ModelManager.h"
 #include "ParticleManager.h"
@@ -61,7 +60,7 @@ void TitleScene::Update()
 	if (Input::GetInstance()->TriggerKey(DIK_SPACE))
 	{
 		//シーン切り替え
-		SceneManager::GetInstance()->SetNextScene(new GamePlayScene());
+		SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
 	}
 }
 

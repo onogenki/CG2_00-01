@@ -201,6 +201,19 @@ void ParticleManager::CreateParticleGroup(const std::string name, const std::str
     particleGroups_[name] = newGroup;
 }
 
+void ParticleManager::ClearAllParticles()
+{
+    for (auto& pair : particleGroups_) {
+        pair.second.particles.clear();
+        pair.second.instanceCount = 0; // インスタンス数もリセット
+    }
+}
+
+void ParticleManager::ClearAllGroups()
+{
+    particleGroups_.clear();
+}
+
 // パーティクルの発生
 void ParticleManager::Emit(const std::string name, const Vector3& position, uint32_t count) {
     // 登録済みのパーティクルグループ名かチェックしてassert
@@ -212,6 +225,9 @@ void ParticleManager::Emit(const std::string name, const Vector3& position, uint
     std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
     std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
     std::uniform_real_distribution<float> distTime(1.0f, 3.0f);
+
+    auto it = particleGroups_.find(name);
+    assert(it != particleGroups_.end() && "発生させようとしたパーティクルグループ名が存在しません。");
 
     for (uint32_t i = 0; i < count; ++i) {
         Particle newParticle;
