@@ -86,8 +86,6 @@ public:
 	//スワップチェーンリソースの数を取得
 	size_t GetSwapChainResourcesNum() const { return 2;}
 
-
-
 	//GPU待ち関数
 	void WaitForGPU();
 
