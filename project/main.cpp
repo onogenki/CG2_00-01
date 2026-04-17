@@ -1,9 +1,6 @@
 #include <Windows.h>
 #include "Game.h"
 #include <memory>
-#define _CRTDBG_MAP_ALLOC
-#include <cstdlib>
-#include <crtdbg.h>
 
 #pragma comment(lib,"Dbghelp.lib")
 #pragma comment(lib,"dxguid.lib")
