@@ -67,10 +67,6 @@ public:
 		//Compilerに使用するProfile
 		const wchar_t* profile);
 
-
-	//スワップチェーンリソース
-	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, 2>swapChainResource;
-
 	//テクスチャリソースの生成
 	Microsoft::WRL::ComPtr<ID3D12Resource>CreateTextureResource(const DirectX::TexMetadata& metadata);
 
@@ -115,8 +111,6 @@ private:
 	Microsoft::WRL::ComPtr<IDxcIncludeHandler> includeHandler;
 
 	Microsoft::WRL::ComPtr < ID3D12GraphicsCommandList> commandList_;
-	//DXGIファクトリ
-	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory_;
 
 	//フェンス値
 	UINT64 fenceVal = 0;

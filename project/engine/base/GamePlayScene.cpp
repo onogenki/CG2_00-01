@@ -20,19 +20,18 @@ void GamePlayScene::Initialize()
 	spriteCommon->Initialize(dxCommon);
 
 	//カメラマネージャ
-	cameraManager = new CameraManager();
+	cameraManager = std::make_unique<CameraManager>();
 
 	//メインカメラ
-	mainCamera = new Camera();
-	mainCamera->SetRotate({ 0.0f,0.0f,0.0f });
+	mainCamera = std::make_unique<Camera>();
 	mainCamera->SetTranslate({ 0.0f,0.0f,-10.0f });
-	cameraManager->AddCamera("MainCamera", mainCamera);
+	cameraManager->AddCamera("MainCamera", mainCamera.get());
 
 	//上アングルカメラ
-	upCamera = new Camera();
+	upCamera = std::make_unique<Camera>();
 	upCamera->SetRotate({ 0.785f,0.0f,0.0f });
 	upCamera->SetTranslate({ 0.0f,5.0f,-5.0f });
-	cameraManager->AddCamera("UpCamera", upCamera);
+	cameraManager->AddCamera("UpCamera", upCamera.get());
 
 	//MainCameraをアクティブ
 	cameraManager->SetActiveCamera("MainCamera");
@@ -56,37 +55,35 @@ void GamePlayScene::Initialize()
 	//音声再生
 	Audio::GetInstance()->PlayWave("Resources/Alarm01.wav");
 
-	//1つ目Plane
-	objectPlane = new Object3d();
-	objectPlane->Initialize(object3dCommon);
-	objectPlane->SetModel("plane.obj");
-	objectPlane->GetTransform().scale = { 1.0f, 1.0f, 1.0f };
-	objectPlane->GetTransform().rotate = { 0.0f, 0.0f, 0.0f };
-	objectPlane->GetTransform().translate = { 1.0f, 0.0f, 0.0f }; // 左に配置
-	objects.push_back(objectPlane); // リストに追加
+	// 2. 3Dオブジェクト生成
+	// 一時的に unique_ptr を作り、初期化してから vector に move する
+	auto objPlane = std::make_unique<Object3d>();
+	objPlane->Initialize(object3dCommon);
+	objPlane->SetModel("plane.obj");
+	objPlane->GetTransform().translate = { 1.0f, 0.0f, 0.0f };
+	objectPlane = objPlane.get();           // 中身を指すだけのポインタを保存
+	objects.push_back(std::move(objPlane)); // ここで所有権が vector に移る
 
-	//2つ目Axis
-	objectAxis = new Object3d();
-	objectAxis->Initialize(object3dCommon);
-	objectAxis->SetModel("axis.obj");
-	objectAxis->GetTransform().scale = { 1.0f, 1.0f, 1.0f };
-	objectAxis->GetTransform().rotate = { 0.0f, 0.0f, 0.0f };
-	objectAxis->GetTransform().translate = { 2.0f, 0.0f, 0.0f }; // 右に配置
-	objects.push_back(objectAxis); // リストに追加
+	auto objAxis = std::make_unique<Object3d>();
+	objAxis->Initialize(object3dCommon);
+	objAxis->SetModel("axis.obj");
+	objAxis->GetTransform().translate = { 2.0f, 0.0f, 0.0f };
+	objectAxis = objAxis.get();
+	objects.push_back(std::move(objAxis));
 
 	for (uint32_t i = 0; i < 1; ++i)
 	{
-		Sprite* sprite = new Sprite();
+		auto sprite = std::make_unique<Sprite>();
 		sprite->Initialize(spriteCommon, "Resources/monsterBall.png");
 
 		if (i % 2 == 0) {
 			// 偶数にモンスターボールpng
 			sprite->SetTexture("Resources/uvChecker.png");
 		}
-
-		Vector2 pos = { 0.0f + i * 0.0f,0.0f + i * 50.0f };
+		Vector2 pos = { 0.0f + i * 0.0f, 0.0f + i * 50.0f };
 		sprite->SetPosition(pos);
-		sprites.push_back(sprite);
+
+		sprites.push_back(std::move(sprite));
 	}
 
 	//パーティクル
@@ -94,15 +91,14 @@ void GamePlayScene::Initialize()
 	emitterTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 
 	//Circleパーティクル
-	emitterCircle = new ParticleEmitter("Circle", emitterTransform, 1, 0.1f);
+	emitterCircle = std::make_unique<ParticleEmitter>("Circle", emitterTransform, 1, 0.1f);
 	//四角形のパーティクル
-	emitterPlane = new ParticleEmitter("Plane", emitterTransform, 1, 0.1f);
+	emitterPlane = std::make_unique<ParticleEmitter>("Plane", emitterTransform, 1, 0.1f);
 
 	//最初はcircleにする
-	activeEmitter = emitterCircle;
+	activeEmitter = emitterCircle.get();
 
 	selectedUI = 0;
-
 }
 
 void GamePlayScene::Update()
@@ -116,19 +112,28 @@ void GamePlayScene::Update()
 	ImGuiManager::GetInstance()->FPSWindow();
 	ImGuiManager::GetInstance()->SpriteWindow(sprites);
 	ImGuiManager::GetInstance()->ModelWindow(objects, lightData);
-	ImGuiManager::GetInstance()->ParticleWindow(activeEmitter, emitterTransform);
-	ImGuiManager::GetInstance()->CameraWindow(cameraManager);
+	// ImGuiのParticleWindowから、どのボタンが押されたかの結果（文字列）を受け取る
+	std::string particleRequest = ImGuiManager::GetInstance()->ParticleWindow(emitterTransform);
+
+	// 結果に応じて、アクティブなエミッター（指し示す先）を切り替える
+	if (particleRequest == "Circle")
+	{
+		activeEmitter = emitterCircle.get(); // 既に作ってあるCircleの方を指す
+	} else if (particleRequest == "Plane")
+	{
+		activeEmitter = emitterPlane.get();  // 既に作ってあるPlaneの方を指す
+	}
+	ImGuiManager::GetInstance()->CameraWindow(cameraManager.get());
 	ImGuiManager::GetInstance()->End();
 
 	//カメラの更新
 	cameraManager->Update();
+
+
 	//カメラのビュープロジェクション行列を渡して更新
 	Matrix4x4 viewMatrix = cameraManager->GetActiveCamera()->GetViewMatrix();
 	Matrix4x4 projectionMatrix = cameraManager->GetActiveCamera()->GetProjectionMatrix();
 	Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
-
-	//時間がきたら自動でパーティクル発生
-	activeEmitter->Update();
 
 	// 安全のために Nullチェックを追加
 	if (activeEmitter) {
@@ -138,7 +143,7 @@ void GamePlayScene::Update()
 	ParticleManager::GetInstance()->Update(viewProjectionMatrix);
 
 	//3Dオブジェクトの更新
-	for (Object3d* object3d : objects) {
+	for (auto& object3d : objects) {
 		//毎フレーム、マネージャから今のアクティブカメラをもらう
 		object3d->SetCamera(cameraManager->GetActiveCamera());
 		float length = Length(lightData.direction);
@@ -154,7 +159,7 @@ void GamePlayScene::Update()
 	}
 
 	//スプライトの更新
-	for (Sprite* sprite : sprites)
+	for (auto& sprite : sprites)
 	{
 		sprite->Update();
 	}
@@ -182,7 +187,7 @@ void GamePlayScene::Draw()
 	//3Dオブジェクトの描画準備3Dオブジェクトの描画に共通のグラフィックスコマンドを積む
 	object3dCommon->SetCommonDrawSetting();
 
-	for (Object3d* object3d : objects) {
+	for (const auto& object3d : objects) {
 		object3d->Draw();
 	}
 
@@ -192,7 +197,7 @@ void GamePlayScene::Draw()
 	// スプライト描画
 	//Spriteの描画準備Spriteの描画に共通のグラフィックスコマンドを積む
 	spriteCommon->SetCommonDrawSetting();
-	for (Sprite* sprite : sprites)
+	for (const auto& sprite : sprites)
 	{
 		sprite->Draw();
 	}
@@ -212,29 +217,7 @@ void GamePlayScene::Finalize()
 	// これにより、中途半端に生き残っている粒子が原因のアクセス違反を防げます
 	ParticleManager::GetInstance()->ClearAllParticles();
 
-	if (emitterCircle) {
-		delete emitterCircle;
-		emitterCircle = nullptr;
-	}
-	if (emitterPlane) {
-		delete emitterPlane;
-		emitterPlane = nullptr;
-	}
-
-	// activeEmitter は「今どれを使っているか」の参照なので、
-	// 実体を消した後は nullptr にしておくだけでOK（deleteは不要）
-	activeEmitter = nullptr;
-
-	for (Sprite* sprite : sprites)
-	{
-		delete sprite;
-	}
 	sprites.clear();
-	for (Object3d* object3d : objects) {
-		delete object3d;
-	}
 	objects.clear();
-
-	delete cameraManager;
 }
 

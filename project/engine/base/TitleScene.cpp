@@ -21,16 +21,18 @@ void TitleScene::Initialize()
 
 	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
 
-	sprite_ = new Sprite();
+	sprite_ = std::make_unique<Sprite>();
 	sprite_->Initialize(spriteCommon, "Resources/uvChecker.png");
 	sprite_->SetPosition({ 0.0f, 0.0f });
 
-	cameraManager = new CameraManager();
-	mainCamera = new Camera();
+	cameraManager = std::make_unique<CameraManager>();
+	mainCamera = std::make_unique<Camera>();
+
 	mainCamera->SetRotate({ 0.0f,0.0f,0.0f });
 	mainCamera->SetTranslate({ 0.0f,0.0f,-10.0f });
-	cameraManager->AddCamera("MainCamera", mainCamera);
+	cameraManager->AddCamera("MainCamera", mainCamera.get());
 	cameraManager->SetActiveCamera("MainCamera");
+
 	object3dCommon->SetDefaultCamera(cameraManager->GetActiveCamera());
 
 	//音声読み込み
@@ -86,7 +88,5 @@ void TitleScene::Finalize()
 {
 	//GPUの完了待ち
 	DirectXCommon::GetInstance()->WaitForGPU();
-	
-	delete sprite_;
-	delete cameraManager;
+
 }

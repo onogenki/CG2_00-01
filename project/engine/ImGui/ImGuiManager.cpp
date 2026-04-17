@@ -110,7 +110,7 @@ void ImGuiManager::FPSWindow()
 }
 
 //スプライトデバック
-void ImGuiManager::SpriteWindow(std::vector<Sprite*>& sprites)
+void ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprites)
 {
 #ifdef USE_IMGUI
 
@@ -122,7 +122,7 @@ void ImGuiManager::SpriteWindow(std::vector<Sprite*>& sprites)
 
 	// ここで色を変えたら、配列内の全スプライトに色を適用する
 	if (ImGui::ColorEdit4("Color", my_color)) {
-		for (Sprite* sprite : sprites) {
+		for (auto& sprite : sprites) {
 			sprite->SetColor({ my_color[0], my_color[1], my_color[2], my_color[3] });
 		}
 	}
@@ -179,7 +179,7 @@ void ImGuiManager::SpriteWindow(std::vector<Sprite*>& sprites)
 #endif
 }
 
-void ImGuiManager::ModelWindow(std::vector<Object3d*>& objects, Object3d::DirectionalLight& lightData)
+void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& objects, Object3d::DirectionalLight& light)
 {
 #ifdef USE_IMGUI
 
@@ -219,9 +219,9 @@ void ImGuiManager::ModelWindow(std::vector<Object3d*>& objects, Object3d::Direct
 		ImGui::Separator();
 
 		ImGui::Text("Light Settings");
-		ImGui::DragFloat3("DirectoinalLight:direction", &lightData.direction.x, 0.01f);//ハイライトの位置
-		ImGui::DragFloat("DirectoinalLight:intensity", &lightData.intensity, 0.01f);//全体の明るさ
-		ImGui::DragFloat3("DirectoinalLight:color", &lightData.color.x, 0.01f);
+		ImGui::DragFloat3("DirectoinalLight:direction", &light.direction.x, 0.01f);//ハイライトの位置
+		ImGui::DragFloat("DirectoinalLight:intensity", &light.intensity, 0.01f);//全体の明るさ
+		ImGui::DragFloat3("DirectoinalLight:color", &light.color.x, 0.01f);
 
 		ImGui::PopID();
 	}
@@ -229,29 +229,29 @@ void ImGuiManager::ModelWindow(std::vector<Object3d*>& objects, Object3d::Direct
 #endif
 }
 
-void ImGuiManager::ParticleWindow(ParticleEmitter*& activeEmitter, Transform& emitterTransform)
+std::string ImGuiManager::ParticleWindow(Transform& emitterTransform)
 {
 #ifdef USE_IMGUI
+	std::string result = ""; // 何も押されていなければ空文字を返す
 	// ウィンドウ作成
 	ImGui::Begin("Editing Particle");
 	ImGui::Separator();
 
-	static int particleType = 0;
-
 	if (ImGui::Button("Circle Texture"))
 	{
-		delete activeEmitter;
-		activeEmitter = new ParticleEmitter("Circle", emitterTransform, 1, 0.1f);
+		result = "Circle"; // Circleが押されたと報告
 	}
 	ImGui::SameLine();
 
 	if (ImGui::Button("Plane Texture"))
 	{
-		delete activeEmitter;
-		activeEmitter = new ParticleEmitter("Plane", emitterTransform, 1, 0.1f);
+		result = "Plane"; // Planeが押されたと報告
 	}
 
 	ImGui::End();
+	return result;
+#else
+	return "";
 #endif
 }
 

@@ -32,11 +32,9 @@ public:
 protected:// 派生クラス（Game）からアクセス可能にする
 	bool endRequest_ = false;
 
-	//シーンファクトリー
-	AbstractSceneFactory* sceneFactory_ = nullptr;
-
 	// どのゲームでも使う汎用インスタンス
-	WinApp* winApp_ = nullptr;
+	std::unique_ptr<AbstractSceneFactory> sceneFactory_;
+	std::unique_ptr<WinApp> winApp_;
 	DirectXCommon* dxCommon_ = nullptr;
 	SrvManager* srvManager_ = nullptr;
 	Input* input_ = nullptr;

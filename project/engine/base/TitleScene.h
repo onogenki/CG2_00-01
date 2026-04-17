@@ -8,8 +8,9 @@
 #include "Sprite.h"
 #include "ParticleEmitter.h"
 #include "Audio.h" // SoundDataを使うために必要
-#include <vector>
 #include "BaseScene.h"
+#include <vector>
+#include <memory>
 
 //BaseSceneを継承する(publicをつけることで公認の親子関係)
 class TitleScene : public BaseScene
@@ -27,7 +28,7 @@ public:
 private:
     //タイトルシーン固有のデータ
 
-    Sprite* sprite_ = nullptr;
+    std::unique_ptr<Sprite> sprite_;
 
     bool isFinished_ = false;
 

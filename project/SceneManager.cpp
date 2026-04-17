@@ -16,10 +16,9 @@ void SceneManager::Update()
 		if (scene_)
 		{
 			scene_->Finalize();
-			delete scene_;
 		}
 		//シーン切り替え
-		scene_ = nextScene_;
+		scene_ = std::move(nextScene_);
 		nextScene_ = nullptr;
 
 		//次シーンを初期化する
@@ -47,7 +46,7 @@ void SceneManager::ChangeScene(const std::string& sceneName)
 	assert(nextScene_ == nullptr);// すでに次のシーンが予約済みでないかチェック
 
 	//次シーンを生成
-	nextScene_ = sceneFactory_->CreateScene(sceneName);
+	nextScene_ = std::unique_ptr<BaseScene>(sceneFactory_->CreateScene(sceneName));
 }
 
 SceneManager::~SceneManager()
@@ -56,6 +55,5 @@ SceneManager::~SceneManager()
 	if (scene_)
 	{
 		scene_->Finalize();
-		delete scene_;
 	}
 }

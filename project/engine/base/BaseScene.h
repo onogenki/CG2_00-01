@@ -9,6 +9,7 @@
 #include "ParticleEmitter.h"
 #include "Audio.h"
 #include <vector>
+#include <memory>
 
 //前方宣言(クラスがあることだけ伝える)
 class SceneManager;
@@ -31,8 +32,8 @@ protected:
 	Object3dCommon* object3dCommon = nullptr;
 	SpriteCommon* spriteCommon = nullptr;
 
-	CameraManager* cameraManager = nullptr;
-	Camera* mainCamera = nullptr;
+	std::unique_ptr<CameraManager> cameraManager;
+	std::unique_ptr<Camera> mainCamera;
 
 };
 

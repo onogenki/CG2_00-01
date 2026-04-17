@@ -35,11 +35,6 @@ void CameraManager::Update()
 
 CameraManager::~CameraManager()
 {
-	// 登録されている全てのカメラを順番に取り出して解放
-	for (auto& pair : cameras_)
-	{
-		delete pair.second;
-	}
 	// コンテナの中身も空にしておく（安全のため）
 	cameras_.clear();
 }

@@ -1,5 +1,9 @@
 #include <Windows.h>
 #include "Game.h"
+#include <memory>
+#define _CRTDBG_MAP_ALLOC
+#include <cstdlib>
+#include <crtdbg.h>
 
 #pragma comment(lib,"Dbghelp.lib")
 #pragma comment(lib,"dxguid.lib")
@@ -8,7 +12,6 @@ using namespace Microsoft::WRL;
 
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
-	//誰も補足しなかった場合に(Unhandled),補足する関数を登録
 
 	struct D3DResourceLeakChecker
 	{
@@ -16,13 +19,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	}leakChecker;
 	
 	//インスタンス生成
-	Framework* game = new Game();
+	std::unique_ptr<Framework> game = std::make_unique<Game>();
 
 	//実行
 	game->Run();
-
-	//削除
-	delete game;
 
 	return 0;
 }

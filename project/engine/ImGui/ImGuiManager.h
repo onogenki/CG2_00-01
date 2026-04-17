@@ -43,11 +43,9 @@ public:
 	//FPS確認
 	void FPSWindow();
 	//スプライト編集
-	void SpriteWindow(std::vector < Sprite*>& sprites);
+	void SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprites);
 	//3Dモデル編集
-	void ModelWindow(std::vector<Object3d*>& objects, Object3d::DirectionalLight& lightData);
-	//パーティクル編集
-	void ParticleWindow(ParticleEmitter*& activeEmitter, Transform& emitterTransform);
+	void ModelWindow(const std::vector<std::unique_ptr<Object3d>>& objects, Object3d::DirectionalLight& light);
 	//カメラ編集
 	void CameraWindow(CameraManager* cameraManager);
 	//描画
@@ -55,6 +53,8 @@ public:
 	//終了処理
 	void Finalize();
 
+	//パーティクル編集
+	std::string ParticleWindow(Transform& emitterTransform);
 private:
 	ImGuiManager() = default;
 	~ImGuiManager() = default;

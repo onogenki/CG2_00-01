@@ -28,9 +28,9 @@ private:
 	SceneManager& operator=(const SceneManager&) = delete;
 
 	//今のシーン
-	BaseScene* scene_ = nullptr;
+	std::unique_ptr<BaseScene> scene_ = nullptr;
 	//次のシーン
-	BaseScene* nextScene_ = nullptr;
+	std::unique_ptr<BaseScene> nextScene_ = nullptr;
 
 	//シーンファクトリー(借りてくる)
 	AbstractSceneFactory* sceneFactory_ = nullptr;

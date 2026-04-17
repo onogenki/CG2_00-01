@@ -8,8 +8,9 @@
 #include "Sprite.h"
 #include "ParticleEmitter.h"
 #include "Audio.h" // SoundDataを使うために必要
-#include <vector>
 #include"BaseScene.h"
+#include <vector>
+#include <memory>
 
 //BaseSceneを継承する(publicをつけることで公認の親子関係)
 class GamePlayScene : public BaseScene
@@ -24,19 +25,22 @@ public:
 private:
     //ゲームプレイシーン固有のデータ
 
-    Camera* upCamera = nullptr;
+    std::unique_ptr<Camera> upCamera;
 
-    Object3d* objectPlane = nullptr;
-    Object3d* objectAxis = nullptr;
-    std::vector<Object3d*> objects;
-    Object3d::DirectionalLight lightData;
-
-    std::vector<Sprite*> sprites;
+    std::vector<std::unique_ptr<Object3d>> objects;
+    std::vector<std::unique_ptr<Sprite>> sprites;
 
     // パーティクル関連
-    ParticleEmitter* emitterCircle = nullptr;
-    ParticleEmitter* emitterPlane = nullptr;
+    std::unique_ptr<ParticleEmitter> emitterCircle;
+    std::unique_ptr<ParticleEmitter> emitterPlane;
+
+    // objects vectorの中にある特定のオブジェクトを指すためのポインタ
+    Object3d* objectPlane = nullptr;
+    Object3d* objectAxis = nullptr;
+    // 今使っているエミッターを指すだけ
     ParticleEmitter* activeEmitter = nullptr;
+
+    Object3d::DirectionalLight lightData;
 
     // パーティクルのトランスフォーム
     Transform emitterTransform{};

@@ -64,12 +64,12 @@ void Framework::Initialize()
 
 	Logger::Log("\nHello DirectX!\n");
 
-	winApp_ = new WinApp();
+	winApp_ = std::make_unique<WinApp>();
 	winApp_->Initialize();
 
 	//DirectXの初期化
 	dxCommon_ = DirectXCommon::GetInstance();
-	dxCommon_->Initialize(winApp_);
+	dxCommon_->Initialize(winApp_.get());
 
 	//SRVマネージャの初期化
 	srvManager_ = SrvManager::GetInstance();
@@ -82,10 +82,10 @@ void Framework::Initialize()
 
 	//入力の初期化
 	input_ = Input::GetInstance();
-	input_->Initialize(winApp_);
+	input_->Initialize(winApp_.get());
 
 	imGuiManager_ = ImGuiManager::GetInstance();
-	imGuiManager_->Initialize(winApp_, dxCommon_, srvManager_);
+	imGuiManager_->Initialize(winApp_.get(), dxCommon_, srvManager_);
 
 	// クラッシュ時にExportDumpを呼ぶように登録
 	SetUnhandledExceptionFilter(ExportDump);
@@ -117,11 +117,13 @@ void Framework::Finalize()
 	xAudio2_.Reset();
 	MFShutdown();
 
-	winApp_->Finalize();
+	if (winApp_) {
+		winApp_->Finalize();
+	}
 
 	//シーンファクトリー解放
-	delete sceneFactory_;
-	delete winApp_;
+	sceneFactory_.reset();
+	winApp_.reset();
 }
 
 void Framework::Run()
