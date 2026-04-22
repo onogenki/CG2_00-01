@@ -68,7 +68,7 @@ public:
     static ParticleManager* GetInstance();
 
     void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
-    void Update(Matrix4x4 viewProjectionMatrix);
+    void Update(const Matrix4x4 viewProjectionMatrix, const Matrix4x4& cameraMatrix);
     void Draw();
     void Finalize() {
         // インスタンス自体を消すのではなく、中身（グループリストなど）を掃除する

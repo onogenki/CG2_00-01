@@ -128,11 +128,11 @@ void GamePlayScene::Update()
 
 	//カメラの更新
 	cameraManager->Update();
-
+	Camera* activeCamera = cameraManager->GetActiveCamera();
 
 	//カメラのビュープロジェクション行列を渡して更新
-	Matrix4x4 viewMatrix = cameraManager->GetActiveCamera()->GetViewMatrix();
-	Matrix4x4 projectionMatrix = cameraManager->GetActiveCamera()->GetProjectionMatrix();
+	Matrix4x4 viewMatrix = activeCamera->GetViewMatrix();
+	Matrix4x4 projectionMatrix = activeCamera->GetProjectionMatrix();
 	Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 
 	// 安全のために Nullチェックを追加
@@ -140,7 +140,7 @@ void GamePlayScene::Update()
 		activeEmitter->Update();
 	}
 	//パーティクル全体の更新
-	ParticleManager::GetInstance()->Update(viewProjectionMatrix);
+	ParticleManager::GetInstance()->Update(viewProjectionMatrix, activeCamera->GetWorldMatrix());
 
 	//3Dオブジェクトの更新
 	for (auto& object3d : objects) {

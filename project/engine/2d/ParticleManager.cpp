@@ -252,9 +252,18 @@ void ParticleManager::Emit(const std::string name, const Vector3& position, uint
 }
 
 // 更新処理
-void ParticleManager::Update(Matrix4x4 viewProjectionMatrix) {
+void ParticleManager::Update(const Matrix4x4 viewProjectionMatrix, const Matrix4x4& cameraMatrix) {
 
     const float kDeltaTime_ = 1.0f / 60.0f;
+
+    //パイ/2回転
+    Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(std::numbers::pi_v<float>);
+    Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
+    billboardMatrix.m[3][0] = 0.0f;
+    billboardMatrix.m[3][1] = 0.0f;
+    billboardMatrix.m[3][2] = 0.0f;
+
+
 
     // 全てのパーティクルグループについて処理する
     for (auto& pair : particleGroups_) {
@@ -278,7 +287,11 @@ void ParticleManager::Update(Matrix4x4 viewProjectionMatrix) {
 
             float alpha = 1.0f - (particle.currentTime / particle.lifeTime);
 
-            Matrix4x4 worldMatrix = MakeAffineMatrix(particle.transform.scale, particle.transform.rotate, particle.transform.translate);
+            //ビルボードを適用
+            Matrix4x4 scaleMatrix = MakeScaleMatrix(particle.transform.scale);
+            Matrix4x4 translateMatrix = MakeTranslateMatrix(particle.transform.translate);
+
+            Matrix4x4 worldMatrix = Multiply(scaleMatrix, Multiply(billboardMatrix, translateMatrix));
             Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, viewProjectionMatrix);
 
             if (group.instanceCount < kNumMaxInstance) {

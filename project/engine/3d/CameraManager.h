@@ -12,6 +12,7 @@ public:
 	//使うカメラを切り替える
 	void SetActiveCamera(const std::string& name);
 	Camera* GetActiveCamera() { return activeCamera_; }
+
 	void Update();
 
 	// デストラクタを追加
