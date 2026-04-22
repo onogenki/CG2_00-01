@@ -180,6 +180,8 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="engine\base\GamePlayScene.cpp" />
     <ClCompile Include="engine\base\Input.cpp" />
     <ClCompile Include="engine\base\Logger.cpp" />
+    <ClCompile Include="engine\base\SceneFactory.cpp" />
+    <ClCompile Include="engine\base\SceneManager.cpp" />
     <ClCompile Include="engine\base\SrvManager.cpp" />
     <ClCompile Include="engine\base\StringUtility.cpp" />
     <ClCompile Include="engine\base\TitleScene.cpp" />
@@ -264,6 +266,8 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="engine\base\GamePlayScene.h" />
     <ClInclude Include="engine\base\Input.h" />
     <ClInclude Include="engine\base\Logger.h" />
+    <ClInclude Include="engine\base\SceneFactory.h" />
+    <ClInclude Include="engine\base\SceneManager.h" />
     <ClInclude Include="engine\base\SrvManager.h" />
     <ClInclude Include="engine\base\StringUtility.h" />
     <ClInclude Include="engine\base\TitleScene.h" />
