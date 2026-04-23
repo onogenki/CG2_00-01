@@ -12,6 +12,8 @@
 #include "DirectXCommon.h"
 #include "SrvManager.h"
 
+class CameraManager;
+
 struct Particle{
 public:
     Transform transform;
@@ -68,7 +70,7 @@ public:
     static ParticleManager* GetInstance();
 
     void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
-    void Update(Matrix4x4 viewProjectionMatrix);
+    void Update();
     void Draw();
     void Finalize() {
         // インスタンス自体を消すのではなく、中身（グループリストなど）を掃除する
@@ -86,6 +88,8 @@ public:
     // 特定のグループのパーティクルだけを削除する
     void ClearAllGroups();
 
+    void SetCameraManager(CameraManager* cameraManager) { cameraManager_ = cameraManager; }
+
 private:
     ParticleManager() = default;
     ~ParticleManager() = default;
@@ -96,6 +100,7 @@ private:
     // メンバ変数に記録するポインタ
     DirectXCommon* dxCommon_ = nullptr;
     SrvManager* srvManager_ = nullptr;
+    CameraManager* cameraManager_ = nullptr;
 
     //グループを複数持てるように
     std::unordered_map<std::string, ParticleGroup> particleGroups_;

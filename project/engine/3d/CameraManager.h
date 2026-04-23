@@ -14,6 +14,7 @@ public:
 	Camera* GetActiveCamera() { return activeCamera_; }
 	void Update();
 
+	CameraManager() = default;
 	// デストラクタを追加
 	~CameraManager();
 private:

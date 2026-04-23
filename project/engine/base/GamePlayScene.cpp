@@ -22,6 +22,9 @@ void GamePlayScene::Initialize()
 	//カメラマネージャ
 	cameraManager = std::make_unique<CameraManager>();
 
+
+	ParticleManager::GetInstance()->SetCameraManager(cameraManager.get());
+
 	//メインカメラ
 	mainCamera = std::make_unique<Camera>();
 	mainCamera->SetTranslate({ 0.0f,0.0f,-10.0f });
@@ -93,7 +96,7 @@ void GamePlayScene::Initialize()
 	//Circleパーティクル
 	emitterCircle = std::make_unique<ParticleEmitter>("Circle", emitterTransform, 1, 0.1f);
 	//四角形のパーティクル
-	emitterPlane = std::make_unique<ParticleEmitter>("Plane", emitterTransform, 1, 0.1f);
+	emitterPlane = std::make_unique<ParticleEmitter>("Plane", emitterTransform, 1, 0.3f);
 
 	//最初はcircleにする
 	activeEmitter = emitterCircle.get();
@@ -140,7 +143,7 @@ void GamePlayScene::Update()
 		activeEmitter->Update();
 	}
 	//パーティクル全体の更新
-	ParticleManager::GetInstance()->Update(viewProjectionMatrix);
+	ParticleManager::GetInstance()->Update();
 
 	//3Dオブジェクトの更新
 	for (auto& object3d : objects) {

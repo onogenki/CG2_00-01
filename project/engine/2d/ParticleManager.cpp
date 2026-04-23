@@ -1,5 +1,6 @@
 #include "ParticleManager.h"
 #include "TextureManager.h"
+#include "CameraManager.h"
 
 using namespace MyMath;
 
@@ -31,7 +32,6 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
     // 引数でポインタを受け取ってメンバ変数に記録
     dxCommon_ = dxCommon;
     srvManager_ = srvManager;
-
     // ランダムエンジンの初期化
     std::random_device seed_gen;
     randomEngine_.seed(seed_gen());
@@ -120,7 +120,7 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
     blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
 
     D3D12_RASTERIZER_DESC rasterizerDesc{};
-    rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
+    rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
     rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 
     D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -252,7 +252,23 @@ void ParticleManager::Emit(const std::string name, const Vector3& position, uint
 }
 
 // 更新処理
-void ParticleManager::Update(Matrix4x4 viewProjectionMatrix) {
+void ParticleManager::Update() {
+
+    if (!cameraManager_)return;
+    //毎フレーム今アクティブなカメラを取得する
+    Camera* activeCamera = cameraManager_->GetActiveCamera();
+
+    //万が一カメラがない場合は安全のために抜ける
+    if (!activeCamera)return;
+
+    Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(std::numbers::pi_v<float>);
+
+    //取得したactiveカメラからビュー作成もらう
+    Matrix4x4 view = activeCamera->GetViewMatrix();
+    view.m[3][0] = 0.0f; view.m[3][1] = 0.0f; view.m[3][2] = 0.0f;
+    Matrix4x4 billboardMatrix = Inverse(view);
+
+    Matrix4x4 viewProjectionMatrix = Multiply(activeCamera->GetViewMatrix(), activeCamera->GetProjectionMatrix());
 
     const float kDeltaTime_ = 1.0f / 60.0f;
 
@@ -278,8 +294,13 @@ void ParticleManager::Update(Matrix4x4 viewProjectionMatrix) {
 
             float alpha = 1.0f - (particle.currentTime / particle.lifeTime);
 
-            Matrix4x4 worldMatrix = MakeAffineMatrix(particle.transform.scale, particle.transform.rotate, particle.transform.translate);
-            Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, viewProjectionMatrix);
+            Matrix4x4 scale = MakeScaleMatrix(particle.transform.scale);
+            Matrix4x4 translate = MakeTranslateMatrix(particle.transform.translate);
+
+            Matrix4x4 worldMatrix = Multiply(Multiply(scale, billboardMatrix), translate);
+
+            // 取得したactiveCameraからビュープロジェクション行列をもらう
+            Matrix4x4 worldViewProjectionMatrix = Multiply(activeCamera->GetViewMatrix(),activeCamera->GetProjectionMatrix());
 
             if (group.instanceCount < kNumMaxInstance) {
                 group.mappedData[group.instanceCount].WVP = worldViewProjectionMatrix;
