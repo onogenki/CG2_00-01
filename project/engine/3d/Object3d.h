@@ -31,6 +31,16 @@ public:
 		float intensity;//明るさの強さ
 	};
 
+	struct PointLight
+	{
+		Vector4 color;//ライトの色
+		Vector3 position;//ライトの位置
+		float intensity;//輝度
+		float radius;//ライトの届く最大距離
+		float decay;//減衰率
+		float padding[2];//資料にはかいてあったが場合によっては不要
+	};
+
 	struct CameraForGPU
 	{
 		Vector3 worldPosition;
@@ -57,7 +67,9 @@ public:
 	void SetDirectionalLight(const DirectionalLight& light) {
 		*directionalLightData = light;
 	};
-
+	void SetPointLight(const PointLight& light) {
+		*pointLightData = light;
+	}
 
 	//getter
 	const Vector3& GetScale()const { return transform.scale; }
@@ -92,6 +104,11 @@ private:
 	void CreateCameraData();
 	Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource;
 	CameraForGPU* cameraData = nullptr;
+
+	// カメラデータ作成関数
+	void CreatePointLightData();
+	Microsoft::WRL::ComPtr<ID3D12Resource> pointLightResource;
+	PointLight* pointLightData = nullptr;
 
 	// リソース作成のヘルパー関数 (Spriteから移植)
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResources(ID3D12Device* device, size_t sizeInBytes);

@@ -19,7 +19,8 @@ void Object3d::Initialize(Object3dCommon* object3dCommon)
 	CreateCameraData();
 	//平行光源データ作成
 	CreateDirectionalLightData();
-
+	//点光源データ作成
+	CreatePointLightData();
 	//Transform変数を作る
 	transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 }
@@ -56,6 +57,8 @@ void Object3d::Draw()
 	commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
 
 	commandList->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
+
+	commandList->SetGraphicsRootConstantBufferView(5, pointLightResource->GetGPUVirtualAddress());
 
 	if (model_)
 	{
@@ -139,4 +142,25 @@ void Object3d::CreateCameraData()
 	cameraResource->Map(0, nullptr, reinterpret_cast<void**>(&cameraData));
 
 	cameraData->worldPosition = { 0.0f, 0.0f, 10.0f };
+}
+
+void Object3d::CreatePointLightData()
+{
+	// 1. 点光源リソースを作る
+	// (サイズは PointLight 構造体1つ分)
+	pointLightResource = CreateBufferResources(object3dCommon->GetDxCommon()->GetDevice(), sizeof(PointLight));
+
+	// 2. データを書き込むためのアドレスを取得して pointLightData に割り当てる
+	pointLightResource->Map(0, nullptr, reinterpret_cast<void**>(&pointLightData));
+
+	// 3. デフォルト値を書き込んでおく
+	// 色: 白 (R, G, B, A)
+	pointLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	// 位置
+	pointLightData->position = { 0.0f, 2.0f, 0.0f };
+	// 強さ
+	pointLightData->intensity = 1.0f;
+
+	pointLightData->radius = 10.0f;//届く距離
+	pointLightData->decay = 1.0f;//普通の線形減衰
 }

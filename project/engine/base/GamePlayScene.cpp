@@ -43,6 +43,7 @@ void GamePlayScene::Initialize()
 
 	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");//1枚目
 	TextureManager::GetInstance()->LoadTexture("Resources/monsterBall.png");//2枚目
+	TextureManager::GetInstance()->LoadTexture("Resources/grass.png");//terrainのpng
 	TextureManager::GetInstance()->LoadTexture("Resources/circle.png");
 
 	ParticleManager::GetInstance()->CreateParticleGroup("Circle", "Resources/circle.png");
@@ -50,7 +51,7 @@ void GamePlayScene::Initialize()
 	ParticleManager::GetInstance()->CreateParticleGroup("Plane", "Resources/uvChecker.png");
 	
 	//.objファイルからモデルを読み込む
-	ModelManager::GetInstance()->LoadModel("plane.obj");
+	ModelManager::GetInstance()->LoadModel("terrain.obj");
 	ModelManager::GetInstance()->LoadModel("sphere.obj");
 
 	//音声読み込み
@@ -62,8 +63,8 @@ void GamePlayScene::Initialize()
 	// 一時的に unique_ptr を作り、初期化してから vector に move する
 	auto objPlane = std::make_unique<Object3d>();
 	objPlane->Initialize(object3dCommon);
-	objPlane->SetModel("plane.obj");
-	objPlane->GetTransform().translate = { 1.0f, 0.0f, 0.0f };
+	objPlane->SetModel("terrain.obj");
+	objPlane->GetTransform().translate = { 1.0f, -2.0f, 10.0f };
 	objectPlane = objPlane.get();           // 中身を指すだけのポインタを保存
 	objects.push_back(std::move(objPlane)); // ここで所有権が vector に移る
 
@@ -71,6 +72,7 @@ void GamePlayScene::Initialize()
 	objAxis->Initialize(object3dCommon);
 	objAxis->SetModel("sphere.obj");
 	objAxis->GetTransform().translate = { 2.0f, 0.0f, 0.0f };
+	objAxis->GetTransform().rotate = { 0.0f,-14.0f,-14.0f };
 	objectAxis = objAxis.get();
 	objects.push_back(std::move(objAxis));
 
@@ -88,6 +90,19 @@ void GamePlayScene::Initialize()
 
 		sprites.push_back(std::move(sprite));
 	}
+
+	// ライトの初期値を設定する
+	// 平行光源はOFF (Intensity = 0.0f)
+	directionalLight.direction = { 1.0f, -1.0f, 1.0f };
+	directionalLight.intensity = 0.0f;
+	directionalLight.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+	// 点光源はON (初期位置 0, 2, 0)
+	pointLight.position = { 0.0f, 2.0f, 0.0f };
+	pointLight.intensity = 1.0f;
+	pointLight.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	pointLight.radius = 10.0f;
+	pointLight.decay = 1.0f;
 
 	//パーティクル
 	//座標、1回の発生数、発生頻度[秒]
@@ -108,13 +123,13 @@ void GamePlayScene::Update()
 {
 
 	//UIの更新
-	lightData = objectAxis->GetDirectionalLight();
+	directionalLight = objectAxis->GetDirectionalLight();
 	//ゲームの処理
 	ImGuiManager::GetInstance()->Begin();
 	ImGuiManager::GetInstance()->DemoWindow();
 	ImGuiManager::GetInstance()->FPSWindow();
 	ImGuiManager::GetInstance()->SpriteWindow(sprites);
-	ImGuiManager::GetInstance()->ModelWindow(objects, lightData);
+	ImGuiManager::GetInstance()->ModelWindow(objects, directionalLight,pointLight);
 	// ImGuiのParticleWindowから、どのボタンが押されたかの結果（文字列）を受け取る
 	std::string particleRequest = ImGuiManager::GetInstance()->ParticleWindow(emitterTransform);
 
@@ -149,14 +164,15 @@ void GamePlayScene::Update()
 	for (auto& object3d : objects) {
 		//毎フレーム、マネージャから今のアクティブカメラをもらう
 		object3d->SetCamera(cameraManager->GetActiveCamera());
-		float length = Length(lightData.direction);
+		float length = Length(directionalLight.direction);
 		if (length > 0.0f) {
-			lightData.direction = Normalize(lightData.direction);
+			directionalLight.direction = Normalize(directionalLight.direction);
 		} else {
 			// 0の場合は適当な下向きにするなど、エラーを回避する
-			lightData.direction = { 0.0f, -1.0f, 0.0f };
+			directionalLight.direction = { 0.0f, -1.0f, 0.0f };
 		}
-		object3d->SetDirectionalLight(lightData);//光を他のモデルにも分け与える
+		object3d->SetDirectionalLight(directionalLight);//光を他のモデルにも分け与える
+		object3d->SetPointLight(pointLight);
 		object3d->Update();
 
 	}

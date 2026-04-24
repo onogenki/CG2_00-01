@@ -40,7 +40,8 @@ private:
     // 今使っているエミッターを指すだけ
     ParticleEmitter* activeEmitter = nullptr;
 
-    Object3d::DirectionalLight lightData;
+    Object3d::DirectionalLight directionalLight;//平行光源
+    Object3d::PointLight pointLight;//点光源
 
     // パーティクルのトランスフォーム
     Transform emitterTransform{};

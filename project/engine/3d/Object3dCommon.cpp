@@ -41,7 +41,7 @@ void Object3dCommon::CreateRootSignature()
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND; // Offsetを自動計算
 
 	// RootParameter作成。複数設定できるので配列
-	D3D12_ROOT_PARAMETER rootParameters[5] = {};
+	D3D12_ROOT_PARAMETER rootParameters[6] = {};
 
 	// [0] Material (CBV)
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; // CBVを使う
@@ -64,10 +64,17 @@ void Object3dCommon::CreateRootSignature()
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // PixelShaderで使う
 	rootParameters[3].Descriptor.ShaderRegister = 1; // レジスタ番号1を使う
 
+	//[4]Camera
 	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;    // 定数バッファ
 	rootParameters[4].Descriptor.ShaderRegister = 2;                    // b2 に対応
 	rootParameters[4].Descriptor.RegisterSpace = 0;
 	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // ピクセルシェーダーで使う
+
+	//[5]PointLight
+	rootParameters[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // ピクセルシェーダーで使う
+	rootParameters[5].Descriptor.ShaderRegister = 3;                    // b3 に対応
+	rootParameters[5].Descriptor.RegisterSpace = 0;
 
 	descriptionRootSignature.pParameters = rootParameters; // ルートパレメーター配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters); // 配列の長さ
@@ -136,7 +143,7 @@ void Object3dCommon::CreateGraphicsPipeline()
 	// RasiterZerStateの設定
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
 	// カリングしない(裏面も表示する)
-	rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
+	rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
 	// 三角形の中を塗りつぶす
 	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 

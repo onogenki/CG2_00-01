@@ -180,7 +180,7 @@ void ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& spri
 #endif
 }
 
-void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& objects, Object3d::DirectionalLight& light)
+void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& objects, Object3d::DirectionalLight& light,Object3d::PointLight& pointLight)
 {
 #ifdef USE_IMGUI
 
@@ -236,6 +236,15 @@ void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& obj
 		ImGui::DragFloat3("DirectoinalLight:direction", &light.direction.x, 0.01f);//ハイライトの位置
 		ImGui::DragFloat("DirectoinalLight:intensity", &light.intensity, 0.01f);//全体の明るさ
 		ImGui::DragFloat3("DirectoinalLight:color", &light.color.x, 0.01f);
+
+		ImGui::Separator();
+
+		ImGui::Text("Point Light");
+		ImGui::DragFloat3("PointLight:position", &pointLight.position.x, 0.01f);
+		ImGui::DragFloat("PointLight:intensity", &pointLight.intensity, 0.01f, 0.0f, 10.0f);
+		ImGui::ColorEdit3("PointLight:color", & pointLight.color.x);
+		ImGui::DragFloat("PointLight:radius", &pointLight.radius, 0.1f);
+		ImGui::DragFloat("PointLight:decay", &pointLight.decay, 0.1f, 10.0f);
 
 		ImGui::PopID();
 	}
