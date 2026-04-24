@@ -21,6 +21,7 @@ public:
 	{
 		Matrix4x4 WVP;
 		Matrix4x4 World;
+		Matrix4x4 WorldInverseTranspose;
 	};
 
 	// 平行光源データ

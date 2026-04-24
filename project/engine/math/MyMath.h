@@ -51,6 +51,8 @@ namespace MyMath {
 	// 逆行列
 	Matrix4x4 Inverse(const Matrix4x4& m);
 
+	//4x4行列の転置
+	Matrix4x4 Transpose(const Matrix4x4& m);
 
 	// --- 変換行列作成 ---
 

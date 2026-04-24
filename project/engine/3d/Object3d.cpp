@@ -41,6 +41,9 @@ void Object3d::Update()
 	}
 	transformationMatrixData->WVP = worldViewProjectionMatrix;
 	transformationMatrixData->World = worldMatrix;
+
+	Matrix4x4 inverseMatrix = Inverse(worldMatrix);
+	transformationMatrixData->WorldInverseTranspose = Transpose(inverseMatrix);
 }
 
 void Object3d::Draw()
