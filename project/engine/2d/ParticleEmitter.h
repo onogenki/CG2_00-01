@@ -8,7 +8,7 @@ class ParticleEmitter
 public:
 
     // ほとんどのメンバ変数を引数として受け取り、メンバ変数に書き込む
-    ParticleEmitter(const std::string& name, const Transform& transform, uint32_t count, float frequency);
+    ParticleEmitter(const std::string& name, const Transform& transform, uint32_t count, float frequency,bool receivesWind);
 
     // 更新処理
     void Update();
@@ -26,6 +26,7 @@ private:
     uint32_t count_;     // 1回あたりの発生数
     float frequency_;    // 発生頻度（何秒ごとに発生させるか）
     float frequencyTime_;// 時間
+    bool receivesWind_;//風に吹かれてるか
 
 };
 

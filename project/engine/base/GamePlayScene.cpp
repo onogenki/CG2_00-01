@@ -94,9 +94,9 @@ void GamePlayScene::Initialize()
 	emitterTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 
 	//Circleパーティクル
-	emitterCircle = std::make_unique<ParticleEmitter>("Circle", emitterTransform, 1, 0.1f);
-	//四角形のパーティクル
-	emitterPlane = std::make_unique<ParticleEmitter>("Plane", emitterTransform, 1, 0.3f);
+	emitterCircle = std::make_unique<ParticleEmitter>("Circle", emitterTransform, 1, 0.1f,false);
+	//四角形のパーティクル(風に吹かれる方)
+	emitterPlane = std::make_unique<ParticleEmitter>("Plane", emitterTransform, 1, 0.3f,true);
 
 	//最初はcircleにする
 	activeEmitter = emitterCircle.get();

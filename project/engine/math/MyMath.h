@@ -92,4 +92,10 @@ namespace MyMath {
 	// cot 関数
 	float Cot(float x);
 
+	struct AABB
+	{
+		Vector3 min;
+		Vector3 max;
+	};
+
 }

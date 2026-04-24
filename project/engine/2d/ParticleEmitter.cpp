@@ -1,8 +1,8 @@
 #include "ParticleEmitter.h"
 #include "ParticleManager.h"
 
-ParticleEmitter::ParticleEmitter(const std::string& name, const Transform& transform, uint32_t count, float frequency)
-    : name_(name), transform_(transform), count_(count), frequency_(frequency), frequencyTime_(0.0f)
+ParticleEmitter::ParticleEmitter(const std::string& name, const Transform& transform, uint32_t count, float frequency,bool receivesWind)
+    : name_(name), transform_(transform), count_(count), frequency_(frequency), frequencyTime_(0.0f), receivesWind_(receivesWind)
 {
     // コンストラクタで引数を受け取り、初期化リストでメンバ変数に書き込む
 }
@@ -29,5 +29,5 @@ void ParticleEmitter::Update()
 void ParticleEmitter::Emit()
 {
     // 設定値に従ってParticleManagerのEmitを呼び出す
-    ParticleManager::GetInstance()->Emit(name_, transform_.translate, count_);
+    ParticleManager::GetInstance()->Emit(name_, transform_.translate, count_, receivesWind_);
 }

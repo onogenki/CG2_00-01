@@ -170,6 +170,13 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
     materialData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
     materialData_->enableLighting = 0;
     materialData_->uvTransform = MakeAffineMatrix({ 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f });
+
+    //フィールドの設定
+    accelerationField_.acceleration = { 15.0f,0.0f,0.0f };
+    accelerationField_.area.min = { -1.0f,-1.0f,-1.0f };
+    accelerationField_.area.max = { 1.0f,1.0f,1.0f };
+
+    isField_ = true;
 }
 
 // パーティクルグループの生成
@@ -214,8 +221,15 @@ void ParticleManager::ClearAllGroups()
     particleGroups_.clear();
 }
 
+bool ParticleManager::IsCollision(const AABB aabb, const Vector3& point)
+{
+    return (point.x >= aabb.min.x && point.x <= aabb.max.x) &&
+        (point.y >= aabb.min.y && point.y <= aabb.max.y) &&
+        (point.z >= aabb.min.z && point.z <= aabb.max.z);
+}
+
 // パーティクルの発生
-void ParticleManager::Emit(const std::string name, const Vector3& position, uint32_t count) {
+void ParticleManager::Emit(const std::string name, const Vector3& position, uint32_t count,bool receivesWind) {
     // 登録済みのパーティクルグループ名かチェックしてassert
     assert(particleGroups_.find(name) != particleGroups_.end() && "指定されたグループ名が見つかりません");
 
@@ -246,6 +260,7 @@ void ParticleManager::Emit(const std::string name, const Vector3& position, uint
         newParticle.lifeTime = distTime(randomEngine_);
         newParticle.currentTime = 0.0f;
 
+        newParticle.receivesWind = receivesWind;
         // グループに登録
         group.particles.push_back(newParticle);
     }
@@ -257,11 +272,20 @@ void ParticleManager::Update() {
     if (!cameraManager_)return;
     //毎フレーム今アクティブなカメラを取得する
     Camera* activeCamera = cameraManager_->GetActiveCamera();
-
     //万が一カメラがない場合は安全のために抜ける
     if (!activeCamera)return;
 
     Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(std::numbers::pi_v<float>);
+
+    const float kDeltaTime_ = 1.0f / 60.0f;
+
+    //風タイマー
+    windTimer_ += kDeltaTime_;
+    if (windTimer_ >= 5.0f)
+    {//5秒経過したら
+        isField_ = !isField_;//trueとfalse切り替え
+        windTimer_ = 0.0f;
+    }
 
     //取得したactiveカメラからビュー作成もらう
     Matrix4x4 view = activeCamera->GetViewMatrix();
@@ -269,8 +293,6 @@ void ParticleManager::Update() {
     Matrix4x4 billboardMatrix = Inverse(view);
 
     Matrix4x4 viewProjectionMatrix = Multiply(activeCamera->GetViewMatrix(), activeCamera->GetProjectionMatrix());
-
-    const float kDeltaTime_ = 1.0f / 60.0f;
 
     // 全てのパーティクルグループについて処理する
     for (auto& pair : particleGroups_) {
@@ -287,6 +309,17 @@ void ParticleManager::Update() {
                 continue;
             }
 
+            //Fieldの範囲内のParticleには加速度を適用
+            if (isField_ && particle.receivesWind)
+            {
+                if (IsCollision(accelerationField_.area, particle.transform.translate))
+                {
+                    particle.velocity.x += accelerationField_.acceleration.x * kDeltaTime_;
+                    particle.velocity.y += accelerationField_.acceleration.y * kDeltaTime_;
+                    particle.velocity.z += accelerationField_.acceleration.z * kDeltaTime_;
+                }
+            }
+
             particle.transform.translate.x += particle.velocity.x * kDeltaTime_;
             particle.transform.translate.y += particle.velocity.y * kDeltaTime_;
             particle.transform.translate.z += particle.velocity.z * kDeltaTime_;
@@ -299,7 +332,7 @@ void ParticleManager::Update() {
 
             Matrix4x4 worldMatrix = Multiply(Multiply(scale, billboardMatrix), translate);
 
-            // 取得したactiveCameraからビュープロジェクション行列をもらう
+            // 取得したactiveCameraからビュープロジェクション行列をもらう(カメラの向きを向く)
             Matrix4x4 worldViewProjectionMatrix = Multiply(activeCamera->GetViewMatrix(),activeCamera->GetProjectionMatrix());
 
             if (group.instanceCount < kNumMaxInstance) {

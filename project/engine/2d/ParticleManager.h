@@ -11,6 +11,7 @@
 #include "Object3d.h"
 #include "DirectXCommon.h"
 #include "SrvManager.h"
+using namespace MyMath;
 
 class CameraManager;
 
@@ -21,6 +22,13 @@ public:
     Vector4 color;
     float lifeTime;
     float currentTime;
+    bool receivesWind;//風を受けるかどうか
+};
+
+struct AccelerationField
+{
+    Vector3 acceleration;//加速度
+    AABB area;//範囲
 };
 
 struct ParticleForGPU {
@@ -78,7 +86,7 @@ public:
     }
 
 	//パーティクルの発生
-	void Emit(const std::string name, const Vector3& position, uint32_t count);
+	void Emit(const std::string name, const Vector3& position, uint32_t count,bool receivesWind);
 
 	void CreateParticleGroup(const std::string name, const std::string textureFilePath);
 
@@ -90,6 +98,7 @@ public:
 
     void SetCameraManager(CameraManager* cameraManager) { cameraManager_ = cameraManager; }
 
+    bool IsCollision(const AABB aabb, const Vector3& point);
 private:
     ParticleManager() = default;
     ~ParticleManager() = default;
@@ -115,5 +124,10 @@ private:
 
     Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_;
     Material* materialData_ = nullptr;
+
+    //場
+    AccelerationField accelerationField_;
+    float windTimer_ = 0.0f;//吹く時間
+    bool isField_ = false;//風が吹いてるかどうか
 };
 
