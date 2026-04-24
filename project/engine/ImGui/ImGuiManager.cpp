@@ -5,6 +5,7 @@
 #include "Object3d.h"
 #include "ParticleEmitter.h"
 #include "CameraManager.h"
+#include "ModelManager.h"
 
 void ImGuiManager::Initialize([[maybe_unused]] WinApp* winApp, [[maybe_unused]]DirectXCommon* directXCommon, [[maybe_unused]]SrvManager* srvManager)
 {
@@ -184,7 +185,7 @@ void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& obj
 #ifdef USE_IMGUI
 
 	static int selectedIndex = 0; //選択されている番号
-
+	static bool useMonsterBall = false;//png入れ替え
 	// ウィンドウ作成
 	ImGui::Begin("Editing Object");
 
@@ -194,6 +195,19 @@ void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& obj
 	ImGui::SameLine();
 	if (ImGui::Button("Select Axis")) {
 		selectedIndex = 1;
+	}
+	ImGui::SameLine();
+	if (ImGui::Checkbox("Use MonsterBall", &useMonsterBall))
+	{//切り替えたいモデル
+		Model* targetModel = ModelManager::GetInstance()->FindModel("sphere.obj");
+		if (targetModel)
+		{
+			if (useMonsterBall) {
+				targetModel->SetTexture("Resources/monsterBall.png");
+			} else {
+				targetModel->SetTexture("Resources/uvChecker.png");
+			}
+		}
 	}
 
 	ImGui::Separator();

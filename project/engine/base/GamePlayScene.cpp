@@ -51,7 +51,7 @@ void GamePlayScene::Initialize()
 	
 	//.objファイルからモデルを読み込む
 	ModelManager::GetInstance()->LoadModel("plane.obj");
-	ModelManager::GetInstance()->LoadModel("axis.obj");
+	ModelManager::GetInstance()->LoadModel("sphere.obj");
 
 	//音声読み込み
 	Audio::GetInstance()->LoadFile("Resources/Alarm01.wav");
@@ -69,7 +69,7 @@ void GamePlayScene::Initialize()
 
 	auto objAxis = std::make_unique<Object3d>();
 	objAxis->Initialize(object3dCommon);
-	objAxis->SetModel("axis.obj");
+	objAxis->SetModel("sphere.obj");
 	objAxis->GetTransform().translate = { 2.0f, 0.0f, 0.0f };
 	objectAxis = objAxis.get();
 	objects.push_back(std::move(objAxis));

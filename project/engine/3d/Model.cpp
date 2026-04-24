@@ -18,9 +18,14 @@ void Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPat
 	CreateVertexData();
 	//マテリアルデータ作成
 	CreateMaterialData();
+	//pngが空ならuvChecker.pngに変える
+	if (modelData.material.textureFilePath.empty() ||
+		modelData.material.textureFilePath.find("None") != std::string::npos)
+	{
+		modelData.material.textureFilePath = "Resources/uvChecker.png";
+	}
 	//テクスチャ読み込み
 	TextureManager::GetInstance()->LoadTexture(modelData.material.textureFilePath);
-	//modelData.material.textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(modelData.material.textureFilePath);
 }
 
 void Model::Draw()
@@ -46,6 +51,13 @@ void Model::Draw()
 	// 7. 描画 (DrawCall)
 	commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
 
+}
+
+void Model::SetTexture(const std::string& filePath)
+{//新しいテクスチャを読み込んで
+	TextureManager::GetInstance()->LoadTexture(filePath);
+	//文字列を書き換える
+	modelData.material.textureFilePath = filePath;
 }
 
 Microsoft::WRL::ComPtr<ID3D12Resource> Model::CreateBufferResources(ID3D12Device* device, size_t sizeInBytes)

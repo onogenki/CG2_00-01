@@ -47,6 +47,9 @@ public:
 	void Initialize(ModelCommon* modelCommon, const std::string& directoryPath, const std::string& filename);
 
 	void Draw();
+
+	void SetTexture(const std::string& filePath);
+
 private:
 
 	//ModelCommonのポインタ
