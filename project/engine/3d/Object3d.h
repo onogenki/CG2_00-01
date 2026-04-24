@@ -38,7 +38,20 @@ public:
 		float intensity;//輝度
 		float radius;//ライトの届く最大距離
 		float decay;//減衰率
-		float padding[2];//資料にはかいてあったが場合によっては不要
+		float padding[2];
+	};
+
+	struct SpotLight
+	{
+		Vector4 color;//ライトの色
+		Vector3 position;//ライトの位置
+		float intensity;//輝度
+		Vector3 direction;//スポットライトの方向
+		float distance;//ライトの届く最大距離
+		float decay;//減衰率
+		float cosAngle;//スポットライトの余弦
+		float cosFalloffStart;
+		float padding[1];
 	};
 
 	struct CameraForGPU
@@ -69,6 +82,9 @@ public:
 	};
 	void SetPointLight(const PointLight& light) {
 		*pointLightData = light;
+	}
+	void SetSpotLight(const SpotLight& light) {
+		*spotLightData = light;
 	}
 
 	//getter
@@ -109,6 +125,11 @@ private:
 	void CreatePointLightData();
 	Microsoft::WRL::ComPtr<ID3D12Resource> pointLightResource;
 	PointLight* pointLightData = nullptr;
+
+	// スポットライト作成関数
+	void CreateSpotLightData();
+	Microsoft::WRL::ComPtr<ID3D12Resource> spotLightResource;
+	SpotLight* spotLightData = nullptr;
 
 	// リソース作成のヘルパー関数 (Spriteから移植)
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResources(ID3D12Device* device, size_t sizeInBytes);

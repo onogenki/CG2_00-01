@@ -180,7 +180,7 @@ void ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& spri
 #endif
 }
 
-void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& objects, Object3d::DirectionalLight& light,Object3d::PointLight& pointLight)
+void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& objects, Object3d::DirectionalLight& light,Object3d::PointLight& pointLight,Object3d::SpotLight& spotLight)
 {
 #ifdef USE_IMGUI
 
@@ -245,6 +245,18 @@ void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& obj
 		ImGui::ColorEdit3("PointLight:color", & pointLight.color.x);
 		ImGui::DragFloat("PointLight:radius", &pointLight.radius, 0.1f);
 		ImGui::DragFloat("PointLight:decay", &pointLight.decay, 0.1f, 10.0f);
+
+		ImGui::Separator();
+
+		ImGui::Text("Spot Light");
+		ImGui::DragFloat3("SpotLight:position", &spotLight.position.x, 0.01f);
+		ImGui::DragFloat3("SpotLight:direction", &spotLight.direction.x, 0.01f);
+		ImGui::DragFloat("SpotLight:intensity", &spotLight.intensity, 0.01f, 0.0f, 20.0f);
+		ImGui::ColorEdit3("SpotLight:color", &spotLight.color.x);
+		ImGui::SliderFloat("SpotLight:distance", &spotLight.distance, 0.0f, 100.0f);
+		ImGui::SliderFloat("SpotLight:decay", &spotLight.decay, 0.1f, 10.0f);
+		ImGui::SliderFloat("SpotLight:cosAngle", &spotLight.cosAngle, -1.0f, 1.0f);
+		ImGui::SliderFloat("SpotLight:cosFalloffStart", &spotLight.cosFalloffStart, -1.0f, 1.0f);
 
 		ImGui::PopID();
 	}

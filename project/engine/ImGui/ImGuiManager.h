@@ -45,7 +45,7 @@ public:
 	//スプライト編集
 	void SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprites);
 	//3Dモデル編集
-	void ModelWindow(const std::vector<std::unique_ptr<Object3d>>& objects, Object3d::DirectionalLight& light,Object3d::PointLight& pointLight);
+	void ModelWindow(const std::vector<std::unique_ptr<Object3d>>& objects, Object3d::DirectionalLight& light,Object3d::PointLight& pointLight,Object3d::SpotLight& spotLight);
 	//カメラ編集
 	void CameraWindow(CameraManager* cameraManager);
 	//描画

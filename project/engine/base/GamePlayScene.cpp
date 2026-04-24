@@ -104,6 +104,18 @@ void GamePlayScene::Initialize()
 	pointLight.radius = 10.0f;
 	pointLight.decay = 1.0f;
 
+	//スポットライト
+	spotLight.position = { 2.0f,1.25f,0.0f };
+	spotLight.intensity = 4.0f;
+	spotLight.color = { 1.0f,1.0f,1.0f,1.0f };
+	spotLight.distance = 7.0f;
+	spotLight.direction =
+		Normalize({ -1.0f,-1.0f,0.0f });
+	spotLight.decay = 2.0f;
+	spotLight.cosAngle =
+		std::cos(std::numbers::pi_v<float> / 3.0f);
+	spotLight.cosFalloffStart = 1.0f;
+
 	//パーティクル
 	//座標、1回の発生数、発生頻度[秒]
 	emitterTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
@@ -129,7 +141,7 @@ void GamePlayScene::Update()
 	ImGuiManager::GetInstance()->DemoWindow();
 	ImGuiManager::GetInstance()->FPSWindow();
 	ImGuiManager::GetInstance()->SpriteWindow(sprites);
-	ImGuiManager::GetInstance()->ModelWindow(objects, directionalLight,pointLight);
+	ImGuiManager::GetInstance()->ModelWindow(objects, directionalLight,pointLight,spotLight);
 	// ImGuiのParticleWindowから、どのボタンが押されたかの結果（文字列）を受け取る
 	std::string particleRequest = ImGuiManager::GetInstance()->ParticleWindow(emitterTransform);
 
@@ -173,6 +185,7 @@ void GamePlayScene::Update()
 		}
 		object3d->SetDirectionalLight(directionalLight);//光を他のモデルにも分け与える
 		object3d->SetPointLight(pointLight);
+		object3d->SetSpotLight(spotLight);
 		object3d->Update();
 
 	}

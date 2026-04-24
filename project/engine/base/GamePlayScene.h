@@ -42,6 +42,7 @@ private:
 
     Object3d::DirectionalLight directionalLight;//平行光源
     Object3d::PointLight pointLight;//点光源
+    Object3d::SpotLight spotLight;//スポットライト
 
     // パーティクルのトランスフォーム
     Transform emitterTransform{};

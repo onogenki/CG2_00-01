@@ -21,6 +21,8 @@ void Object3d::Initialize(Object3dCommon* object3dCommon)
 	CreateDirectionalLightData();
 	//点光源データ作成
 	CreatePointLightData();
+	//スポットライトデータ作成
+	CreateSpotLightData();
 	//Transform変数を作る
 	transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 }
@@ -59,6 +61,8 @@ void Object3d::Draw()
 	commandList->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
 
 	commandList->SetGraphicsRootConstantBufferView(5, pointLightResource->GetGPUVirtualAddress());
+
+	commandList->SetGraphicsRootConstantBufferView(6, spotLightResource->GetGPUVirtualAddress());
 
 	if (model_)
 	{
@@ -163,4 +167,20 @@ void Object3d::CreatePointLightData()
 
 	pointLightData->radius = 10.0f;//届く距離
 	pointLightData->decay = 1.0f;//普通の線形減衰
+}
+
+void Object3d::CreateSpotLightData()
+{
+	spotLightResource = CreateBufferResources(object3dCommon->GetDxCommon()->GetDevice(), sizeof(SpotLight));
+	spotLightResource->Map(0, nullptr, reinterpret_cast<void**>(&spotLightData));
+
+	// 資料通りの初期値
+	spotLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	spotLightData->position = { 2.0f, 1.25f, 0.0f };
+	spotLightData->distance = 7.0f;
+	spotLightData->direction = Normalize({ -1.0f, -1.0f, 0.0f });
+	spotLightData->intensity = 4.0f;
+	spotLightData->decay = 2.0f;
+	spotLightData->cosAngle = std::cos(std::numbers::pi_v<float> / 3.0f);// 限界の角度 (60度)
+	spotLightData->cosFalloffStart = 1.0f;//1.0 = 中心(0度)から減衰が始まる
 }
