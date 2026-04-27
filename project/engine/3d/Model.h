@@ -8,6 +8,9 @@
 #include "Matrix4x4.h"
 #include "ModelCommon.h"
 #include "MyMath.h"
+#include<assimp/Importer.hpp>
+#include<assimp/scene.h>
+#include<assimp/postprocess.h>
 
 //見た目のモデル
 class Model
@@ -36,13 +39,23 @@ public:
 
 	struct MaterialData {
 		std::string textureFilePath;
-		//uint32_t textureIndex = 0;
+	};
+
+	struct Node
+	{
+		Matrix4x4 localMatrix;
+		std::string name;
+		std::vector<Node> children;
 	};
 
 	struct ModelData {
 		std::vector<VertexData> vertices;
 		MaterialData material;
+		Node rootNode;
 	};
+
+
+	Node ReadNode(aiNode* node);
 
 	void Initialize(ModelCommon* modelCommon, const std::string& directoryPath, const std::string& filename);
 
@@ -50,6 +63,7 @@ public:
 
 	void SetTexture(const std::string& filePath);
 
+	const ModelData& GetModelData() const { return modelData; }
 private:
 
 	//ModelCommonのポインタ
@@ -66,8 +80,7 @@ private:
 
 
 
-	void LoadObjFile(const std::string& directoryPath, const std::string& filename);
-	MaterialData LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename);
+	void LoadModelFile(const std::string& directoryPath, const std::string& filename);
 	void CreateVertexData();
 	void CreateMaterialData();
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResources(ID3D12Device* device, size_t sizeInBytes);

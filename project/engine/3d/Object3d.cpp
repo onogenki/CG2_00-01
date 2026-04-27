@@ -33,6 +33,13 @@ void Object3d::Update()
 	// 1. TransformからWorldMatrixを作る
 	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 	Matrix4x4 worldViewProjectionMatrix;
+
+	if (model_)
+	{
+		Matrix4x4 rootMatrix = model_->GetModelData().rootNode.localMatrix;
+		worldMatrix = Multiply(rootMatrix, worldMatrix);
+	}
+
 	if (camera)
 	{
 		const Matrix4x4& viewProjectionMatrix = camera->GetViewProjectionMatrix();
