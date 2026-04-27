@@ -54,6 +54,11 @@ void GamePlayScene::Initialize()
 	ModelManager::GetInstance()->LoadModel("terrain.obj");
 	ModelManager::GetInstance()->LoadModel("sphere.obj");
 	ModelManager::GetInstance()->LoadModel("plane.gltf");
+	ModelManager::GetInstance()->LoadModel("AnimatedCube.gltf");
+
+	//アニメーションの読み込み
+	animation_=Model::LoadAnimationFile("./resources", "AnimatedCube.gltf");
+
 	//音声読み込み
 	Audio::GetInstance()->LoadFile("Resources/Alarm01.wav");
 	//音声再生
@@ -70,9 +75,12 @@ void GamePlayScene::Initialize()
 
 	auto objAxis = std::make_unique<Object3d>();
 	objAxis->Initialize(object3dCommon);
-	objAxis->SetModel("plane.gltf");
+	objAxis->SetModel("AnimatedCube.gltf");
 	objAxis->GetTransform().translate = { 2.0f, 0.0f, 0.0f };
 	objAxis->GetTransform().rotate = { 0.0f,0.0f,0.0f };
+
+	objAxis->PlayAnimation(animation_);
+
 	objectAxis = objAxis.get();
 	objects.push_back(std::move(objAxis));
 

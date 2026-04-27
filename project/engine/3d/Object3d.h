@@ -87,6 +87,8 @@ public:
 		*spotLightData = light;
 	}
 
+	void PlayAnimation(const Model::Animation& animation);
+
 	//getter
 	const Vector3& GetScale()const { return transform.scale; }
 	const Vector3& GetRotate()const { return transform.rotate; }
@@ -134,5 +136,9 @@ private:
 	// リソース作成のヘルパー関数 (Spriteから移植)
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResources(ID3D12Device* device, size_t sizeInBytes);
 
+	//アニメーション
+	Model::Animation currentAnimation_;//アニメーション読み込み
+	float animationTime_ = 0.0f;// アニメーションの再生時間を管理
+	bool isAnimating_ = false;
 };
 

@@ -29,8 +29,23 @@ void Object3d::Initialize(Object3dCommon* object3dCommon)
 
 void Object3d::Update()
 {
-	//transform.rotate.y += 3.14f / 180.0f;
-	// 1. TransformからWorldMatrixを作る
+
+	if (model_&&isAnimating_)
+	{
+		animationTime_ += 1.0f / 60.0f;//時刻を進める。1/60で固定してあるが、計算した時間を使って可変フレーム対応するほうが望ましい
+		animationTime_ = std::fmod(animationTime_, currentAnimation_.duration);//最後まで行ったら最初からリポート再生
+		std::string rootName = model_->GetModelData().rootNode.name;
+		Model::NodeAnimation& rootNodeAnimation = currentAnimation_.nodeAnimations[rootName];//rootNodeのAnimationを取得
+
+		Vector3 translate = Model::CalculateValue(rootNodeAnimation.translate.keyframes, animationTime_);//指定時刻の値を取得。関数の詳細は次ページ
+		Quaternion rotate = Model::CalculateValue(rootNodeAnimation.rotate.keyframes, animationTime_);
+		Vector3 scale = Model::CalculateValue(rootNodeAnimation.scale.keyframes, animationTime_);
+
+		// モデルの rootNode の localMatrix を更新する
+		model_->GetModelData().rootNode.localMatrix = MakeAffineMatrixQuaternion(scale, rotate, translate);
+	}
+
+//TransformからWorldMatrixを作る
 	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 	Matrix4x4 worldViewProjectionMatrix;
 
@@ -39,7 +54,6 @@ void Object3d::Update()
 		Matrix4x4 rootMatrix = model_->GetModelData().rootNode.localMatrix;
 		worldMatrix = Multiply(rootMatrix, worldMatrix);
 	}
-
 	if (camera)
 	{
 		const Matrix4x4& viewProjectionMatrix = camera->GetViewProjectionMatrix();
@@ -80,6 +94,13 @@ void Object3d::Draw()
 void Object3d::SetModel(const std::string& filePath)
 {// モデルマネージャからモデルを検索してセットする
 	model_ = ModelManager::GetInstance()->FindModel(filePath);
+}
+
+void Object3d::PlayAnimation(const Model::Animation& animation)
+{
+	currentAnimation_ = animation;
+	animationTime_ = 0.0f;
+	isAnimating_ = true;
 }
 
 Microsoft::WRL::ComPtr<ID3D12Resource> Object3d::CreateBufferResources(ID3D12Device* device, size_t sizeInBytes)

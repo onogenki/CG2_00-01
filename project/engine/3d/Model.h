@@ -11,11 +11,22 @@
 #include<assimp/Importer.hpp>
 #include<assimp/scene.h>
 #include<assimp/postprocess.h>
+#include <map>
 
 //見た目のモデル
 class Model
 {
 public:
+
+	//キーフレーム
+	template<typename tValue>
+	struct Keyframe
+	{
+		float time;//キーフレームの時刻
+		tValue value;//キーフレームの幅
+	};
+	using KeyframeVector3 = Keyframe<Vector3>;
+	using KeyframeQuaternion = Keyframe<Quaternion>;
 
 	struct VertexData {
 		Vector4 position;
@@ -54,6 +65,31 @@ public:
 		Node rootNode;
 	};
 
+	template<typename tValue>
+	struct AnimationCurve
+	{
+		std::vector<Keyframe<tValue>> keyframes;
+	};
+
+	struct NodeAnimation
+	{
+		AnimationCurve<Vector3> translate;
+		AnimationCurve<Quaternion>rotate;
+		AnimationCurve<Vector3> scale;
+	};
+
+	struct Animation
+	{
+		float duration;//アニメーション全体の尺(単位は秒)
+		//NodeAnimationの集合。Node名でひけるようにしておく
+		std::map<std::string, NodeAnimation>nodeAnimations;
+	};
+
+	//アニメーションの解析
+	static Animation LoadAnimationFile(const std::string& directoryPath, const std::string& filename);
+
+	static Vector3 CalculateValue(const std::vector<KeyframeVector3>& keyframes, float time);
+	static Quaternion CalculateValue(const std::vector<KeyframeQuaternion>& keyframes, float time);
 
 	Node ReadNode(aiNode* node);
 
@@ -63,7 +99,7 @@ public:
 
 	void SetTexture(const std::string& filePath);
 
-	const ModelData& GetModelData() const { return modelData; }
+	ModelData& GetModelData() { return modelData; }
 private:
 
 	//ModelCommonのポインタ

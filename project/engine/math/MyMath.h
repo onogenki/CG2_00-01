@@ -74,6 +74,13 @@ namespace MyMath {
 	// アフィン変換行列の作成
 	Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Vector3& translate);
 
+	//クォータニオン
+	Matrix4x4 MakeRotateMatrix(const Quaternion& quaternion);
+	Matrix4x4 MakeAffineMatrixQuaternion(const Vector3& scale, const Quaternion& rotate, const Vector3& translate);
+
+	Vector3 Lerp(const Vector3& v1, const Vector3& v2, float t);
+
+	Quaternion Slerp(const Quaternion& q0, const Quaternion& q1, float t);
 
 	// --- 座標変換・投影 ---
 

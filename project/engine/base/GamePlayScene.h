@@ -48,6 +48,8 @@ private:
     Transform emitterTransform{};
 
     int selectedUI = 0;
-   
+  
+    Model::Animation animation_;//仮アニメーション読み込み
+    float animationTime_ = 0.0f;// アニメーションの再生時間を管理
 };
 

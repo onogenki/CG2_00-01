@@ -98,6 +98,90 @@ namespace MyMath {
 		return Multiply(Multiply(matScale, matRot), matTrans);
 	}
 
+	Matrix4x4 MakeRotateMatrix(const Quaternion& q)
+	{
+		Matrix4x4 result = MakeIdentity4x4();
+		float xx = q.x * q.x;
+		float yy = q.y * q.y;
+		float zz = q.z * q.z;
+		float ww = q.w * q.w;
+		float xy = q.x * q.y;
+		float xz = q.x * q.z;
+		float xw = q.x * q.w;
+		float yz = q.y * q.z;
+		float yw = q.y * q.w;
+		float zw = q.z * q.w;
+
+		result.m[0][0] = 1.0f - 2.0f * (yy + zz);
+		result.m[0][1] = 2.0f * (xy + zw);
+		result.m[0][2] = 2.0f * (xz - yw);
+
+		result.m[1][0] = 2.0f * (xy - zw);
+		result.m[1][1] = 1.0f - 2.0f * (xx + zz);
+		result.m[1][2] = 2.0f * (yz + xw);
+
+		result.m[2][0] = 2.0f * (xz + yw);
+		result.m[2][1] = 2.0f * (yz - xw);
+		result.m[2][2] = 1.0f - 2.0f * (xx + yy);
+
+		return result;
+	}
+
+	Matrix4x4 MyMath::MakeAffineMatrixQuaternion(const Vector3& scale, const Quaternion& rotate, const Vector3& translate) {
+		Matrix4x4 scaleMatrix = MakeScaleMatrix(scale);
+		Matrix4x4 rotateMatrix = MakeRotateMatrix(rotate);
+		Matrix4x4 translateMatrix = MakeTranslateMatrix(translate);
+		return Multiply(scaleMatrix, Multiply(rotateMatrix, translateMatrix));
+	}
+
+	Vector3 Lerp(const Vector3& v1, const Vector3& v2, float t)
+	{
+		return {
+		v1.x + (v2.x - v1.x) * t,
+		v1.y + (v2.y - v1.y) * t,
+		v1.z + (v2.z - v1.z) * t
+		};
+	}
+
+	Quaternion MyMath::Slerp(const Quaternion& q0, const Quaternion& q1, float t) {
+		float dot = q0.x * q1.x + q0.y * q1.y + q0.z * q1.z + q0.w * q1.w;
+		Quaternion q1_ = q1;
+
+		// 内積が負の場合は、逆回転を防ぐために反転
+		if (dot < 0.0f) {
+			q1_ = { -q1.x, -q1.y, -q1.z, -q1.w };
+			dot = -dot;
+		}
+
+		// 内積が1に近い（角度がほぼ0）場合はゼロ除算を防ぐため線形補間
+		if (dot >= 1.0f - 0.0005f) {
+			Quaternion result = {
+				q0.x * (1.0f - t) + q1_.x * t,
+				q0.y * (1.0f - t) + q1_.y * t,
+				q0.z * (1.0f - t) + q1_.z * t,
+				q0.w * (1.0f - t) + q1_.w * t
+			};
+			// 正規化
+			float norm = std::sqrt(result.x * result.x + result.y * result.y + result.z * result.z + result.w * result.w);
+			return { result.x / norm, result.y / norm, result.z / norm, result.w / norm };
+		}
+
+		float theta_0 = std::acos(dot);
+		float theta = theta_0 * t;
+		float sin_theta = std::sin(theta);
+		float sin_theta_0 = std::sin(theta_0);
+
+		float s0 = std::cos(theta) - dot * sin_theta / sin_theta_0;
+		float s1 = sin_theta / sin_theta_0;
+
+		return {
+			(q0.x * s0) + (q1_.x * s1),
+			(q0.y * s0) + (q1_.y * s1),
+			(q0.z * s0) + (q1_.z * s1),
+			(q0.w * s0) + (q1_.w * s1)
+		};
+	}
+
 	float Cot(float x) {
 		return 1.0f / std::tan(x);
 	}
