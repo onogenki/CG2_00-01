@@ -4,6 +4,9 @@
 #include <fstream>
 #include <sstream>
 #include <cassert>
+#include<assimp/Importer.hpp>
+#include<assimp/scene.h>
+#include<assimp/postprocess.h>
 
 using namespace MyMath;
 
@@ -160,6 +163,11 @@ void Model::LoadObjFile(const std::string& directoryPath, const std::string& fil
 	std::vector<Vector2>texcoords;//テクスチャ座標
 	std::string line;//ファイルから読んだ1行を格納する
 
+	//assimpでobjを読む
+	Assimp::Importer importer;
+	std::string filePath = directoryPath + "/" + filename;
+	const aiScene* scene = importer.ReadFile(filePath.c_str(), aiProcess_FlipWindingOrder | aiProcess_FlipUVs);
+	assert(scene->HasMeshes());//メッシュがないのは対応しない
 	std::ifstream file(directoryPath + "/" + filename);//ファイルを開く
 	assert(file.is_open());//とりあえず開けなかったら止める
 
@@ -169,6 +177,45 @@ void Model::LoadObjFile(const std::string& directoryPath, const std::string& fil
 		std::string identifier;
 		std::istringstream s(line);//文字列を分解しながら読むためのクラス
 		s >> identifier;//先頭の識別子を読む
+
+		for (uint32_t meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex)//mesh解析
+		{
+			aiMesh* mesh = scene->mMeshes[meshIndex];
+			assert(mesh->HasNormals());//法線がないMeshは今回は非対応
+			assert(mesh->HasTextureCoords(0));//TexcoordがないMeshは今回は非対応
+			for (uint32_t faceIndex = 0; faceIndex < mesh->mNumFaces; ++faceIndex)//face解析
+			{
+				aiFace& face = mesh->mFaces[faceIndex];
+				assert(face.mNumIndices == 3);//三角形のみサポート
+				for (uint32_t element = 0; element < face.mNumIndices; ++element)//vertex解析
+				{
+					uint32_t vertexIndex = face.mIndices[element];
+					aiVector3D& position = mesh->mVertices[vertexIndex];
+					aiVector3D& normal = mesh->mNormals[vertexIndex];
+					aiVector3D& texcoord = mesh->mTextureCoords[0][vertexIndex];
+					VertexData vertex;
+					vertex.position = { position.x,position.y,position.z,1.0f };
+					vertex.normal = { normal.x,normal.y,normal.z };
+					vertex.texcoord = { texcoord.x,texcoord.y };
+					//aiProcess_MakeLeftHandedはz*=-1で右手->左手に変換するので手動で対処
+					vertex.position.x *= -1.0f;
+					vertex.normal.x *= -1.0f;
+					modelData.vertices.push_back(vertex);
+				}
+			}
+		}
+
+		//material解析
+		for (uint32_t materialIndex = 0; materialIndex < scene->mNumMaterials; ++materialIndex)
+		{
+			aiMaterial* material = scene->mMaterials[materialIndex];
+			if (material->GetTextureCount(aiTextureType_DIFFUSE) != 0)
+			{
+				aiString textureFilePath;
+				material->GetTexture(aiTextureType_DIFFUSE, 0, &textureFilePath);
+				modelData.material.textureFilePath = directoryPath + "/" + textureFilePath.C_Str();
+			}
+		}
 
 		if (identifier == "v")//頂点位置
 		{
