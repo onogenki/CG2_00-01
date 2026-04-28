@@ -48,6 +48,8 @@ public:
 	void ModelWindow(const std::vector<std::unique_ptr<Object3d>>& objects, Object3d::DirectionalLight& light,Object3d::PointLight& pointLight,Object3d::SpotLight& spotLight);
 	//カメラ編集
 	void CameraWindow(CameraManager* cameraManager);
+	//アニメーション編集
+	void SkeletonDebugDraw(const Model::Skeleton& skeleton, const Matrix4x4& worldMatrix, const Matrix4x4& viewProjectionMatrix);
 	//描画
 	void Draw(DirectXCommon* dxCommon);
 	//終了処理

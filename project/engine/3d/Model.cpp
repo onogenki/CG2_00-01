@@ -7,6 +7,45 @@
 
 using namespace MyMath;
 
+Model::Skeleton Model::CreateSkeleton(const Node& rootNode)
+{
+	Skeleton skeleton;
+	skeleton.root = CreateJoint(rootNode, {}, skeleton.joints);
+
+	//名前とindexのマッピングを行いアクセスしやすくなる
+	for (const Joint& joint : skeleton.joints)
+	{
+		skeleton.jointMap.emplace(joint.name, joint.index);
+	}
+
+	//作成直後にも一度更新をかけておくと初期姿勢が正しく計算される
+	Update(skeleton);
+
+	return skeleton;
+}
+
+int32_t Model::CreateJoint(const Node& node, const std::optional<int32_t>& parent, std::vector<Joint>& joints)
+{
+	Joint joint;
+	joint.name = node.name;
+	joint.localMatrix = node.localMatrix;
+	joint.skeletonSpaceMatrix = MakeIdentity4x4();
+	joint.transform = node.transform;
+	joint.index = uint32_t(joints.size());//現在登録されてる数をindexに
+	joint.parent = parent;
+
+	joints.push_back(joint);//skeletonのJoint列に追加
+
+	for (const Node& child : node.children)
+	{
+		//子Jointを作成し、そのIndexを登録
+		int32_t childIndex = CreateJoint(child, joint.index, joints);
+		joints[joint.index].children.push_back(childIndex);//push_backなどで再確保が走るとアドレス変わるためindex
+	}
+	//自身のIndexを返す
+	return joint.index;
+}
+
 Model::Animation Model::LoadAnimationFile(const std::string& directoryPath, const std::string& filename)
 {
 	//アニメーション
@@ -106,14 +145,13 @@ Quaternion Model::CalculateValue(const std::vector<KeyframeQuaternion>& keyframe
 Model::Node Model::ReadNode(aiNode* node)
 {
 	Node result;
-	aiMatrix4x4 aiLocalMatrix = node->mTransformation;//nodeのlocalMatrixを取得
-	aiLocalMatrix.Transpose();//列ベクトル形式を行ベクトル形式に転置
-
-	for (int i = 0; i < 4; ++i) {
-		for (int j = 0; j < 4; ++j) {
-			result.localMatrix.m[i][j] = aiLocalMatrix[i][j];
-		}
-	}
+	aiVector3D scale, translate;
+	aiQuaternion rotate;
+	node->mTransformation.Decompose(scale, rotate, translate);//assimpの行列からSRTを抽出する関数を利用
+	result.transform.scale = { scale.x,scale.y,scale.z };//scaleはそのまま
+	result.transform.rotate = { rotate.x,-rotate.y,-rotate.z,rotate.w };//X軸を反転、さらに回転方向が逆なので軸を反転させる
+	result.transform.translate = { -translate.x,translate.y,translate.z };//X軸を反転
+	result.localMatrix = MakeAffineMatrixQuaternion(result.transform.scale, result.transform.rotate, result.transform.translate);
 
 	result.name = node->mName.C_Str();//Node名を格納
 	result.children.resize(node->mNumChildren);//子供の数だけ確保
@@ -147,6 +185,21 @@ void Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPat
 	TextureManager::GetInstance()->LoadTexture(modelData.material.textureFilePath);
 }
 
+void Model::Update(Skeleton& skeleton)
+{
+	//すべてのJointを更新 親が若いので通常ループで処理可能になっている
+	for (Joint& joint : skeleton.joints)
+	{
+		joint.localMatrix = MakeAffineMatrixQuaternion(joint.transform.scale, joint.transform.rotate, joint.transform.translate);
+		if (joint.parent)//親がいれば親の行列をかける
+		{
+			joint.skeletonSpaceMatrix = Multiply(joint.localMatrix, skeleton.joints[*joint.parent].skeletonSpaceMatrix);
+		} else {//親がいないのでlocalMatrixとskeletonSpaceMatrixは一致する
+			joint.skeletonSpaceMatrix = joint.localMatrix;
+		}
+	}
+}
+
 void Model::Draw()
 {
 
@@ -177,6 +230,22 @@ void Model::SetTexture(const std::string& filePath)
 	TextureManager::GetInstance()->LoadTexture(filePath);
 	//文字列を書き換える
 	modelData.material.textureFilePath = filePath;
+}
+
+//アニメーション適用
+void Model::ApplyAnimation(Skeleton& skeleton, const Animation& animation, float animationTime)
+{
+	for (Joint& joint : skeleton.joints)
+	{
+		//対象のJointのAnimationがあれば値の適用を行う。初期化付きif文
+		if (auto it = animation.nodeAnimations.find(joint.name); it != animation.nodeAnimations.end())
+		{
+			const NodeAnimation& rootNodeAnimation = (*it).second;
+			joint.transform.translate = CalculateValue(rootNodeAnimation.translate.keyframes, animationTime);
+			joint.transform.rotate = CalculateValue(rootNodeAnimation.rotate.keyframes, animationTime);
+			joint.transform.scale = CalculateValue(rootNodeAnimation.scale.keyframes, animationTime);
+		}
+	}
 }
 
 Microsoft::WRL::ComPtr<ID3D12Resource> Model::CreateBufferResources(ID3D12Device* device, size_t sizeInBytes)

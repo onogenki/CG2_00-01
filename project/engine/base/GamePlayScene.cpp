@@ -47,17 +47,26 @@ void GamePlayScene::Initialize()
 	TextureManager::GetInstance()->LoadTexture("Resources/circle.png");
 
 	ParticleManager::GetInstance()->CreateParticleGroup("Circle", "Resources/circle.png");
-
 	ParticleManager::GetInstance()->CreateParticleGroup("Plane", "Resources/uvChecker.png");
 	
 	//.objファイルからモデルを読み込む
 	ModelManager::GetInstance()->LoadModel("terrain.obj");
 	ModelManager::GetInstance()->LoadModel("sphere.obj");
 	ModelManager::GetInstance()->LoadModel("plane.gltf");
-	ModelManager::GetInstance()->LoadModel("AnimatedCube.gltf");
+	ModelManager::GetInstance()->LoadModel("AnimatedCube.gltf");//アニメーションありのモデル
+	ModelManager::GetInstance()->LoadModel("simpleSkin.gltf");//スケルトン(細かいアニメーション)
+	ModelManager::GetInstance()->LoadModel("walk.gltf");//アニメーションのみだが必要
+	ModelManager::GetInstance()->LoadModel("sneakWalk.gltf");//アニメーションのみだが必要
+	Model* model = ModelManager::GetInstance()->FindModel("simpleSkin.gltf");
+
+	//スケルトン
+	skeleton_ = model->CreateSkeleton(model->GetModelData().rootNode);
 
 	//アニメーションの読み込み
-	animation_=Model::LoadAnimationFile("./resources", "AnimatedCube.gltf");
+	animation_=Model::LoadAnimationFile("./resources", "AnimatedCube.gltf");//アニメーションありのモデル
+	SimpleAnimation_ = Model::LoadAnimationFile("./resources", "simpleSkin.gltf");//スケルトン
+	walkAnimation_ = Model::LoadAnimationFile("./resources", "walk.gltf");//アニメーションのみ
+	sneakWalkAnimation_ = Model::LoadAnimationFile("./resources", "sneakWalk.gltf");//アニメーションのみ
 
 	//音声読み込み
 	Audio::GetInstance()->LoadFile("Resources/Alarm01.wav");
@@ -75,11 +84,11 @@ void GamePlayScene::Initialize()
 
 	auto objAxis = std::make_unique<Object3d>();
 	objAxis->Initialize(object3dCommon);
-	objAxis->SetModel("AnimatedCube.gltf");
+	objAxis->SetModel("sneakWalk.gltf");//モデル読み込み
 	objAxis->GetTransform().translate = { 2.0f, 0.0f, 0.0f };
 	objAxis->GetTransform().rotate = { 0.0f,0.0f,0.0f };
 
-	objAxis->PlayAnimation(animation_);
+	objAxis->PlayAnimation(sneakWalkAnimation_);//アニメーション読み込み
 
 	objectAxis = objAxis.get();
 	objects.push_back(std::move(objAxis));
@@ -144,29 +153,9 @@ void GamePlayScene::Update()
 
 	//UIの更新
 	directionalLight = objectAxis->GetDirectionalLight();
-	//ゲームの処理
-	ImGuiManager::GetInstance()->Begin();
-	ImGuiManager::GetInstance()->DemoWindow();
-	ImGuiManager::GetInstance()->FPSWindow();
-	ImGuiManager::GetInstance()->SpriteWindow(sprites);
-	ImGuiManager::GetInstance()->ModelWindow(objects, directionalLight,pointLight,spotLight);
-	// ImGuiのParticleWindowから、どのボタンが押されたかの結果（文字列）を受け取る
-	std::string particleRequest = ImGuiManager::GetInstance()->ParticleWindow(emitterTransform);
-
-	// 結果に応じて、アクティブなエミッター（指し示す先）を切り替える
-	if (particleRequest == "Circle")
-	{
-		activeEmitter = emitterCircle.get(); // 既に作ってあるCircleの方を指す
-	} else if (particleRequest == "Plane")
-	{
-		activeEmitter = emitterPlane.get();  // 既に作ってあるPlaneの方を指す
-	}
-	ImGuiManager::GetInstance()->CameraWindow(cameraManager.get());
-	ImGuiManager::GetInstance()->End();
 
 	//カメラの更新
 	cameraManager->Update();
-
 
 	//カメラのビュープロジェクション行列を渡して更新
 	Matrix4x4 viewMatrix = cameraManager->GetActiveCamera()->GetViewMatrix();
@@ -195,7 +184,6 @@ void GamePlayScene::Update()
 		object3d->SetPointLight(pointLight);
 		object3d->SetSpotLight(spotLight);
 		object3d->Update();
-
 	}
 
 	//スプライトの更新
@@ -203,6 +191,42 @@ void GamePlayScene::Update()
 	{
 		sprite->Update();
 	}
+
+	//ゲームの処理
+
+	ImGuiManager::GetInstance()->Begin();
+	ImGuiManager::GetInstance()->DemoWindow();
+	ImGuiManager::GetInstance()->FPSWindow();
+	ImGuiManager::GetInstance()->SpriteWindow(sprites);
+	ImGuiManager::GetInstance()->ModelWindow(objects, directionalLight, pointLight, spotLight);
+	// ImGuiのParticleWindowから、どのボタンが押されたかの結果（文字列）を受け取る
+	std::string particleRequest = ImGuiManager::GetInstance()->ParticleWindow(emitterTransform);
+
+	// 結果に応じて、アクティブなエミッター（指し示す先）を切り替える
+	if (particleRequest == "Circle")
+	{
+		activeEmitter = emitterCircle.get(); // 既に作ってあるCircleの方を指す
+	} else if (particleRequest == "Plane")
+	{
+		activeEmitter = emitterPlane.get();  // 既に作ってあるPlaneの方を指す
+	}
+
+	// 3Dオブジェクトの更新が終わった後あたり
+	Transform& axisTrans = objectAxis->GetTransform();
+
+	// 1. ワールド行列を計算する（Transformはただの構造体なので、関数を使って作る）
+	Matrix4x4 axisWorldMatrix = MakeAffineMatrix(axisTrans.scale, axisTrans.rotate, axisTrans.translate);
+
+	ImGuiManager::GetInstance()->CameraWindow(cameraManager.get());
+
+	ImGuiManager::GetInstance()->SkeletonDebugDraw(
+		objectAxis->GetSkeleton(),
+		axisWorldMatrix, // 表示したい場所のワールド行列
+		cameraManager->GetActiveCamera()->GetViewProjectionMatrix()// Update内で計算した合成行列
+	);
+
+	ImGuiManager::GetInstance()->End();
+
 
 	//数字の0キーが押されていたら
 	if (Input::GetInstance()->PushKey(DIK_0))
@@ -243,7 +267,6 @@ void GamePlayScene::Draw()
 	}
 
 	ImGuiManager::GetInstance()->Draw(DirectXCommon::GetInstance());
-
 
 	DirectXCommon::GetInstance()->PostDraw();
 

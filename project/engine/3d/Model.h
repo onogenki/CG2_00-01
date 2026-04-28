@@ -12,6 +12,7 @@
 #include<assimp/scene.h>
 #include<assimp/postprocess.h>
 #include <map>
+#include<optional>
 
 //見た目のモデル
 class Model
@@ -54,6 +55,7 @@ public:
 
 	struct Node
 	{
+		QuaternionTransform transform;
 		Matrix4x4 localMatrix;
 		std::string name;
 		std::vector<Node> children;
@@ -85,6 +87,28 @@ public:
 		std::map<std::string, NodeAnimation>nodeAnimations;
 	};
 
+	struct Joint
+	{
+		QuaternionTransform transform;//Transform情報
+		Matrix4x4 localMatrix;
+		Matrix4x4 skeletonSpaceMatrix;//skeletonSpaceでの変換行列
+		std::string name;
+		std::vector<int32_t> children;//子JointのIndexのリスト。いなければ空
+		int32_t index;
+		std::optional<int32_t>parent;//親JointのIndex、いなければnull
+	};
+
+	struct Skeleton
+	{
+		int32_t root;//RootJointのIndex
+		std::map<std::string, int32_t>jointMap;//Joint名とIndexとの辞書
+		std::vector<Joint>joints;//所属しているジョイント
+	};
+
+	Skeleton CreateSkeleton(const Node& rootNode);
+
+	int32_t CreateJoint(const Node& node, const std::optional<int32_t>& parent, std::vector<Joint>& joints);
+
 	//アニメーションの解析
 	static Animation LoadAnimationFile(const std::string& directoryPath, const std::string& filename);
 
@@ -95,9 +119,15 @@ public:
 
 	void Initialize(ModelCommon* modelCommon, const std::string& directoryPath, const std::string& filename);
 
+	//skeletonの更新
+	void Update(Skeleton& skeleton);
+
 	void Draw();
 
 	void SetTexture(const std::string& filePath);
+
+	//アニメーション適用
+	void ApplyAnimation(Skeleton& skeleton, const Animation& animation, float animationTime);
 
 	ModelData& GetModelData() { return modelData; }
 private:

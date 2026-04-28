@@ -6,6 +6,7 @@
 #include "ParticleEmitter.h"
 #include "CameraManager.h"
 #include "ModelManager.h"
+using namespace MyMath;
 
 void ImGuiManager::Initialize([[maybe_unused]] WinApp* winApp, [[maybe_unused]]DirectXCommon* directXCommon, [[maybe_unused]]SrvManager* srvManager)
 {
@@ -327,6 +328,60 @@ void ImGuiManager::CameraWindow(CameraManager* cameraManager)
 	}
 
 	ImGui::End();
+#endif
+}
+
+//アニメーションデバック
+void ImGuiManager::SkeletonDebugDraw(const Model::Skeleton& skeleton, const Matrix4x4& worldMatrix, const Matrix4x4& viewProjectionMatrix)
+{
+#ifdef USE_IMGUI
+	ImDrawList* drawList = ImGui::GetForegroundDrawList();
+	float sWidth = ImGui::GetIO().DisplaySize.x;
+	float sHeight = ImGui::GetIO().DisplaySize.y;
+	Matrix4x4 matWVP = Multiply(worldMatrix, viewProjectionMatrix);
+
+	// 1. まず「骨（線）」をすべて描く
+	for (size_t i = 0; i < skeleton.joints.size(); i++) {
+		const auto& joint = skeleton.joints[i];
+
+		if (joint.parent.has_value()) {
+			const auto& parentJoint = skeleton.joints[joint.parent.value()];
+
+			// 自分と親の3D座標
+			Vector3 pos3d = { joint.skeletonSpaceMatrix.m[3][0], joint.skeletonSpaceMatrix.m[3][1], joint.skeletonSpaceMatrix.m[3][2] };
+			Vector3 pPos3d = { parentJoint.skeletonSpaceMatrix.m[3][0], parentJoint.skeletonSpaceMatrix.m[3][1], parentJoint.skeletonSpaceMatrix.m[3][2] };
+
+			// 2D座標に変換（計算式はそのまま）
+			float x = pos3d.x * matWVP.m[0][0] + pos3d.y * matWVP.m[1][0] + pos3d.z * matWVP.m[2][0] + matWVP.m[3][0];
+			float y = pos3d.x * matWVP.m[0][1] + pos3d.y * matWVP.m[1][1] + pos3d.z * matWVP.m[2][1] + matWVP.m[3][1];
+			float w = pos3d.x * matWVP.m[0][3] + pos3d.y * matWVP.m[1][3] + pos3d.z * matWVP.m[2][3] + matWVP.m[3][3];
+
+			float px = pPos3d.x * matWVP.m[0][0] + pPos3d.y * matWVP.m[1][0] + pPos3d.z * matWVP.m[2][0] + matWVP.m[3][0];
+			float py = pPos3d.x * matWVP.m[0][1] + pPos3d.y * matWVP.m[1][1] + pPos3d.z * matWVP.m[2][1] + matWVP.m[3][1];
+			float pw = pPos3d.x * matWVP.m[0][3] + pPos3d.y * matWVP.m[1][3] + pPos3d.z * matWVP.m[2][3] + matWVP.m[3][3];
+
+			if (w > 0.0f && pw > 0.0f) {
+				ImVec2 screenPos = { (x / w + 1.0f) * 0.5f * sWidth, (1.0f - y / w) * 0.5f * sHeight };
+				ImVec2 pScreenPos = { (px / pw + 1.0f) * 0.5f * sWidth, (1.0f - py / pw) * 0.5f * sHeight };
+				drawList->AddLine(pScreenPos, screenPos, IM_COL32(255, 255, 0, 255), 2.0f);
+			}
+		}
+	}
+
+	// 2. 次に「関節（点）」をすべて描く（線の上に重なるように）
+	for (size_t i = 0; i < skeleton.joints.size(); i++) {
+		const auto& joint = skeleton.joints[i];
+		Vector3 pos3d = { joint.skeletonSpaceMatrix.m[3][0], joint.skeletonSpaceMatrix.m[3][1], joint.skeletonSpaceMatrix.m[3][2] };
+
+		float x = pos3d.x * matWVP.m[0][0] + pos3d.y * matWVP.m[1][0] + pos3d.z * matWVP.m[2][0] + matWVP.m[3][0];
+		float y = pos3d.x * matWVP.m[0][1] + pos3d.y * matWVP.m[1][1] + pos3d.z * matWVP.m[2][1] + matWVP.m[3][1];
+		float w = pos3d.x * matWVP.m[0][3] + pos3d.y * matWVP.m[1][3] + pos3d.z * matWVP.m[2][3] + matWVP.m[3][3];
+
+		if (w > 0.0f) {
+			ImVec2 screenPos = { (x / w + 1.0f) * 0.5f * sWidth, (1.0f - y / w) * 0.5f * sHeight };
+			drawList->AddCircleFilled(screenPos, 5.0f, IM_COL32(255, 0, 0, 255)); // ちょっと大きめに
+		}
+	}
 #endif
 }
 

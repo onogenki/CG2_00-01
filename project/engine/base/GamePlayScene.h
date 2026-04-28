@@ -50,6 +50,10 @@ private:
     int selectedUI = 0;
   
     Model::Animation animation_;//仮アニメーション読み込み
+    Model::Skeleton skeleton_;
+    Model::Animation SimpleAnimation_;
+    Model::Animation walkAnimation_;
+    Model::Animation sneakWalkAnimation_;
     float animationTime_ = 0.0f;// アニメーションの再生時間を管理
 };
 

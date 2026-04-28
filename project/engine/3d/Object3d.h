@@ -71,6 +71,9 @@ public:
 	// モデルをファイルパス（文字列）でセットする
 	void SetModel(const std::string& filePath);
 
+	//スケルトンを取得
+	Model::Skeleton& GetSkeleton() { return skeleton_; }
+
 	/// setter
 	void SetScale(const Vector3& scale) { transform.scale = scale; }
 	void SetRotate(const Vector3& rotate) { transform.rotate = rotate; }
@@ -140,5 +143,9 @@ private:
 	Model::Animation currentAnimation_;//アニメーション読み込み
 	float animationTime_ = 0.0f;// アニメーションの再生時間を管理
 	bool isAnimating_ = false;
+
+	Model::Skeleton skeleton_; // このオブジェクト専用の骨
+	bool isSkeletal_ = false;  // スケルトンを持っているかどうか
+
 };
 
