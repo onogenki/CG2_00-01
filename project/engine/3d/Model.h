@@ -63,6 +63,7 @@ public:
 
 	struct ModelData {
 		std::vector<VertexData> vertices;
+		std::vector<uint32_t>indices;
 		MaterialData material;
 		Node rootNode;
 	};
@@ -136,6 +137,10 @@ private:
 	ModelCommon* modelCommon_ = nullptr;
 	//OBJファイルのデータ
 	ModelData modelData;
+
+	//インデックスリソース
+	Microsoft::WRL::ComPtr<ID3D12Resource> indexResource;
+	D3D12_INDEX_BUFFER_VIEW indexBufferView{};
 	//バッファリソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource;
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
@@ -147,6 +152,7 @@ private:
 
 
 	void LoadModelFile(const std::string& directoryPath, const std::string& filename);
+	void CreateIndexData();
 	void CreateVertexData();
 	void CreateMaterialData();
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResources(ID3D12Device* device, size_t sizeInBytes);

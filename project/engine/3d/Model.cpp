@@ -171,6 +171,8 @@ void Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPat
 	modelCommon_ = modelCommon;
 	//モデル読み込み
 	LoadModelFile(directoryPath, filename);
+
+	CreateIndexData();
 	//頂点データ作成
 	CreateVertexData();
 	//マテリアルデータ作成
@@ -209,6 +211,9 @@ void Model::Draw()
 	// 1. 頂点バッファビューを設定
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 
+	// インデックスバッファをセット
+	commandList->IASetIndexBuffer(&indexBufferView);
+
 	// 2. 形状を設定 (三角形リスト)
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -220,8 +225,8 @@ void Model::Draw()
 		TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureFilePath);
 	commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
 
-	// 7. 描画 (DrawCall)
-	commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
+	// 7. インデックスを利用して描画 (引数に総数を渡す)
+	commandList->DrawIndexedInstanced(static_cast<UINT>(modelData.indices.size()), 1, 0, 0, 0);
 
 }
 
@@ -274,6 +279,23 @@ Microsoft::WRL::ComPtr<ID3D12Resource> Model::CreateBufferResources(ID3D12Device
 	return resource;
 }
 
+void Model::CreateIndexData()
+{
+	// --- インデックスバッファの作成 ---
+	indexResource = CreateBufferResources(modelCommon_->GetDxCommon()->GetDevice(), sizeof(uint32_t) * modelData.indices.size());
+
+	// インデックスバッファビューの設定
+	indexBufferView.BufferLocation = indexResource->GetGPUVirtualAddress();
+	indexBufferView.SizeInBytes = sizeof(uint32_t) * static_cast<uint32_t>(modelData.indices.size());
+	indexBufferView.Format = DXGI_FORMAT_R32_UINT;
+
+	// --- データのマップとコピー ---
+	uint32_t* mappedIndex = nullptr;
+	indexResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedIndex));
+	std::memcpy(mappedIndex, modelData.indices.data(), sizeof(uint32_t) * modelData.indices.size());
+	indexResource->Unmap(0, nullptr);
+}
+
 void Model::CreateVertexData()
 {
 	// 書き込むデータのサイズ（頂点データ全体のバイト数）
@@ -320,6 +342,7 @@ void Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 {
 	// メンバ変数をクリアしておく
 	modelData.vertices.clear();
+	modelData.indices.clear();
 
 	//assimpでobjを読む
 	Assimp::Importer importer;
@@ -335,6 +358,28 @@ void Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 		aiMesh* mesh = scene->mMeshes[meshIndex];
 		assert(mesh->HasNormals());//法線がないMeshは今回は非対応
 		assert(mesh->HasTextureCoords(0));//TexcoordがないMeshは今回は非対応
+
+		//現在の頂点数を保存しておく(複数メッシュ対応のため)
+		uint32_t vertexOffset = static_cast<uint32_t>(modelData.vertices.size());
+
+		//まず頂点をすべて解析して配列に突っ込む
+		for (uint32_t v = 0; v < mesh->mNumVertices; ++v)
+		{
+			aiVector3D& position = mesh->mVertices[v];
+			aiVector3D& normal = mesh->mNormals[v];
+			aiVector3D& texcoord = mesh->mTextureCoords[0][v];
+
+			VertexData vertex;
+			vertex.position = { position.x,position.y,position.z,1.0f };
+			vertex.normal = { normal.x,normal.y,normal.z };
+			vertex.texcoord = { texcoord.x,texcoord.y };
+			//aiProcess_MakeLeftHandedはz*=-1で右手->左手に変換するので手動で対処
+			vertex.position.x *= -1.0f;
+			vertex.normal.x *= -1.0f;
+			modelData.vertices.push_back(vertex);
+		}
+
+		//面インデックスを解析して配列に突っ込む
 		for (uint32_t faceIndex = 0; faceIndex < mesh->mNumFaces; ++faceIndex)//face解析
 		{
 			aiFace& face = mesh->mFaces[faceIndex];
@@ -342,18 +387,8 @@ void Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 			for (uint32_t element = 0; element < face.mNumIndices; ++element)//vertex解析
 			{
 				uint32_t vertexIndex = face.mIndices[element];
-				aiVector3D& position = mesh->mVertices[vertexIndex];
-				aiVector3D& normal = mesh->mNormals[vertexIndex];
-				aiVector3D& texcoord = mesh->mTextureCoords[0][vertexIndex];
-
-				VertexData vertex;
-				vertex.position = { position.x,position.y,position.z,1.0f };
-				vertex.normal = { normal.x,normal.y,normal.z };
-				vertex.texcoord = { texcoord.x,texcoord.y };
-				//aiProcess_MakeLeftHandedはz*=-1で右手->左手に変換するので手動で対処
-				vertex.position.x *= -1.0f;
-				vertex.normal.x *= -1.0f;
-				modelData.vertices.push_back(vertex);
+				//オフセットを足してインデックスを保存する
+				modelData.indices.push_back(vertexIndex + vertexOffset);
 			}
 		}
 	}
