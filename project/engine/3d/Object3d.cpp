@@ -40,6 +40,7 @@ void Object3d::Update()
 			model_->ApplyAnimation(skeleton_, currentAnimation_, animationTime_);
 			//親子関係を計算してskeletonSpaceMatrixを更新
 			model_->Update(skeleton_);
+			model_->Update(skinCluster_, skeleton_);
 		} else {//RootNodeだけ動かす場合
 			std::string rootName = model_->GetModelData().rootNode.name;
 			if (currentAnimation_.nodeAnimations.count(rootName))
@@ -63,6 +64,11 @@ void Object3d::Update()
 		if (!isSkeletal_)
 		{
 			Matrix4x4 rootMatrix = model_->GetModelData().rootNode.localMatrix;
+			
+			//もしrootMatrixが未初期化だったら単位行列に
+			if (rootMatrix.m[0][0] == 0.0f && rootMatrix.m[3][3] == 0.0f) {
+				rootMatrix = MakeIdentity4x4();
+			}
 			worldMatrix = Multiply(rootMatrix, worldMatrix);
 		}
 	}
@@ -81,32 +87,49 @@ void Object3d::Draw()
 {
 	// コマンドリストを取得
 	ID3D12GraphicsCommandList* commandList = object3dCommon->GetDxCommon()->GetCommandList();
-
 	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
-
 	commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
-
 	commandList->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
-
 	commandList->SetGraphicsRootConstantBufferView(5, pointLightResource->GetGPUVirtualAddress());
-
 	commandList->SetGraphicsRootConstantBufferView(6, spotLightResource->GetGPUVirtualAddress());
 
 	if (model_)
 	{
-		model_->Draw();
+		//アニメーションモデルならアドレスを渡す
+		if (isSkeletal_)
+		{
+			model_->Draw(skinCluster_);
+		} else
+		{
+			model_->Draw();
+		}
 	}
 }
 
-void Object3d::SetModel(const std::string& filePath)
+void Object3d::SetModel(const std::string& filePath,bool isAnimation)
 {// モデルマネージャからモデルを検索してセットする
 	model_ = ModelManager::GetInstance()->FindModel(filePath);
 	if (model_)
 	{
-		//モデルの階層構造からスケルトンを生成
-		skeleton_ = model_->CreateSkeleton(model_->GetModelData().rootNode);
-		//ジョイントがあればスケルトンモデルとして扱う
-		isSkeletal_ = !skeleton_.joints.empty();
+		if (isAnimation) {
+			//モデルの階層構造からスケルトンを生成
+			skeleton_ = model_->CreateSkeleton(model_->GetModelData().rootNode);
+			//ジョイントがあればスケルトンモデルとして扱う
+			isSkeletal_ = !skeleton_.joints.empty();
+		//obj なら絶対にスケルトンを作らない
+		} else {
+			isSkeletal_ = false;//アニメーションしないモデルはfalse
+		}
+
+		if (isSkeletal_) {
+			//スケルトンがあるならSkinClusterも作成する
+			// （引数の descriptorHeap や device は DxCommon 等から引っ張ってくる）
+			auto device = object3dCommon->GetDxCommon()->GetDevice();
+			auto srvHeap = SrvManager::GetInstance()->GetDescriptorHeap();
+			uint32_t descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+			skinCluster_ = model_->CreateSkinCluster(device, skeleton_, model_->GetModelData(), srvHeap, descriptorSize);
+		}
 	}
 }
 
@@ -117,7 +140,7 @@ void Object3d::PlayAnimation(const Model::Animation& animation)
 	isAnimating_ = true;
 }
 
-Microsoft::WRL::ComPtr<ID3D12Resource> Object3d::CreateBufferResources(ID3D12Device* device, size_t sizeInBytes)
+Microsoft::WRL::ComPtr<ID3D12Resource> Object3d::CreateBufferResource(ID3D12Device* device, size_t sizeInBytes)
 {
 	// 頂点リソース用のヒープの設定
 	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
@@ -147,7 +170,7 @@ void Object3d::CreateTransformationMatrixData()
 {
 	// 1. 座標変換行列リソースを作る
 	// (サイズは TransformationMatrix 構造体1つ分)
-	transformationMatrixResource = CreateBufferResources(object3dCommon->GetDxCommon()->GetDevice(), sizeof(TransformationMatrix));
+	transformationMatrixResource = CreateBufferResource(object3dCommon->GetDxCommon()->GetDevice(), sizeof(TransformationMatrix));
 
 	// 2. データを書き込むためのアドレスを取得して transformationMatrixData に割り当てる
 	transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData));
@@ -161,7 +184,7 @@ void Object3d::CreateDirectionalLightData()
 {
 	// 1. 平行光源リソースを作る
 	// (サイズは DirectionalLight 構造体1つ分)
-	directionalLightResource = CreateBufferResources(object3dCommon->GetDxCommon()->GetDevice(), sizeof(DirectionalLight));
+	directionalLightResource = CreateBufferResource(object3dCommon->GetDxCommon()->GetDevice(), sizeof(DirectionalLight));
 
 	// 2. データを書き込むためのアドレスを取得して directionalLightData に割り当てる
 	directionalLightResource->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
@@ -182,7 +205,7 @@ void Object3d::CreateDirectionalLightData()
 void Object3d::CreateCameraData()
 {
 	//カメラ
-	cameraResource = CreateBufferResources(object3dCommon->GetDxCommon()->GetDevice(), sizeof(CameraForGPU));
+	cameraResource = CreateBufferResource(object3dCommon->GetDxCommon()->GetDevice(), sizeof(CameraForGPU));
 
 
 	cameraResource->Map(0, nullptr, reinterpret_cast<void**>(&cameraData));
@@ -194,7 +217,7 @@ void Object3d::CreatePointLightData()
 {
 	// 1. 点光源リソースを作る
 	// (サイズは PointLight 構造体1つ分)
-	pointLightResource = CreateBufferResources(object3dCommon->GetDxCommon()->GetDevice(), sizeof(PointLight));
+	pointLightResource = CreateBufferResource(object3dCommon->GetDxCommon()->GetDevice(), sizeof(PointLight));
 
 	// 2. データを書き込むためのアドレスを取得して pointLightData に割り当てる
 	pointLightResource->Map(0, nullptr, reinterpret_cast<void**>(&pointLightData));
@@ -213,7 +236,7 @@ void Object3d::CreatePointLightData()
 
 void Object3d::CreateSpotLightData()
 {
-	spotLightResource = CreateBufferResources(object3dCommon->GetDxCommon()->GetDevice(), sizeof(SpotLight));
+	spotLightResource = CreateBufferResource(object3dCommon->GetDxCommon()->GetDevice(), sizeof(SpotLight));
 	spotLightResource->Map(0, nullptr, reinterpret_cast<void**>(&spotLightData));
 
 	// 資料通りの初期値

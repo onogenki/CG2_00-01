@@ -3,6 +3,7 @@
 #include "Transform.h"
 #include "Model.h"
 #include "ModelManager.h"
+#include "SrvManager.h"
 #include "Camera.h"
 #include <vector>
 #include <string>
@@ -69,7 +70,7 @@ public:
 	void SetModel(Model* model) { this->model_ = model; }
 
 	// モデルをファイルパス（文字列）でセットする
-	void SetModel(const std::string& filePath);
+	void SetModel(const std::string& filePath, bool isAnimation = false);
 
 	//スケルトンを取得
 	Model::Skeleton& GetSkeleton() { return skeleton_; }
@@ -98,12 +99,15 @@ public:
 	const Vector3& GetTranslate()const { return transform.translate; }
 	const DirectionalLight& GetDirectionalLight()const { return *directionalLightData; }
 
+	//外部からアニメーションモデルかどうか判定
+	bool IsSkeletal() const { return isSkeletal_; }
+
 	// モデル
 	Transform& GetTransform() { return transform; }
 
 private:
 	Object3dCommon* object3dCommon = nullptr;
-	
+
 	Model* model_ = nullptr;
 
 	Camera* camera = nullptr;
@@ -137,7 +141,7 @@ private:
 	SpotLight* spotLightData = nullptr;
 
 	// リソース作成のヘルパー関数 (Spriteから移植)
-	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResources(ID3D12Device* device, size_t sizeInBytes);
+	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(ID3D12Device* device, size_t sizeInBytes);
 
 	//アニメーション
 	Model::Animation currentAnimation_;//アニメーション読み込み
@@ -147,5 +151,6 @@ private:
 	Model::Skeleton skeleton_; // このオブジェクト専用の骨
 	bool isSkeletal_ = false;  // スケルトンを持っているかどうか
 
+	Model::SkinCluster skinCluster_;
 };
 

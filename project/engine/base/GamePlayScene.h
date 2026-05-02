@@ -27,7 +27,10 @@ private:
 
     std::unique_ptr<Camera> upCamera;
 
-    std::vector<std::unique_ptr<Object3d>> objects;
+
+    std::vector<std::unique_ptr<Object3d>> normalObjects;//通常モデル  
+    std::vector<std::unique_ptr<Object3d>> animationObjects;//アニメーションモデル 
+
     std::vector<std::unique_ptr<Sprite>> sprites;
 
     // パーティクル関連
@@ -51,9 +54,12 @@ private:
   
     Model::Animation animation_;//仮アニメーション読み込み
     Model::Skeleton skeleton_;
-    Model::Animation SimpleAnimation_;
+    Model::Skeleton skinCluster_;
+    Model::Animation simpleAnimation_;
     Model::Animation walkAnimation_;
     Model::Animation sneakWalkAnimation_;
     float animationTime_ = 0.0f;// アニメーションの再生時間を管理
+
+    bool isSkeletal_ = false;//アニメーションモデルかどうか
 };
 

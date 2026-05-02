@@ -52,19 +52,18 @@ void GamePlayScene::Initialize()
 	//.objファイルからモデルを読み込む
 	ModelManager::GetInstance()->LoadModel("terrain.obj");
 	ModelManager::GetInstance()->LoadModel("sphere.obj");
-	ModelManager::GetInstance()->LoadModel("plane.gltf");
+	ModelManager::GetInstance()->LoadModel("plane.gltf");//アニメーションなしgltf
 	ModelManager::GetInstance()->LoadModel("AnimatedCube.gltf");//アニメーションありのモデル
 	ModelManager::GetInstance()->LoadModel("simpleSkin.gltf");//スケルトン(細かいアニメーション)
 	ModelManager::GetInstance()->LoadModel("walk.gltf");//アニメーションのみだが必要
 	ModelManager::GetInstance()->LoadModel("sneakWalk.gltf");//アニメーションのみだが必要
-	Model* model = ModelManager::GetInstance()->FindModel("simpleSkin.gltf");
 
 	//スケルトン
-	skeleton_ = model->CreateSkeleton(model->GetModelData().rootNode);
+	Model* model = ModelManager::GetInstance()->FindModel("simpleSkin.gltf");//スケルトンアクセス権
+	skeleton_ = model->CreateSkeleton(model->GetModelData().rootNode);//動く仕組み
 
 	//アニメーションの読み込み
-	animation_=Model::LoadAnimationFile("./resources", "AnimatedCube.gltf");//アニメーションありのモデル
-	SimpleAnimation_ = Model::LoadAnimationFile("./resources", "simpleSkin.gltf");//スケルトン
+	simpleAnimation_ = Model::LoadAnimationFile("./resources", "simpleSkin.gltf");//スケルトン
 	walkAnimation_ = Model::LoadAnimationFile("./resources", "walk.gltf");//アニメーションのみ
 	sneakWalkAnimation_ = Model::LoadAnimationFile("./resources", "sneakWalk.gltf");//アニメーションのみ
 
@@ -73,25 +72,29 @@ void GamePlayScene::Initialize()
 	//音声再生
 	Audio::GetInstance()->PlayWave("Resources/Alarm01.wav");
 
-	// 2. 3Dオブジェクト生成
+	///
+	/// 3Dオブジェクト生成
+	/// normalとanimationに分けてるのは処理を軽くするため
+	
 	// 一時的に unique_ptr を作り、初期化してから vector に move する
 	auto objPlane = std::make_unique<Object3d>();
 	objPlane->Initialize(object3dCommon);
 	objPlane->SetModel("terrain.obj");
 	objPlane->GetTransform().translate = { 1.0f, -2.0f, 10.0f };
 	objectPlane = objPlane.get();           // 中身を指すだけのポインタを保存
-	objects.push_back(std::move(objPlane)); // ここで所有権が vector に移る
+	normalObjects.push_back(std::move(objPlane));//通常(アニメーション無し)モデル入れる
 
 	auto objAxis = std::make_unique<Object3d>();
 	objAxis->Initialize(object3dCommon);
-	objAxis->SetModel("sneakWalk.gltf");//モデル読み込み
+	objAxis->SetModel("walk.gltf",true);//アニメーションモデル読み込み(true必要)
 	objAxis->GetTransform().translate = { 2.0f, 0.0f, 0.0f };
 	objAxis->GetTransform().rotate = { 0.0f,0.0f,0.0f };
 
-	objAxis->PlayAnimation(sneakWalkAnimation_);//アニメーション読み込み
-
+	objAxis->PlayAnimation(walkAnimation_);//アニメーション読み込み
 	objectAxis = objAxis.get();
-	objects.push_back(std::move(objAxis));
+
+	animationObjects.push_back(std::move(objAxis));//アニメーションモデル専用入れる
+
 
 	for (uint32_t i = 0; i < 1; ++i)
 	{
@@ -146,13 +149,11 @@ void GamePlayScene::Initialize()
 	activeEmitter = emitterCircle.get();
 
 	selectedUI = 0;
+
 }
 
 void GamePlayScene::Update()
 {
-
-	//UIの更新
-	directionalLight = objectAxis->GetDirectionalLight();
 
 	//カメラの更新
 	cameraManager->Update();
@@ -169,8 +170,25 @@ void GamePlayScene::Update()
 	//パーティクル全体の更新
 	ParticleManager::GetInstance()->Update();
 
-	//3Dオブジェクトの更新
-	for (auto& object3d : objects) {
+	//3Dオブジェクトの更新通常モデル
+	for (auto& object3d : normalObjects) {
+		//毎フレーム、マネージャから今のアクティブカメラをもらう
+		object3d->SetCamera(cameraManager->GetActiveCamera());
+		float length = Length(directionalLight.direction);
+		if (length > 0.0f) {
+			directionalLight.direction = Normalize(directionalLight.direction);
+		} else {
+			// 0の場合は適当な下向きにするなど、エラーを回避する
+			directionalLight.direction = { 0.0f, -1.0f, 0.0f };
+		}
+		object3d->SetDirectionalLight(directionalLight);//光を他のモデルにも分け与える
+		object3d->SetPointLight(pointLight);
+		object3d->SetSpotLight(spotLight);
+		object3d->Update();
+	}
+
+	//3Dオブジェクトの更新アニメーションモデル
+	for (auto& object3d : animationObjects) {
 		//毎フレーム、マネージャから今のアクティブカメラをもらう
 		object3d->SetCamera(cameraManager->GetActiveCamera());
 		float length = Length(directionalLight.direction);
@@ -198,7 +216,7 @@ void GamePlayScene::Update()
 	ImGuiManager::GetInstance()->DemoWindow();
 	ImGuiManager::GetInstance()->FPSWindow();
 	ImGuiManager::GetInstance()->SpriteWindow(sprites);
-	ImGuiManager::GetInstance()->ModelWindow(objects, directionalLight, pointLight, spotLight);
+	ImGuiManager::GetInstance()->ModelWindow(normalObjects,animationObjects, directionalLight, pointLight, spotLight);
 	// ImGuiのParticleWindowから、どのボタンが押されたかの結果（文字列）を受け取る
 	std::string particleRequest = ImGuiManager::GetInstance()->ParticleWindow(emitterTransform);
 
@@ -219,11 +237,22 @@ void GamePlayScene::Update()
 
 	ImGuiManager::GetInstance()->CameraWindow(cameraManager.get());
 
-	ImGuiManager::GetInstance()->SkeletonDebugDraw(
-		objectAxis->GetSkeleton(),
-		axisWorldMatrix, // 表示したい場所のワールド行列
-		cameraManager->GetActiveCamera()->GetViewProjectionMatrix()// Update内で計算した合成行列
-	);
+	if (!animationObjects.empty()) {
+		Object3d* animationObject = animationObjects[0].get(); // アニメーションモデルを取得
+
+		if (animationObject->IsSkeletal()) {
+			Transform& animationTrans = animationObject->GetTransform();
+
+			// アニメーションモデルのワールド行列を作る
+			Matrix4x4 animationWorldMatrix = MakeAffineMatrix(animationTrans.scale, animationTrans.rotate, animationTrans.translate);
+
+			ImGuiManager::GetInstance()->SkeletonDebugDraw(
+				animationObject->GetSkeleton(),//アニメーションモデルの骨を渡す
+				axisWorldMatrix, // 表示したい場所のワールド行列
+				cameraManager->GetActiveCamera()->GetViewProjectionMatrix()// Update内で計算した合成行列
+			);
+		}
+	}
 
 	ImGuiManager::GetInstance()->End();
 
@@ -248,11 +277,20 @@ void GamePlayScene::Draw()
 	DirectXCommon::GetInstance()->PreDraw();
 	SrvManager::GetInstance()->PreDraw();
 
-	//3Dオブジェクトの描画準備3Dオブジェクトの描画に共通のグラフィックスコマンドを積む
+	// 先に通常モデル用を描画(処理を軽くするため)
 	object3dCommon->SetCommonDrawSetting();
+	for (const auto& object3d : normalObjects) {
+		if (!object3d->IsSkeletal()) {
+			object3d->Draw();
+		}
+	}
 
-	for (const auto& object3d : objects) {
-		object3d->Draw();
+	// アニメーションモデル用の描画
+	object3dCommon->SetSkinningCommonDrawSetting();
+	for (const auto& object3d : animationObjects) {
+		if (object3d->IsSkeletal()) {
+			object3d->Draw();
+		}
 	}
 
 	//パーティクル描画
@@ -281,6 +319,7 @@ void GamePlayScene::Finalize()
 	ParticleManager::GetInstance()->ClearAllParticles();
 
 	sprites.clear();
-	objects.clear();
+	normalObjects.clear();
+	animationObjects.clear();
 }
 

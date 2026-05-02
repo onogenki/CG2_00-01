@@ -32,6 +32,10 @@ public:
 	//setter
 	void SetDefaultCamera(Camera* camera) { this->defaultCamera_ = camera; }
 
+	//スキニング用の共通描画設定
+	void SetSkinningCommonDrawSetting();
+
+
 private:
 
 	Object3dCommon() = default;
@@ -50,6 +54,14 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;
 	// PipelineState
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState_;
+
+	// スキニング用のルートシグネチャとパイプライン
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> skinningRootSignature_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> skinningGraphicsPipelineState_;
+
+	// スキニング用の生成関数
+	void CreateSkinningRootSignature();
+	void CreateSkinningGraphicsPipeline();
 
 };
 

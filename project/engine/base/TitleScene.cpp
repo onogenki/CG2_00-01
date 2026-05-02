@@ -72,13 +72,10 @@ void TitleScene::Draw()
 	DirectXCommon::GetInstance()->PreDraw();
 	SrvManager::GetInstance()->PreDraw();
 
-	//3Dオブジェクトの描画準備3Dオブジェクトの描画に共通のグラフィックスコマンドを積む
-	object3dCommon->SetCommonDrawSetting();
-
-	ImGuiManager::GetInstance()->Draw(DirectXCommon::GetInstance());
-
 	spriteCommon->SetCommonDrawSetting();
 	sprite_->Draw();
+
+	ImGuiManager::GetInstance()->Draw(DirectXCommon::GetInstance());
 
 	DirectXCommon::GetInstance()->PostDraw();
 	

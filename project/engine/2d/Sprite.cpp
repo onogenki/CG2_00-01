@@ -7,7 +7,7 @@
 
 using namespace MyMath;
 
-Microsoft::WRL::ComPtr<ID3D12Resource> Sprite::CreateBufferResources(ID3D12Device* device, size_t sizeInBytes)
+Microsoft::WRL::ComPtr<ID3D12Resource> Sprite::CreateBufferResource(ID3D12Device* device, size_t sizeInBytes)
 {
 	//頂点リソース用のヒープの設定
 	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
@@ -64,7 +64,7 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 	ID3D12Device* device = spriteCommon->GetDevice();
 
 	//頂点リソースを作る
-	vertexResource = CreateBufferResources(device, sizeof(VertexData) * 4);
+	vertexResource = CreateBufferResource(device, sizeof(VertexData) * 4);
 
 	//リリースの先頭のアドレスから使う
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
@@ -99,7 +99,7 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 
 
 
-	indexResource = CreateBufferResources(device, sizeof(uint32_t) * 6);
+	indexResource = CreateBufferResource(device, sizeof(uint32_t) * 6);
 
 	//リソースの先頭のアドレスから使う
 	indexBufferView.BufferLocation = indexResource->GetGPUVirtualAddress();
@@ -113,7 +113,7 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 	indexData[3] = 1;  indexData[4] = 3;   indexData[5] = 2;
 
 	//マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
-	materialResource = CreateBufferResources(device, sizeof(Material));
+	materialResource = CreateBufferResource(device, sizeof(Material));
 	//書き込むためのアドレスを取得
 	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
 
@@ -123,7 +123,7 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 	materialData->uvTransform = MakeIdentity4x4();
 
 	//TransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	transformationMatrixResource = CreateBufferResources(device, sizeof(TransformationMatrix));
+	transformationMatrixResource = CreateBufferResource(device, sizeof(TransformationMatrix));
 	//座標変換行列リソースにデータを書き込むためのアドレスを取得してtransformationMatrixDataに割り当てる
 	transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData));
 

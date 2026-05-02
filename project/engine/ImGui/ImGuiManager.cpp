@@ -181,21 +181,24 @@ void ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& spri
 #endif
 }
 
-void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& objects, Object3d::DirectionalLight& light,Object3d::PointLight& pointLight,Object3d::SpotLight& spotLight)
+void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& normalObjects, const std::vector<std::unique_ptr<Object3d>>& animationObjects, Object3d::DirectionalLight& light,Object3d::PointLight& pointLight,Object3d::SpotLight& spotLight)
 {
 #ifdef USE_IMGUI
 
+	static int targetArray = 0;// 0:アニメーションなし 1:アニメーションあり
 	static int selectedIndex = 0; //選択されている番号
 	static bool useMonsterBall = false;//png入れ替え
 	// ウィンドウ作成
 	ImGui::Begin("Editing Object");
 
-	if (ImGui::Button("Select Plane")) {
+	if (ImGui::Button("Select NormalModel")) {
+		targetArray = 0;
 		selectedIndex = 0;
 	}
 	ImGui::SameLine();
-	if (ImGui::Button("Select Axis")) {
-		selectedIndex = 1;
+	if (ImGui::Button("Select AnimarionModel")) {
+		targetArray = 1;
+		selectedIndex = 0;
 	}
 	ImGui::SameLine();
 	if (ImGui::Checkbox("Use MonsterBall", &useMonsterBall))
@@ -213,23 +216,33 @@ void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& obj
 
 	ImGui::Separator();
 
+	//選択しているオブジェクトのポインタを取得
+	Object3d* targetObject = nullptr;
 	// 配列の範囲外エラーを防ぐ
-	if (selectedIndex >= 0 && selectedIndex < objects.size()) {
-		ImGui::PushID(selectedIndex); // IDを分けて干渉を防ぐ
+	if (targetArray == 0 && selectedIndex < normalObjects.size()) {
+		targetObject = normalObjects[selectedIndex].get();
+		ImGui::Text("Editing: Normal Object [%d]", selectedIndex);
+	}else if (targetArray == 1 && selectedIndex < animationObjects.size()) {
+		targetObject = animationObjects[selectedIndex].get();
+		ImGui::Text("Editing: Animation Object [%d]", selectedIndex);
+	}
 
-		if (selectedIndex == 0) {
-			ImGui::Text("Plane");
-		} else if (selectedIndex == 1) {
-			ImGui::Text("Axis");
-		}
+	// --- 対象が存在すれば Transform をいじる ---
+	if (targetObject) {
+		// IDを分けて干渉を防ぐ（配列番号×100 + インデックス）
+		ImGui::PushID(targetArray * 100 + selectedIndex);
 
-		Transform& transform = objects[selectedIndex]->GetTransform();
-		ImGui::Separator();
+		Transform& transform = targetObject->GetTransform();
 
 		// 各オブジェクトのTransformを取得して操作
 		ImGui::DragFloat3("Translate", &transform.translate.x, 0.01f);
 		ImGui::DragFloat3("Rotate", &transform.rotate.x, 0.01f);
 		ImGui::DragFloat3("Scale", &transform.scale.x, 0.01f);
+
+		ImGui::PopID();
+} else {
+	ImGui::TextColored(ImVec4(1, 0, 0, 1), "Selected object does not exist!");
+}
 
 		ImGui::Separator();
 
@@ -258,9 +271,7 @@ void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& obj
 		ImGui::SliderFloat("SpotLight:decay", &spotLight.decay, 0.1f, 10.0f);
 		ImGui::SliderFloat("SpotLight:cosAngle", &spotLight.cosAngle, -1.0f, 1.0f);
 		ImGui::SliderFloat("SpotLight:cosFalloffStart", &spotLight.cosFalloffStart, -1.0f, 1.0f);
-
-		ImGui::PopID();
-	}
+	
 	ImGui::End();
 #endif
 }
