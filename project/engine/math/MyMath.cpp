@@ -127,7 +127,7 @@ namespace MyMath {
 		return result;
 	}
 
-	Matrix4x4 MyMath::MakeAffineMatrixQuaternion(const Vector3& scale, const Quaternion& rotate, const Vector3& translate) {
+	Matrix4x4 MakeAffineMatrixQuaternion(const Vector3& scale, const Quaternion& rotate, const Vector3& translate) {
 		Matrix4x4 scaleMatrix = MakeScaleMatrix(scale);
 		Matrix4x4 rotateMatrix = MakeRotateMatrix(rotate);
 		Matrix4x4 translateMatrix = MakeTranslateMatrix(translate);
@@ -143,7 +143,7 @@ namespace MyMath {
 		};
 	}
 
-	Quaternion MyMath::Slerp(const Quaternion& q0, const Quaternion& q1, float t) {
+	Quaternion Slerp(const Quaternion& q0, const Quaternion& q1, float t) {
 		float dot = q0.x * q1.x + q0.y * q1.y + q0.z * q1.z + q0.w * q1.w;
 		Quaternion q1_ = q1;
 
