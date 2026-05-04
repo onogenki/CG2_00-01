@@ -18,8 +18,8 @@ Model::SkinCluster Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12D
 	WellForGPU* mappedPalette = nullptr;
 	skinCluster.paletteResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedPalette));
 	skinCluster.mappedPalette = { mappedPalette,skeleton.joints.size() };//spanを使ってアクセスするようにする
-	skinCluster.paletterSrvHandle.first = SrvManager::GetInstance()->GetCPUDescriptorHandle(srvIndex);
-	skinCluster.paletterSrvHandle.second = SrvManager::GetInstance()->GetGPUDescriptorHandle(srvIndex);
+	skinCluster.paletteSrvHandle.first = SrvManager::GetInstance()->GetCPUDescriptorHandle(srvIndex);
+	skinCluster.paletteSrvHandle.second = SrvManager::GetInstance()->GetGPUDescriptorHandle(srvIndex);
 
 	//palette用のsrvを作成する。StructuredBufferでアクセスできるようにする。
 	D3D12_SHADER_RESOURCE_VIEW_DESC paletterSrvDesc{};
@@ -30,7 +30,7 @@ Model::SkinCluster Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12D
 	paletterSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 	paletterSrvDesc.Buffer.NumElements = UINT(skeleton.joints.size());
 	paletterSrvDesc.Buffer.StructureByteStride = sizeof(WellForGPU);
-	device->CreateShaderResourceView(skinCluster.paletteResource.Get(), &paletterSrvDesc, skinCluster.paletterSrvHandle.first);
+	device->CreateShaderResourceView(skinCluster.paletteResource.Get(), &paletterSrvDesc, skinCluster.paletteSrvHandle.first);
 
 	//influence用のResourceを確保。頂点ごとにinfluence情報を追加できるようにする
 	skinCluster.influenceResource = CreateBufferResource(modelCommon_->GetDxCommon()->GetDevice(), sizeof(VertexInfluence) * modelData.vertices.size());
@@ -336,7 +336,7 @@ void Model::Draw(const SkinCluster& skinCluster)
 
 	// マトリックスパレットSRVの設定 (RootParameter 7)
 	// （※Object3dCommonで追加した [7] 番のパラメータに、パレットのSRVを渡します）
-	commandList->SetGraphicsRootDescriptorTable(7, skinCluster.paletterSrvHandle.second);
+	commandList->SetGraphicsRootDescriptorTable(7, skinCluster.paletteSrvHandle.second);
 
 	// 描画
 	commandList->DrawIndexedInstanced(static_cast<UINT>(modelData.indices.size()), 1, 0, 0, 0);
