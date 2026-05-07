@@ -60,7 +60,5 @@ private:
     Model::Animation sneakWalkAnimation_;
     Model::Animation humanAnimation_;
     float animationTime_ = 0.0f;// アニメーションの再生時間を管理
-
-    bool isSkeletal_ = false;//アニメーションモデルかどうか
 };
 

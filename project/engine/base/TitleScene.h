@@ -30,6 +30,8 @@ private:
 
     std::unique_ptr<Sprite> sprite_;
 
+    std::vector<std::unique_ptr<Object3d>> normalObjects;//通常モデル  
+    Object3d* obj = nullptr;
     bool isFinished_ = false;
 
 };

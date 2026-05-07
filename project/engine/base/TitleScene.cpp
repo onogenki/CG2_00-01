@@ -16,6 +16,15 @@ void TitleScene::Initialize()
 	object3dCommon = Object3dCommon::GetInstance();
 	object3dCommon->Initialize(dxCommon);
 
+	ModelManager::GetInstance()->LoadModel("plane.obj");
+	auto terrain = std::make_unique<Object3d>();
+
+	terrain->Initialize(object3dCommon);
+	terrain->SetModel("plane.obj");
+	terrain->GetTransform().translate = { 1.0f, -2.0f, 10.0f };
+	obj = terrain.get();
+	normalObjects.push_back(std::move(terrain));
+
 	spriteCommon = SpriteCommon::GetInstance();
 	spriteCommon->Initialize(dxCommon);
 
@@ -48,6 +57,11 @@ void TitleScene::Update()
 	//カメラの更新
 	cameraManager->Update();
 
+	for (auto& object3d : normalObjects) {
+		object3d->SetCamera(cameraManager->GetActiveCamera());
+		obj->Update();
+	}
+
 	//カメラのビュープロジェクション行列を渡して更新
 	Matrix4x4 viewMatrix = cameraManager->GetActiveCamera()->GetViewMatrix();
 	Matrix4x4 projectionMatrix = cameraManager->GetActiveCamera()->GetProjectionMatrix();
@@ -72,6 +86,12 @@ void TitleScene::Draw()
 	DirectXCommon::GetInstance()->PreDraw();
 	SrvManager::GetInstance()->PreDraw();
 
+	object3dCommon->SetCommonDrawSetting();
+	for (const auto& object : normalObjects) {
+		if (!obj->IsSkeletal()) {
+			obj->Draw();
+		}
+	}
 	spriteCommon->SetCommonDrawSetting();
 	sprite_->Draw();
 
