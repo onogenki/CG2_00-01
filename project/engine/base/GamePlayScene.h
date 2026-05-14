@@ -59,6 +59,7 @@ private:
     Model::Animation walkAnimation_;
     Model::Animation sneakWalkAnimation_;
     Model::Animation humanAnimation_;
+    Model::Animation hissatu_;
     float animationTime_ = 0.0f;// アニメーションの再生時間を管理
 };
 

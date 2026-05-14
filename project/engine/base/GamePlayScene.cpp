@@ -58,6 +58,7 @@ void GamePlayScene::Initialize()
 	ModelManager::GetInstance()->LoadModel("walk.gltf");//アニメーションのみだが必要
 	ModelManager::GetInstance()->LoadModel("sneakWalk.gltf");//アニメーションのみだが必要
 	ModelManager::GetInstance()->LoadModel("human.gltf");//持ってきたもの
+	ModelManager::GetInstance()->LoadModel("playerCloudAnimation.gltf");//持ってきたもの
 
 	//スケルトン
 	Model* model = ModelManager::GetInstance()->FindModel("simpleSkin.gltf");//スケルトンアクセス権
@@ -68,6 +69,7 @@ void GamePlayScene::Initialize()
 	walkAnimation_ = Model::LoadAnimationFile("./resources", "walk.gltf");//アニメーションのみ
 	sneakWalkAnimation_ = Model::LoadAnimationFile("./resources", "sneakWalk.gltf");//アニメーションのみ
 	humanAnimation_ = Model::LoadAnimationFile("./resources", "human.gltf");//持ってきたもの
+	hissatu_ = Model::LoadAnimationFile("./resources", "playerCloudAnimation.gltf");//持ってきたもの
 
 	//音声読み込み
 	Audio::GetInstance()->LoadFile("Resources/Alarm01.wav");
@@ -88,12 +90,12 @@ void GamePlayScene::Initialize()
 
 	auto objAxis = std::make_unique<Object3d>();
 	objAxis->Initialize(object3dCommon);
-	objAxis->SetModel("human.gltf",true);//アニメーションモデル読み込み(true必要)
+	objAxis->SetModel("playerCloudAnimation.gltf",true);//アニメーションモデル読み込み(true必要)
 	objAxis->GetTransform().translate = { 2.0f, 0.0f, 0.0f };
 	objAxis->GetTransform().rotate = { 0.0f,0.0f,0.0f };
 	objAxis->GetTransform().scale = { 0.2f,0.2f,0.2f };
 
-	objAxis->PlayAnimation(humanAnimation_);//アニメーション読み込み
+	objAxis->PlayAnimation(hissatu_);//アニメーション読み込み
 	objectAxis = objAxis.get();
 
 	animationObjects.push_back(std::move(objAxis));//アニメーションモデル専用入れる

@@ -127,7 +127,7 @@ void Object3d::SetModel(const std::string& filePath,bool isAnimation)
 			auto device = object3dCommon->GetDxCommon()->GetDevice();
 			auto srvHeap = SrvManager::GetInstance()->GetDescriptorHeap();
 			uint32_t descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
+			//Todo:createだと
 			skinCluster_ = model_->CreateSkinCluster(device, skeleton_, model_->GetModelData(), srvHeap, descriptorSize);
 		}
 	}
