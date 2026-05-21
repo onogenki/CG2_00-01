@@ -178,5 +178,6 @@ private:
 	uint32_t width = WinApp::kClientWidth; // 幅・高さをメンバに
 	uint32_t height = WinApp::kClientHeight;
 
-
+	//解放待ちのテクスチャ転送用リソースを一時的に保管する配列
+	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> intermediateResources_;
 };
