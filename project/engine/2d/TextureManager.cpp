@@ -81,46 +81,8 @@ void TextureManager::LoadTexture(const std::string& filePath)
 		//設定をもとにSRVの生成
 		dxCommon_->GetDevice()->CreateShaderResourceView(textureData.resource.Get(), &srvDesc, textureData.srvHandleCPU);
 
-		//テクスチャデータ転送
-		Microsoft::WRL::ComPtr< ID3D12Resource > intermediateResource = dxCommon_->UploadTextureData(textureData.resource, mipImages, dxCommon_->GetDevice(),
-			dxCommon_->GetCommandList());
-		
-		//CommandListをCloseし、commandQueue->ExecuteCommandListを使いキックする。 
-		dxCommon_->GetCommandList()->Close();
-		assert(SUCCEEDED(hr));
-		ID3D12CommandList* commandLists[] = { dxCommon_->GetCommandList() };
-		dxCommon_->GetCommandQueue()->ExecuteCommandLists(1, commandLists);
-
-		// //実行を待つ。
-		Microsoft::WRL::ComPtr<ID3D12Fence> fence = nullptr;
-		uint64_t fenceVal = 0;
-		hr = dxCommon_->GetDevice()->CreateFence(fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
-		assert(SUCCEEDED(hr));
-
-		HANDLE fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-		assert(fenceEvent != nullptr);
-
-		// シグナルを送る
-		fenceVal++;
-		dxCommon_->GetCommandQueue()->Signal(fence.Get(), fenceVal);
-
-		// 完了していなければ待つ
-		if (fence->GetCompletedValue() < fenceVal)
-		{
-			fence->SetEventOnCompletion(fenceVal, fenceEvent);
-			WaitForSingleObject(fenceEvent, INFINITE);
-		}
-		CloseHandle(fenceEvent);
-
-		//実行が完了したので、allocatorとcommandListをResetsして次のコマンドを積めるようにする。 
-		hr = dxCommon_->GetCommandAllocator()->Reset();
-		assert(SUCCEEDED(hr));
-		hr = dxCommon_->GetCommandList()->Reset(dxCommon_->GetCommandAllocator(), nullptr);
-		assert(SUCCEEDED(hr));
-
-		//ここまできたら転送は終わってるので、intermediateResourceはReleaseしても良い。 
-		intermediateResource.Reset();
-
+		//テクスチャデータの転送(GPUへのキックから完了待ち、リセットまでをDirectXCommonに全て任せる)
+		dxCommon_->ExecuteTextureTransfer(textureData.resource, mipImages);
 }
 
 const DirectX::TexMetadata& TextureManager::GetMetaData(const std::string& filePath)
