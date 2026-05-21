@@ -1,10 +1,11 @@
 #include "DirectXCommon.h"
-#include<cassert>
 #include "Input.h"
 #include"Logger.h"
 #include"StringUtility.h"
-#include <thread>
 #include "externals/DirectXTex/d3dx12.h"
+#include<cassert>
+#include <thread>
+#include<vector>
 using namespace Logger;
 
 #pragma comment(lib,"d3d12.lib")
@@ -615,7 +616,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateTextureResource(cons
 
 	// 2. 利用するHeapの設定
 	D3D12_HEAP_PROPERTIES heapProperties{};
-	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT; // VRAM上に作る
+	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT; // 細かい設定を行う
 
 	// 3. Resourceを生成する
 	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
@@ -632,7 +633,9 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateTextureResource(cons
 }
 
 // テクスチャデータの転送
-Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::UploadTextureData(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages)
+[[nodiscard]]
+Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::UploadTextureData(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages, ID3D12Device* device,
+	ID3D12GraphicsCommandList* commandList)
 {
 	std::vector<D3D12_SUBRESOURCE_DATA> subresources;
 	DirectX::PrepareUpload(device_.Get(), mipImages.GetImages(), mipImages.GetImageCount(), mipImages.GetMetadata(), subresources);
@@ -662,6 +665,44 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::UploadTextureData(const Mi
 	);
 	assert(SUCCEEDED(hr));
 
+	D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
+	UINT numRows = 0;
+	UINT64 rowSizeInBytes = 0;
+	UINT64 totalBytes = 0;
+
+	//デバイスに配置図(Footprint)を計算してもらう
+	device->GetCopyableFootprints(
+		&textureDesc,//テクスチャの設定
+		0, 1, 0,//ミップレベル0から1つ分
+		&footprint,//結果の配置図がここに入る
+		&numRows,//行数(高さ)
+		&rowSizeInBytes,//実際の1桁のデータサイズ(パディング抜き)
+		&totalBytes//必要な中間バッファのサイズ
+	);
+
+	uint8_t* mappedData = nullptr;
+	intermediateResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedData));
+
+	//画像の元データ
+	const uint8_t* srcData = mipImages.GetImages()[0].pixels;
+	//元データの1行のサイズ
+	size_t srcRowPitch = mipImages.GetImages()[0].rowPitch;
+
+	//1行ずつ、アライメントを考慮してコピーする
+	for (UINT y = 0; y < numRows; ++y)
+	{ //書き込み先: mappedData + (Footprintの開始位置) + (y行目 * 256バイトアライメント済みのRowPitch)
+		uint8_t* destRow = mappedData + footprint.Offset + (y * footprint.Footprint.RowPitch);
+
+		//読み込み先: srcData+(Y行目*元画像のRowPitch)
+		const uint8_t* srcRow = srcData + (y * srcRowPitch);
+
+		//1行分だけ(rpwSizeBytes)だけmemcpy
+		std::memcpy(destRow, srcRow, rowSizeInBytes);
+	}
+
+intermediateResource->Unmap(0, nullptr);
+
+
 	UpdateSubresources(commandList_.Get(), texture.Get(), intermediateResource.Get(), 0, 0, UINT(subresources.size()), subresources.data());
 
 	// Textureへの転送後は利用できるよう、D3D12_RESOURCE_STATE_COPY_DESTからD3D12_RESOURCE_STATE_GENERIC_READへResourceStateを変更する
@@ -675,6 +716,56 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::UploadTextureData(const Mi
 	commandList_->ResourceBarrier(1, &barrier);
 
 	return intermediateResource;
+}
+
+Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateBufferResource(size_t sizeInBytes)
+{
+	// 頂点リソース用のヒープの設定
+	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
+	uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD; // UploadHeapを使う
+
+	// 頂点リソースの設定
+	D3D12_RESOURCE_DESC resourceDesc{};
+	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resourceDesc.Width = sizeInBytes;
+	resourceDesc.Height = 1;
+	resourceDesc.DepthOrArraySize = 1;
+	resourceDesc.MipLevels = 1;
+	resourceDesc.SampleDesc.Count = 1;
+	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	// 実際にリソースを作る
+	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
+	HRESULT hr = device_->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE,
+		&resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+		IID_PPV_ARGS(&resource));
+	assert(SUCCEEDED(hr));
+
+	return resource;
+}
+
+void DirectXCommon::ExecuteTextureTransfer(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages)
+{
+	//UploadTextureDataを引数4つで呼び出す
+Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = UploadTextureData(texture,mipImages,device_.Get(),commandList_.Get());
+
+//CommandListをClose
+HRESULT hr = commandList_->Close();
+assert(SUCCEEDED(hr));
+
+//commandQueue->ExecuteCommandListsを使いキックする
+ID3D12CommandList* commandLists[] = { commandList_.Get() };
+commandQueue->ExecuteCommandLists(1, commandLists);
+
+//実行を待つ
+WaitForGPU();
+
+//allocatorとcommandListをResetして次のコマンドを積めるようにする
+hr = commandAllocator->Reset();
+assert(SUCCEEDED(hr));
+hr = commandList_->Reset(commandAllocator.Get(), nullptr);
+assert(SUCCEEDED(hr));
+
 }
 
 DirectXCommon::~DirectXCommon() {

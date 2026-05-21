@@ -7,32 +7,6 @@
 
 using namespace MyMath;
 
-Microsoft::WRL::ComPtr<ID3D12Resource> Sprite::CreateBufferResource(ID3D12Device* device, size_t sizeInBytes)
-{
-	//頂点リソース用のヒープの設定
-	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
-	uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD; // UploadHeapを使う
-
-	//頂点リソースの設定
-	D3D12_RESOURCE_DESC resourceDesc{};
-	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resourceDesc.Width = sizeInBytes;
-	resourceDesc.Height = 1;
-	resourceDesc.DepthOrArraySize = 1;
-	resourceDesc.MipLevels = 1;
-	resourceDesc.SampleDesc.Count = 1;
-	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-	//実際にリソースを作る
-	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
-	HRESULT hr = device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE,
-		&resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-		IID_PPV_ARGS(&resource));
-	assert(SUCCEEDED(hr));
-
-	return resource;
-}
-
 void Sprite::AdjustTextureSize()
 {
 	//テクスチャメタデータを取得
@@ -47,10 +21,7 @@ void Sprite::AdjustTextureSize()
 }
 
 void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
-{
-	//Sprite* sprite = new Sprite();
-	//sprite->Initialize();
-	 
+{	 
 	position = { 0.0f, 0.0f };
 	rotation = 0.0f;
 	anchorPoint = { 0.0f, 0.0f }; // 左上を基準（または0.5fで中心）
@@ -61,10 +32,8 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 	//引数で受け取ってメンバ変数に記録する
 	this->spriteCommon = spriteCommon;
 
-	ID3D12Device* device = spriteCommon->GetDevice();
-
 	//頂点リソースを作る
-	vertexResource = CreateBufferResource(device, sizeof(VertexData) * 4);
+	vertexResource = spriteCommon->GetDxCommon()->CreateBufferResource(sizeof(VertexData) * 4);
 
 	//リリースの先頭のアドレスから使う
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
@@ -99,7 +68,7 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 
 
 
-	indexResource = CreateBufferResource(device, sizeof(uint32_t) * 6);
+	indexResource = spriteCommon->GetDxCommon()->CreateBufferResource(sizeof(uint32_t) * 6);
 
 	//リソースの先頭のアドレスから使う
 	indexBufferView.BufferLocation = indexResource->GetGPUVirtualAddress();
@@ -113,7 +82,7 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 	indexData[3] = 1;  indexData[4] = 3;   indexData[5] = 2;
 
 	//マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
-	materialResource = CreateBufferResource(device, sizeof(Material));
+	materialResource = spriteCommon->GetDxCommon()->CreateBufferResource(sizeof(Material));
 	//書き込むためのアドレスを取得
 	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
 
@@ -123,7 +92,7 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 	materialData->uvTransform = MakeIdentity4x4();
 
 	//TransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	transformationMatrixResource = CreateBufferResource(device, sizeof(TransformationMatrix));
+	transformationMatrixResource = spriteCommon->GetDxCommon()->CreateBufferResource(sizeof(TransformationMatrix));
 	//座標変換行列リソースにデータを書き込むためのアドレスを取得してtransformationMatrixDataに割り当てる
 	transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData));
 

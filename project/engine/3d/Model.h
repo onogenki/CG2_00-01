@@ -203,6 +203,5 @@ private:
 	void CreateIndexData();
 	void CreateVertexData();
 	void CreateMaterialData();
-	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(ID3D12Device* device, size_t sizeInBytes);
 
 };

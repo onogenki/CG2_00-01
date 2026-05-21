@@ -82,10 +82,12 @@ void TextureManager::LoadTexture(const std::string& filePath)
 		dxCommon_->GetDevice()->CreateShaderResourceView(textureData.resource.Get(), &srvDesc, textureData.srvHandleCPU);
 
 		//テクスチャデータ転送
-		Microsoft::WRL::ComPtr< ID3D12Resource > intermediateResource = dxCommon_->UploadTextureData(textureData.resource, mipImages);
+		Microsoft::WRL::ComPtr< ID3D12Resource > intermediateResource = dxCommon_->UploadTextureData(textureData.resource, mipImages, dxCommon_->GetDevice(),
+			dxCommon_->GetCommandList());
 		
 		//CommandListをCloseし、commandQueue->ExecuteCommandListを使いキックする。 
 		dxCommon_->GetCommandList()->Close();
+		assert(SUCCEEDED(hr));
 		ID3D12CommandList* commandLists[] = { dxCommon_->GetCommandList() };
 		dxCommon_->GetCommandQueue()->ExecuteCommandLists(1, commandLists);
 

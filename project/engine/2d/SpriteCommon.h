@@ -21,6 +21,8 @@ class SpriteCommon
 	ID3D12Device* GetDevice() const { return dxCommon_->GetDevice(); }
 	ID3D12GraphicsCommandList* GetCommandList() const { return dxCommon_->GetCommandList(); }
 
+	DirectXCommon* GetDxCommon() const { return dxCommon_; }
+
 private:
 	SpriteCommon() = default;
 	~SpriteCommon() = default;

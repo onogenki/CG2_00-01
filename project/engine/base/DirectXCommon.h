@@ -71,7 +71,10 @@ public:
 	Microsoft::WRL::ComPtr<ID3D12Resource>CreateTextureResource(const DirectX::TexMetadata& metadata);
 
 	//テクスチャデータの転送
-	Microsoft::WRL::ComPtr<ID3D12Resource> UploadTextureData(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages);
+	Microsoft::WRL::ComPtr<ID3D12Resource> UploadTextureData(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages, ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
+
+	//どこからでも使えるバッファ生成関数として公開する
+	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(size_t sizeInBytes);
 
 	//getter
 	ID3D12Device* GetDevice() const { return device_.Get(); }
@@ -88,6 +91,9 @@ public:
 
 	//GPU待ち関数
 	void WaitForGPU();
+
+	// テクスチャの転送コマンドを実行して完了を待つ関数
+	void ExecuteTextureTransfer(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages);
 
 private:
 
@@ -168,5 +174,6 @@ private:
 
 	uint32_t width = WinApp::kClientWidth; // 幅・高さをメンバに
 	uint32_t height = WinApp::kClientHeight;
-};
 
+
+};

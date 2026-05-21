@@ -4,23 +4,6 @@
 
 using namespace MyMath;
 
-// バッファ作成関数
-static Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(ID3D12Device* device, size_t sizeInBytes) {
-    D3D12_HEAP_PROPERTIES uploadHeapProperties{};
-    uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
-    D3D12_RESOURCE_DESC bufferResourceDesc{};
-    bufferResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    bufferResourceDesc.Width = sizeInBytes;
-    bufferResourceDesc.Height = 1;
-    bufferResourceDesc.DepthOrArraySize = 1;
-    bufferResourceDesc.MipLevels = 1;
-    bufferResourceDesc.SampleDesc.Count = 1;
-    bufferResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    Microsoft::WRL::ComPtr<ID3D12Resource> resource;
-    device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE, &bufferResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&resource));
-    return resource;
-}
-
 // シングルトンインスタンスの取得
 ParticleManager* ParticleManager::GetInstance() {
     static ParticleManager instance;
@@ -148,7 +131,7 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
     assert(SUCCEEDED(hr));
 
     //頂点データの初期化
-    vertexResource_ = CreateBufferResource(device, sizeof(VertexData) * 6);
+    vertexResource_ = dxCommon_->CreateBufferResource(sizeof(VertexData) * 6);
     vertexBufferView_.BufferLocation = vertexResource_->GetGPUVirtualAddress();
     vertexBufferView_.SizeInBytes = sizeof(VertexData) * 6;
     vertexBufferView_.StrideInBytes = sizeof(VertexData);
@@ -164,7 +147,7 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
     vertexData[5] = { { 1.0f, -1.0f, 0.0f, 1.0f}, {1.0f, 1.0f}, normal };
 
     // マテリアル（定数バッファ）の初期化
-    materialResource_ = CreateBufferResource(device, sizeof(Material));
+    materialResource_ = dxCommon_->CreateBufferResource(sizeof(Material));
     materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
     memset(materialData_, 0, sizeof(Material));
     materialData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -190,7 +173,7 @@ void ParticleManager::CreateParticleGroup(const std::string name, const std::str
     newGroup.textureFilePath = textureFilePath;
 
     // インスタンシング用リソースの生成 (上限を決めてリソースを作る)
-    newGroup.instancingResource = CreateBufferResource(dxCommon_->GetDevice(), sizeof(ParticleForGPU) * kNumMaxInstance);
+    newGroup.instancingResource = dxCommon_->CreateBufferResource(sizeof(ParticleForGPU) * kNumMaxInstance);
 
     // ポインタを取得
     newGroup.instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&newGroup.mappedData));

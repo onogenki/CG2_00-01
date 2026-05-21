@@ -140,37 +140,11 @@ void Object3d::PlayAnimation(const Model::Animation& animation)
 	isAnimating_ = true;
 }
 
-Microsoft::WRL::ComPtr<ID3D12Resource> Object3d::CreateBufferResource(ID3D12Device* device, size_t sizeInBytes)
-{
-	// 頂点リソース用のヒープの設定
-	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
-	uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD; // UploadHeapを使う
-
-	// 頂点リソースの設定
-	D3D12_RESOURCE_DESC resourceDesc{};
-	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resourceDesc.Width = sizeInBytes;
-	resourceDesc.Height = 1;
-	resourceDesc.DepthOrArraySize = 1;
-	resourceDesc.MipLevels = 1;
-	resourceDesc.SampleDesc.Count = 1;
-	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-	// 実際にリソースを作る
-	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
-	HRESULT hr = device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE,
-		&resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-		IID_PPV_ARGS(&resource));
-	assert(SUCCEEDED(hr));
-
-	return resource;
-}
-
 void Object3d::CreateTransformationMatrixData()
 {
 	// 1. 座標変換行列リソースを作る
 	// (サイズは TransformationMatrix 構造体1つ分)
-	transformationMatrixResource = CreateBufferResource(object3dCommon->GetDxCommon()->GetDevice(), sizeof(TransformationMatrix));
+	transformationMatrixResource = object3dCommon->GetDxCommon()->CreateBufferResource(sizeof(TransformationMatrix));
 
 	// 2. データを書き込むためのアドレスを取得して transformationMatrixData に割り当てる
 	transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData));
@@ -184,7 +158,7 @@ void Object3d::CreateDirectionalLightData()
 {
 	// 1. 平行光源リソースを作る
 	// (サイズは DirectionalLight 構造体1つ分)
-	directionalLightResource = CreateBufferResource(object3dCommon->GetDxCommon()->GetDevice(), sizeof(DirectionalLight));
+	directionalLightResource = object3dCommon->GetDxCommon()->CreateBufferResource(sizeof(DirectionalLight));
 
 	// 2. データを書き込むためのアドレスを取得して directionalLightData に割り当てる
 	directionalLightResource->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
@@ -205,7 +179,7 @@ void Object3d::CreateDirectionalLightData()
 void Object3d::CreateCameraData()
 {
 	//カメラ
-	cameraResource = CreateBufferResource(object3dCommon->GetDxCommon()->GetDevice(), sizeof(CameraForGPU));
+	cameraResource = object3dCommon->GetDxCommon()->CreateBufferResource(sizeof(CameraForGPU));
 
 
 	cameraResource->Map(0, nullptr, reinterpret_cast<void**>(&cameraData));
@@ -217,7 +191,7 @@ void Object3d::CreatePointLightData()
 {
 	// 1. 点光源リソースを作る
 	// (サイズは PointLight 構造体1つ分)
-	pointLightResource = CreateBufferResource(object3dCommon->GetDxCommon()->GetDevice(), sizeof(PointLight));
+	pointLightResource = object3dCommon->GetDxCommon()->CreateBufferResource(sizeof(PointLight));
 
 	// 2. データを書き込むためのアドレスを取得して pointLightData に割り当てる
 	pointLightResource->Map(0, nullptr, reinterpret_cast<void**>(&pointLightData));
@@ -236,7 +210,7 @@ void Object3d::CreatePointLightData()
 
 void Object3d::CreateSpotLightData()
 {
-	spotLightResource = CreateBufferResource(object3dCommon->GetDxCommon()->GetDevice(), sizeof(SpotLight));
+	spotLightResource = object3dCommon->GetDxCommon()->CreateBufferResource(sizeof(SpotLight));
 	spotLightResource->Map(0, nullptr, reinterpret_cast<void**>(&spotLightData));
 
 	// 資料通りの初期値

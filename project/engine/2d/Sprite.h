@@ -77,9 +77,6 @@ public:
 	Transform& GetTransform() { return transform; }
 private:
 
-	// デバイスを受け取ってバッファを作る関数
-	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(ID3D12Device* device, size_t sizeInBytes);
-
 	SpriteCommon* spriteCommon = nullptr;
 
 	//バッファリソース

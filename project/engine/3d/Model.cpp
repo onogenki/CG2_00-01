@@ -14,7 +14,7 @@ Model::SkinCluster Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12D
 	uint32_t srvIndex = SrvManager::GetInstance()->Allocate();
 
 	//paletter用のResourceを確保
-	skinCluster.paletteResource = CreateBufferResource(modelCommon_->GetDxCommon()->GetDevice(), sizeof(WellForGPU) * skeleton.joints.size());
+	skinCluster.paletteResource = modelCommon_->GetDxCommon()->CreateBufferResource(sizeof(WellForGPU) * skeleton.joints.size());
 	WellForGPU* mappedPalette = nullptr;
 	skinCluster.paletteResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedPalette));
 	skinCluster.mappedPalette = { mappedPalette,skeleton.joints.size() };//spanを使ってアクセスするようにする
@@ -33,7 +33,7 @@ Model::SkinCluster Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12D
 	device->CreateShaderResourceView(skinCluster.paletteResource.Get(), &paletterSrvDesc, skinCluster.paletteSrvHandle.first);
 
 	//influence用のResourceを確保。頂点ごとにinfluence情報を追加できるようにする
-	skinCluster.influenceResource = CreateBufferResource(modelCommon_->GetDxCommon()->GetDevice(), sizeof(VertexInfluence) * modelData.vertices.size());
+	skinCluster.influenceResource = modelCommon_->GetDxCommon()->CreateBufferResource(sizeof(VertexInfluence) * modelData.vertices.size());
 	VertexInfluence* mappedInfluence = nullptr;
 	skinCluster.influenceResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedInfluence));
 	std::memset(mappedInfluence, 0, sizeof(VertexInfluence) * modelData.vertices.size());//0埋め weightを0にしておく
@@ -366,36 +366,10 @@ void Model::ApplyAnimation(Skeleton& skeleton, const Animation& animation, float
 	}
 }
 
-Microsoft::WRL::ComPtr<ID3D12Resource> Model::CreateBufferResource(ID3D12Device* device, size_t sizeInBytes)
-{
-	// 頂点リソース用のヒープの設定
-	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
-	uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD; // UploadHeapを使う
-
-	// 頂点リソースの設定
-	D3D12_RESOURCE_DESC resourceDesc{};
-	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resourceDesc.Width = sizeInBytes;
-	resourceDesc.Height = 1;
-	resourceDesc.DepthOrArraySize = 1;
-	resourceDesc.MipLevels = 1;
-	resourceDesc.SampleDesc.Count = 1;
-	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-	// 実際にリソースを作る
-	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
-	HRESULT hr = device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE,
-		&resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-		IID_PPV_ARGS(&resource));
-	assert(SUCCEEDED(hr));
-
-	return resource;
-}
-
 void Model::CreateIndexData()
 {
 	// --- インデックスバッファの作成 ---
-	indexResource = CreateBufferResource(modelCommon_->GetDxCommon()->GetDevice(), sizeof(uint32_t) * modelData.indices.size());
+	indexResource = modelCommon_->GetDxCommon()->CreateBufferResource(sizeof(uint32_t) * modelData.indices.size());
 
 	// インデックスバッファビューの設定
 	indexBufferView.BufferLocation = indexResource->GetGPUVirtualAddress();
@@ -415,7 +389,7 @@ void Model::CreateVertexData()
 	size_t sizeInBytes = sizeof(VertexData) * modelData.vertices.size();
 
 	// 1. 頂点リソースを作る (Spriteから持ってきたヘルパー関数を使用)
-	vertexResource = CreateBufferResource(modelCommon_->GetDxCommon()->GetDevice(), sizeInBytes);
+	vertexResource = modelCommon_->GetDxCommon()->CreateBufferResource(sizeInBytes);
 
 	// 2. 頂点バッファビューを作成
 	// リソースの先頭のアドレスから使う
@@ -436,7 +410,7 @@ void Model::CreateVertexData()
 void Model::CreateMaterialData()
 {
 	// 1. マテリアルリソースを作る (サイズは Material 構造体1つ分)
-	materialResource = CreateBufferResource(modelCommon_->GetDxCommon()->GetDevice(), sizeof(Material));
+	materialResource = modelCommon_->GetDxCommon()->CreateBufferResource(sizeof(Material));
 
 	// 2. データを書き込むためのアドレスを取得して materialData に割り当てる
 	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
