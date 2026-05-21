@@ -440,9 +440,6 @@ void DirectXCommon::PostDraw()
 		WaitForSingleObject(fenceEvent_, INFINITE);
 	}
 
-	//GPUの実行が完全に終わったので、溜まっていた中間リソースを全て安全に一斉開放
-	intermediateResources_.clear();
-
 	//次のフレーム用のコマンドリストを準備
 	hr = commandAllocator->Reset();
 	assert(SUCCEEDED(hr));
@@ -779,8 +776,22 @@ void DirectXCommon::ExecuteTextureTransfer(const Microsoft::WRL::ComPtr<ID3D12Re
 	//GPUの処理 作成した中間バッファを使って、コマンドリストにコピー命令を積む
 	RecordTextureCopyCommand(texture, intermediateResource, mipImages.GetImageCount(), device_.Get(), commandList_.Get());
 
-	//中間リソースが関数終了時に勝手に消えないよう、配列にお預かりする（寿命を延ばす）
-	intermediateResources_.push_back(intermediateResource);
+	//CommandListをClose
+	HRESULT hr = commandList_->Close();
+	assert(SUCCEEDED(hr));
+
+	//commandQueue->ExecuteCommandListsを使いキックする
+	ID3D12CommandList* commandLists[] = { commandList_.Get() };
+	commandQueue->ExecuteCommandLists(1, commandLists);
+
+	//実行を待つ
+	WaitForGPU();
+
+	//allocatorとcommandListをResetして次のコマンドを積めるようにする
+	hr = commandAllocator->Reset();
+	assert(SUCCEEDED(hr));
+	hr = commandList_->Reset(commandAllocator.Get(), nullptr);
+	assert(SUCCEEDED(hr));
 
 }
 
