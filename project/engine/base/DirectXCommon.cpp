@@ -513,7 +513,7 @@ Microsoft::WRL::ComPtr < IDxcBlob> DirectXCommon::CompileShader(
 	const std::wstring& filePath,
 	//Compilerに使用するProfile
 	const wchar_t* profile
-	)
+)
 {
 	//これからシェーダーをコンバイルする旨をログに出す
 	Log(StringUtility::ConvertString(std::format(L"Begin CompileShader,path:{},profile:{}\n", filePath, profile)));
@@ -565,7 +565,6 @@ Microsoft::WRL::ComPtr < IDxcBlob> DirectXCommon::CompileShader(
 	//実行用のバイナリを返却
 	return shaderBlob;
 }
-
 
 
 Microsoft::WRL::ComPtr < ID3D12DescriptorHeap> DirectXCommon::CreateDescriptorHeap(
