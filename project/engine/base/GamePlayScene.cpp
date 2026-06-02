@@ -52,17 +52,12 @@ void GamePlayScene::Initialize()
 	//.objファイルからモデルを読み込む
 	ModelManager::GetInstance()->LoadModel("terrain.obj");
 	ModelManager::GetInstance()->LoadModel("sphere.obj");
-	ModelManager::GetInstance()->LoadModel("plane.gltf");//アニメーションなしgltf
 	ModelManager::GetInstance()->LoadModel("AnimatedCube.gltf");//アニメーションありのモデル
 	ModelManager::GetInstance()->LoadModel("simpleSkin.gltf");//スケルトン(細かいアニメーション)
 	ModelManager::GetInstance()->LoadModel("walk.gltf");//アニメーションのみだが必要
 	ModelManager::GetInstance()->LoadModel("sneakWalk.gltf");//アニメーションのみだが必要
 	ModelManager::GetInstance()->LoadModel("human.gltf");//持ってきたもの
-	ModelManager::GetInstance()->LoadModel("playerCloudAnimation.gltf");//持ってきたもの
-
-	//スケルトン
-	Model* model = ModelManager::GetInstance()->FindModel("simpleSkin.gltf");//スケルトンアクセス権
-	skeleton_ = model->CreateSkeleton(model->GetModelData().rootNode);//動く仕組み
+	ModelManager::GetInstance()->LoadModel("playerCloudAnimation.gltf");//持ってきたアニメーション
 
 	//アニメーションの読み込み
 	simpleAnimation_ = Model::LoadAnimationFile("./resources", "simpleSkin.gltf");//スケルトン
@@ -86,21 +81,27 @@ void GamePlayScene::Initialize()
 	objPlane->SetModel("terrain.obj");
 	objPlane->GetTransform().translate = { 1.0f, -2.0f, 10.0f };
 	objectPlane = objPlane.get();           // 中身を指すだけのポインタを保存
-	normalObjects.push_back(std::move(objPlane));//通常(アニメーション無し)モデル入れる
+	normalObjects.push_back(std::move(objPlane));//通常(obj)モデル入れる
 
 	auto objAxis = std::make_unique<Object3d>();
 	objAxis->Initialize(object3dCommon);
-	objAxis->SetModel("playerCloudAnimation.gltf",true);//アニメーションモデル読み込み(true必要)
+	objAxis->SetModel("human.gltf");//アニメーションモデル読み込み
+	objAxis->InitializeAnimation();//skinClusterが1回だけ作られてisSkeletal_がtrueになる
 	objAxis->GetTransform().translate = { 2.0f, 0.0f, 0.0f };
 	objAxis->GetTransform().rotate = { 0.0f,0.0f,0.0f };
 	objAxis->GetTransform().scale = { 0.2f,0.2f,0.2f };
 
-	objAxis->PlayAnimation(hissatu_);//アニメーション読み込み
-	objectAxis = objAxis.get();
+	objAxis->PlayAnimation(humanAnimation_);//アニメーション再生
 
-	animationObjects.push_back(std::move(objAxis));//アニメーションモデル専用入れる
+	//1ループ再生させる場合(ループや時間指定させたい場合は削除する)
+	objAxis->SetIsLoop(false);
+	//時間指定したいなら利用(アニメーション時間で演出などができる)
+	//objAxis->SetMaxPlayTime(6.0f);
 
+	objectAxis = objAxis.get();//外部保存用に記録
 
+	animationObjects.push_back(std::move(objAxis));//アニメーションモデル専用に登録
+	
 	for (uint32_t i = 0; i < 1; ++i)
 	{
 		auto sprite = std::make_unique<Sprite>();
@@ -191,6 +192,9 @@ void GamePlayScene::Update()
 		object3d->SetSpotLight(spotLight);
 		object3d->Update();
 	}
+
+	// アニメーションの時間確認
+	this->animationTime_ = objectAxis->GetAnimationTime();
 
 	//3Dオブジェクトの更新アニメーションモデル
 	for (auto& object3d : animationObjects) {
