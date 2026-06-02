@@ -31,47 +31,39 @@ void Object3d::Update()
 {
 
 	if (model_ && isAnimating_)
-	{
-		animationTime_ += 1.0f / 60.0f;//時刻を進める。1/60で固定してあるが、計算した時間を使って可変フレーム対応するほうが望ましい
-		animationTime_ = std::fmod(animationTime_, currentAnimation_.duration);//最後まで行ったら最初からリポート再生
+	{// 実時間を 1/60 秒ずつ進める
+		animationTime_ += 1.0f / 60.0f;
 
-		if (isSkeletal_)//スケルトンがある場合
-		{//全てのジョイントにアニメーションを適用
-			model_->ApplyAnimation(skeleton_, currentAnimation_, animationTime_);
-			//親子関係を計算してskeletonSpaceMatrixを更新
-			model_->Update(skeleton_);
-			model_->Update(skinCluster_, skeleton_);
-		} else {//RootNodeだけ動かす場合
-			std::string rootName = model_->GetModelData().rootNode.name;
-			if (currentAnimation_.nodeAnimations.count(rootName))
+		// ループOFFなら、自動的にアニメーションの1本分の長さ（duration)にする
+		if (!isLoop_ && maxPlayTime_ == 0.0f) {
+			maxPlayTime_ = currentAnimation_.duration;
+		}
+
+		//時間指定されてる場合の止まる処理
+		if (maxPlayTime_ > 0.0f)
+		{
+			if (animationTime_ >= maxPlayTime_)
 			{
-				Model::NodeAnimation& rootNodeAnimation = currentAnimation_.nodeAnimations[rootName];//rootNodeのAnimationを取得
-
-				Vector3 translate = Model::CalculateValue(rootNodeAnimation.translate.keyframes, animationTime_);//指定時刻の値を取得。関数の詳細は次ページ
-				Quaternion rotate = Model::CalculateValue(rootNodeAnimation.rotate.keyframes, animationTime_);
-				Vector3 scale = Model::CalculateValue(rootNodeAnimation.scale.keyframes, animationTime_);
-
-				// モデルの rootNode の localMatrix を更新する
-				model_->GetModelData().rootNode.localMatrix = MakeAffineMatrixQuaternion(scale, rotate, translate);
+				animationTime_ = maxPlayTime_;//指定時間でタイマー固定
 			}
 		}
+
+		// 実際にモデルを動かすループ時間を計算
+		float finalRenderTime = std::fmod(animationTime_, currentAnimation_.duration);
+
+		// もし制限時間に達して止まったなら、最後のポーズで固定する
+		if (maxPlayTime_ > 0.0f && animationTime_ >= maxPlayTime_) {
+			finalRenderTime = std::fmod(maxPlayTime_, currentAnimation_.duration);
+		}
+		//アニメーションを骨に適用して行列をアップデート
+		model_->ApplyAnimation(skeleton_, currentAnimation_, finalRenderTime);
+		//親子関係を計算してskeletonSpaceMatrixを更新
+		model_->Update(skeleton_);
+		model_->Update(skinCluster_, skeleton_);
 	}
-//TransformからWorldMatrixを作る
+	//TransformからWorldMatrixを作る
 	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 
-	if (model_)
-	{
-		if (!isSkeletal_)
-		{
-			Matrix4x4 rootMatrix = model_->GetModelData().rootNode.localMatrix;
-			
-			//もしrootMatrixが未初期化だったら単位行列に
-			if (rootMatrix.m[0][0] == 0.0f && rootMatrix.m[3][3] == 0.0f) {
-				rootMatrix = MakeIdentity4x4();
-			}
-			worldMatrix = Multiply(rootMatrix, worldMatrix);
-		}
-	}
 	if (camera)
 	{
 		const Matrix4x4& viewProjectionMatrix = camera->GetViewProjectionMatrix();
@@ -106,30 +98,34 @@ void Object3d::Draw()
 	}
 }
 
-void Object3d::SetModel(const std::string& filePath,bool isAnimation)
-{// モデルマネージャからモデルを検索してセットする
+void Object3d::SetModel(const std::string& filePath)
+{
+	// モデルマネージャからモデルを検索してセットする
 	model_ = ModelManager::GetInstance()->FindModel(filePath);
-	if (model_)
-	{
-		if (isAnimation) {
-			//モデルの階層構造からスケルトンを生成
-			skeleton_ = model_->CreateSkeleton(model_->GetModelData().rootNode);
-			//ジョイントがあればスケルトンモデルとして扱う
-			isSkeletal_ = !skeleton_.joints.empty();
-		//obj なら絶対にスケルトンを作らない
-		} else {
-			isSkeletal_ = false;//アニメーションしないモデルはfalse
-		}
+}
+// この関数を初期化時に1回だけ呼ぶ
+void Object3d::InitializeAnimation()
+{
+	//既に同じモデルがセットされている場合は、再生成を防ぐために何もせず抜ける
+	if (!model_)return;
 
-		if (isSkeletal_) {
-			//スケルトンがあるならSkinClusterも作成する
-			// （引数の descriptorHeap や device は DxCommon 等から引っ張ってくる）
-			auto device = object3dCommon->GetDxCommon()->GetDevice();
-			auto srvHeap = SrvManager::GetInstance()->GetDescriptorHeap();
-			uint32_t descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			//Todo:createだと
-			skinCluster_ = model_->CreateSkinCluster(device, skeleton_, model_->GetModelData(), srvHeap, descriptorSize);
-		}
+	//モデルの階層構造からスケルトンを生成
+	skeleton_ = model_->CreateSkeleton(model_->GetModelData().rootNode);
+	//ジョイントがあればスケルトンモデルとして扱う
+	isSkeletal_ = !skeleton_.joints.empty();
+
+	if (isSkeletal_) {
+		//スケルトンがあるならSkinClusterも作成する
+		// （引数の descriptorHeap や device は DxCommon 等から引っ張ってくる）
+		auto device = object3dCommon->GetDxCommon()->GetDevice();
+		auto srvHeap = SrvManager::GetInstance()->GetDescriptorHeap();
+		uint32_t descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+		skinCluster_ = model_->CreateSkinCluster(device, skeleton_, model_->GetModelData(), srvHeap, descriptorSize);
+	}
+	else
+	{
+		isSkeletal_ = false;//アニメーションしないモデルはfalse
 	}
 }
 

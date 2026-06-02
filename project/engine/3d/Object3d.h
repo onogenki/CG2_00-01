@@ -70,9 +70,25 @@ public:
 	void SetModel(Model* model) { this->model_ = model; }
 
 	// モデルをファイルパス（文字列）でセットする
-	void SetModel(const std::string& filePath, bool isAnimation = false);
+	void SetModel(const std::string& filePath);
 
-	//スケルトンを取得
+	//アニメーションの初期化と生成専用の関数
+	void InitializeAnimation();
+
+	void PlayAnimation(const Model::Animation& animation);
+
+	//ループするかどうかの関数(falseで1ループのみ)
+	void SetIsLoop(bool isLoop) { isLoop_ = isLoop; }
+
+	//最大で何秒まで再生するか設定
+	void SetMaxPlayTime(float maxTime) { maxPlayTime_ = maxTime; }
+
+	//今何秒か教える関数
+	float GetAnimationTime() const { return animationTime_; }
+	//シーンからアニメーションの時間をいじる関数
+	void SetAnimationTime(float time) { this->animationTime_ = true; }
+
+	//スケルトン(アニメーションするか)を取得
 	Model::Skeleton& GetSkeleton() { return skeleton_; }
 
 	/// setter
@@ -80,6 +96,7 @@ public:
 	void SetRotate(const Vector3& rotate) { transform.rotate = rotate; }
 	void SetTranslate(const Vector3& translate) { transform.translate = translate; }
 	void SetCamera(Camera* camera) { this->camera = camera; }
+
 	//構造体(color,direction,intensity)全部入ってるsetter
 	void SetDirectionalLight(const DirectionalLight& light) {
 		*directionalLightData = light;
@@ -90,8 +107,6 @@ public:
 	void SetSpotLight(const SpotLight& light) {
 		*spotLightData = light;
 	}
-
-	void PlayAnimation(const Model::Animation& animation);
 
 	//getter
 	const Vector3& GetScale()const { return transform.scale; }
@@ -144,10 +159,11 @@ private:
 	Model::Animation currentAnimation_;//アニメーション読み込み
 	float animationTime_ = 0.0f;// アニメーションの再生時間を管理
 	bool isAnimating_ = false;
+	bool isLoop_ = true;//デフォルトはループ
+	float maxPlayTime_ = 0.0f;
 
 	Model::Skeleton skeleton_; // このオブジェクト専用の骨
 	bool isSkeletal_ = false;  // スケルトンを持っているかどうか
-
-	Model::SkinCluster skinCluster_;
+	Model::SkinCluster skinCluster_;//骨に合わせて動く体
 };
 

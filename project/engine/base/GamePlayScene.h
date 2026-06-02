@@ -53,13 +53,15 @@ private:
     int selectedUI = 0;
   
     Model::Animation animation_;//仮アニメーション読み込み
-    Model::Skeleton skeleton_;
     Model::Skeleton skinCluster_;
     Model::Animation simpleAnimation_;
     Model::Animation walkAnimation_;
     Model::Animation sneakWalkAnimation_;
     Model::Animation humanAnimation_;
     Model::Animation hissatu_;
-    float animationTime_ = 0.0f;// アニメーションの再生時間を管理
+    
+    // アニメーションの再生時間を管理
+    // (ダメージ発生タイミングやコンボ時間、イベントシーンなどをアニメーションの時間タイミングで合わせれる)
+    float animationTime_ = 0.0f;
 };
 
