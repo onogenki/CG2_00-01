@@ -73,7 +73,7 @@ void TitleScene::Update()
 	ImGuiManager::GetInstance()->End();
 
 	//sapceキーが押されていたら
-	if (Input::GetInstance()->TriggerKey(DIK_SPACE))
+	if (Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->IsPadButtonPressed(0, 1))
 	{
 		//シーン切り替え
 		SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
