@@ -53,14 +53,12 @@ void GamePlayScene::Initialize()
 	ModelManager::GetInstance()->LoadModel("terrain.obj");
 	ModelManager::GetInstance()->LoadModel("sphere.obj");
 	ModelManager::GetInstance()->LoadModel("AnimatedCube.gltf");//アニメーションありのモデル
-	ModelManager::GetInstance()->LoadModel("simpleSkin.gltf");//スケルトン(細かいアニメーション)
 	ModelManager::GetInstance()->LoadModel("walk.gltf");//アニメーションのみだが必要
 	ModelManager::GetInstance()->LoadModel("sneakWalk.gltf");//アニメーションのみだが必要
 	ModelManager::GetInstance()->LoadModel("human.gltf");//持ってきたもの
 	ModelManager::GetInstance()->LoadModel("playerCloudAnimation.gltf");//持ってきたアニメーション
 
 	//アニメーションの読み込み
-	simpleAnimation_ = Model::LoadAnimationFile("./resources", "simpleSkin.gltf");//スケルトン
 	walkAnimation_ = Model::LoadAnimationFile("./resources", "walk.gltf");//アニメーションのみ
 	sneakWalkAnimation_ = Model::LoadAnimationFile("./resources", "sneakWalk.gltf");//アニメーションのみ
 	humanAnimation_ = Model::LoadAnimationFile("./resources", "human.gltf");//持ってきたもの

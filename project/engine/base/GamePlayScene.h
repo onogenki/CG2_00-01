@@ -52,9 +52,7 @@ private:
 
     int selectedUI = 0;
   
-    Model::Animation animation_;//仮アニメーション読み込み
-    Model::Skeleton skinCluster_;
-    Model::Animation simpleAnimation_;
+    //アニメーション
     Model::Animation walkAnimation_;
     Model::Animation sneakWalkAnimation_;
     Model::Animation humanAnimation_;
