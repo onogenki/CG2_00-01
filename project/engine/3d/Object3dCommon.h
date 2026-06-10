@@ -35,6 +35,9 @@ public:
 	//スキニング用の共通描画設定
 	void SetSkinningCommonDrawSetting();
 
+	// Skybox用のルートシグネチャとパイプラインを取得するゲッター
+	ID3D12RootSignature* GetSkyboxRootSignature() const { return skyboxRootSignature_.Get(); }
+	ID3D12PipelineState* GetSkyboxPipelineState() const { return skyboxGraphicsPipelineState_.Get(); }
 
 private:
 
@@ -59,9 +62,16 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> skinningRootSignature_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> skinningGraphicsPipelineState_;
 
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> skyboxRootSignature_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> skyboxGraphicsPipelineState_;
+
 	// スキニング用の生成関数
 	void CreateSkinningRootSignature();
 	void CreateSkinningGraphicsPipeline();
+
+	//Skybox用生成関数
+	void CreateSkyboxRootSignature();
+	void CreateSkyboxPipeline();
 
 };
 

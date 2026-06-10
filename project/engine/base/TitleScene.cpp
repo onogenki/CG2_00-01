@@ -10,11 +10,19 @@ using namespace MyMath;
 
 void TitleScene::Initialize()
 {
-
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+
+	cameraManager = std::make_unique<CameraManager>();
+	mainCamera = std::make_unique<Camera>();
+
+	mainCamera->SetRotate({ 0.0f,0.0f,0.0f });
+	mainCamera->SetTranslate({ 0.0f,0.0f,-10.0f });
+	cameraManager->AddCamera("MainCamera", mainCamera.get());
+	cameraManager->SetActiveCamera("MainCamera");
 
 	object3dCommon = Object3dCommon::GetInstance();
 	object3dCommon->Initialize(dxCommon);
+	object3dCommon->SetDefaultCamera(cameraManager->GetActiveCamera());
 
 	ModelManager::GetInstance()->LoadModel("plane.obj");
 	auto terrain = std::make_unique<Object3d>();
@@ -33,16 +41,6 @@ void TitleScene::Initialize()
 	sprite_ = std::make_unique<Sprite>();
 	sprite_->Initialize(spriteCommon, "Resources/uvChecker.png");
 	sprite_->SetPosition({ 0.0f, 0.0f });
-
-	cameraManager = std::make_unique<CameraManager>();
-	mainCamera = std::make_unique<Camera>();
-
-	mainCamera->SetRotate({ 0.0f,0.0f,0.0f });
-	mainCamera->SetTranslate({ 0.0f,0.0f,-10.0f });
-	cameraManager->AddCamera("MainCamera", mainCamera.get());
-	cameraManager->SetActiveCamera("MainCamera");
-
-	object3dCommon->SetDefaultCamera(cameraManager->GetActiveCamera());
 
 	//音声読み込み
 	Audio::GetInstance()->LoadFile("Resources/Alarm01.wav");
@@ -92,6 +90,7 @@ void TitleScene::Draw()
 			obj->Draw();
 		}
 	}
+
 	spriteCommon->SetCommonDrawSetting();
 	sprite_->Draw();
 

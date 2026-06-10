@@ -64,6 +64,15 @@ void GamePlayScene::Initialize()
 	humanAnimation_ = Model::LoadAnimationFile("./resources", "human.gltf");//持ってきたもの
 	hissatu_ = Model::LoadAnimationFile("./resources", "playerCloudAnimation.gltf");//持ってきたもの
 
+	//ddsの読み込み
+	TextureManager::GetInstance()->LoadTexture("Resources/rostock_laage_airport_4k.dds");
+
+	//Skybox
+	skyBox_ = std::make_unique<SkyBox>();
+	skyBox_->Initialize(dxCommon, cameraManager->GetActiveCamera());
+	// 添付されていたDDSテクスチャのパスを指定する
+	skyBox_->SetTexture("Resources/rostock_laage_airport_4k.dds");
+
 	//音声読み込み
 	Audio::GetInstance()->LoadFile("Resources/Alarm01.wav");
 	//音声再生
@@ -216,6 +225,7 @@ void GamePlayScene::Update()
 	{
 		sprite->Update();
 	}
+	skyBox_->Update();
 
 	//ゲームの処理
 
@@ -298,6 +308,10 @@ void GamePlayScene::Draw()
 		if (object3d->IsSkeletal()) {
 			object3d->Draw();
 		}
+	}
+
+	if (skyBox_) {
+		skyBox_->Draw(object3dCommon);
 	}
 
 	//パーティクル描画

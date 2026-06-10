@@ -9,6 +9,7 @@
 #include "ParticleEmitter.h"
 #include "Audio.h" // SoundDataを使うために必要
 #include "BaseScene.h"
+#include "SkyBox.h"
 #include <vector>
 #include <memory>
 

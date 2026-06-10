@@ -9,6 +9,7 @@
 #include "ParticleEmitter.h"
 #include "Audio.h" // SoundDataを使うために必要
 #include"BaseScene.h"
+#include "SkyBox.h"
 #include <vector>
 #include <memory>
 
@@ -32,6 +33,7 @@ private:
     std::vector<std::unique_ptr<Object3d>> animationObjects;//アニメーションモデル 
 
     std::vector<std::unique_ptr<Sprite>> sprites;
+    std::unique_ptr<SkyBox> skyBox_;
 
     // パーティクル関連
     std::unique_ptr<ParticleEmitter> emitterCircle;
