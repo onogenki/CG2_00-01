@@ -302,16 +302,17 @@ void GamePlayScene::Draw()
 		}
 	}
 
+	//skyBox描画
+	if (skyBox_) {
+		skyBox_->Draw();
+	}
+
 	// アニメーションモデル用の描画
 	object3dCommon->SetSkinningCommonDrawSetting();
 	for (const auto& object3d : animationObjects) {
 		if (object3d->IsSkeletal()) {
 			object3d->Draw();
 		}
-	}
-
-	if (skyBox_) {
-		skyBox_->Draw(object3dCommon);
 	}
 
 	//パーティクル描画

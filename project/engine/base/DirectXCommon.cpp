@@ -697,7 +697,7 @@ void DirectXCommon::RecordTextureCopyCommand(const Microsoft::WRL::ComPtr<ID3D12
 	// footprints配置図はここでもう一度計算すれば前の関数から引き回さなくて済む
 	D3D12_RESOURCE_DESC desc = texture->GetDesc();
 	std::vector<D3D12_PLACED_SUBRESOURCE_FOOTPRINT>footprints(numSubresources);
-	// DirectX12に配置図(Footprint)を計算してもらう
+	// DirectX12にすべてのサブリソース（ミップマップ・配列面）の配置図を計算してもらう
 	device->GetCopyableFootprints(
 		&desc,//テクスチャの設定
 		0,//ミップレベル0から1つ分
@@ -709,6 +709,7 @@ void DirectXCommon::RecordTextureCopyCommand(const Microsoft::WRL::ComPtr<ID3D12
 		nullptr
 	);
 
+	// 全てのサブリソースをループで転送
 	for (size_t i = 0; i < numSubresources; ++i)
 	{
 		// コピー先（VRAMテクスチャ）
@@ -727,14 +728,14 @@ void DirectXCommon::RecordTextureCopyCommand(const Microsoft::WRL::ComPtr<ID3D12
 		commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
 	}
 
-	// Textureへの転送後は利用できるよう、D3D12_RESOURCE_STATE_COPY_DESTからD3D12_RESOURCE_STATE_GENERIC_READへResourceStateを変更する
+	// Textureへの転送後は利用できるよう、D3D12_RESOURCE_STATE_COPY_DESTからD3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCEへResourceStateを変更する
 	D3D12_RESOURCE_BARRIER barrier{};
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 	barrier.Transition.pResource = texture.Get();
 	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_GENERIC_READ; // PixelShaderで使うなら
+	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 	
 	commandList->ResourceBarrier(1, &barrier);
 }
@@ -769,28 +770,32 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateBufferResource(size_
 void DirectXCommon::ExecuteTextureTransfer(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages)
 {
 
-	//CPUの処理　中間バッファにデータを書き込んで、そのポインタを受け取る
+	// メインの commandList_ を汚さないよう、この関数内だけで使う一時的なコマンドリストを作る
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> tempAllocator = nullptr;
+	HRESULT hr = device_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&tempAllocator));
+	assert(SUCCEEDED(hr));
+
+	// 新しく作った tempAllocator を使って、一時的なコマンドリストを作成する
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> tempCommandList = nullptr;
+	hr = device_->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, tempAllocator.Get(), nullptr, IID_PPV_ARGS(&tempCommandList));
+	assert(SUCCEEDED(hr));
+
+	// CPUの処理：中間バッファにデータを書き込んで、そのポインタを受け取る
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = WriteToIntermediateResource(texture, mipImages, device_.Get());
 
-	//GPUの処理 作成した中間バッファを使って、コマンドリストにコピー命令を積む
-	RecordTextureCopyCommand(texture, intermediateResource, mipImages.GetImageCount(), device_.Get(), commandList_.Get());
+	// 転送コマンドを積む対象を、新しく作った「tempCommandList.Get()」にする
+	RecordTextureCopyCommand(texture, intermediateResource, mipImages.GetImageCount(), device_.Get(), tempCommandList.Get());
 
-	//CommandListをClose
-	HRESULT hr = commandList_->Close();
+	// 一時的なコマンドリストをCloseする
+	hr = tempCommandList->Close();
 	assert(SUCCEEDED(hr));
 
-	//commandQueue->ExecuteCommandListsを使いキックする
-	ID3D12CommandList* commandLists[] = { commandList_.Get() };
+	// 実行するコマンドリストを「tempCommandList.Get()」にする
+	ID3D12CommandList* commandLists[] = { tempCommandList.Get() };
 	commandQueue->ExecuteCommandLists(1, commandLists);
 
-	//実行を待つ
+	// GPUの実行完了を安全に待つ
 	WaitForGPU();
-
-	//allocatorとcommandListをResetして次のコマンドを積めるようにする
-	hr = commandAllocator->Reset();
-	assert(SUCCEEDED(hr));
-	hr = commandList_->Reset(commandAllocator.Get(), nullptr);
-	assert(SUCCEEDED(hr));
 
 }
 

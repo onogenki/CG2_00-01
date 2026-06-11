@@ -166,31 +166,6 @@ void Sprite::Update()
 	vertexData[2].texcoord = { tex_right,tex_bottom };//右下
 	vertexData[3].texcoord = { tex_right,tex_top };//右上
 
-	////スプライト用の頂点リソースにデータを書き込む
-	//VertexData* vertexData = nullptr;
-	//////書き込むためのアドレスを取得
-	//vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
-	
-	//右面　描画インデックスは[0,1,2][2,1,3]で内側を向く
-	vertexData[0].position = { 1.0f,1.0f,1.0f,1.0f };
-	vertexData[1].position = { 1.0f,1.0f,-1.0f,1.0f };
-	vertexData[2].position = { 1.0f,-1.0f,1.0f,1.0f };
-	vertexData[3].position = { 1.0f,-1.0f,-1.0f,1.0f };
-	//左面　描画インデックスは[4,5,6][6,5,7]
-	vertexData[4].position = { -1.0f,1.0f,-1.0f,1.0f };
-	vertexData[5].position = { -1.0f,1.0f,1.0f,1.0f };
-	vertexData[6].position = { -1.0f,-1.0f,-1.0f,1.0f };
-	vertexData[7].position = { -1.0f,-1.0f,1.0f,1.0f };
-	//全面　描画インデックスは[8,9,10][10,9,11]
-	vertexData[8].position = { -1.0f,1.0f,1.0f,1.0f };
-	vertexData[9].position = { 1.0f,1.0f,1.0f,1.0f };
-	vertexData[10].position = { -1.0f,-1.0f,1.0f,1.0f };
-	vertexData[11].position = { 1.0f,-1.0f,1.0f,1.0f };
-	//このような感じで残り後、上、下面も作る
-
-
-
-
 }
 
 void Sprite::Draw()

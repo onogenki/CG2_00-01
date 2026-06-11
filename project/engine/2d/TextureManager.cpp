@@ -64,7 +64,14 @@ void TextureManager::LoadTexture(const std::string& filePath)
 		mipImages = std::move(image);//圧縮フォーマットならそのまま使うのでmoveする
 	} else
 	{//非圧縮フォーマットならMipMapを作成する
-		hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::TEX_FILTER_SRGB, 4, mipImages);
+		hr = DirectX::GenerateMipMaps(
+			image.GetImages(),
+			image.GetImageCount(),
+			image.GetMetadata(),
+			DirectX::TEX_FILTER_SRGB,
+			0, // 0を指定すると、1x1まで全てのミップマップを自動計算してくれます
+			mipImages
+		); 
 		assert(SUCCEEDED(hr));
 	}
 
@@ -75,14 +82,13 @@ void TextureManager::LoadTexture(const std::string& filePath)
 	textureData.metadata = mipImages.GetMetadata(); //テクスチャメタデータを取得
 	textureData.resource = dxCommon_->CreateTextureResource(textureData.metadata);
 
+	//srvManagerからデスクリプタの割り当てを受ける
 	textureData.srvIndex = srvManager_->Allocate();
 	textureData.srvHandleCPU = srvManager_->GetCPUDescriptorHandle(textureData.srvIndex);
 	textureData.srvHandleGPU = srvManager_->GetGPUDescriptorHandle(textureData.srvIndex);
 
-
-
+	//SRVの設定
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-
 	srvDesc.Format = textureData.metadata.format;
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 

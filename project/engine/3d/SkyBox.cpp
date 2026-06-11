@@ -144,12 +144,15 @@ void SkyBox::Update() {
     transformationData_->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
 }
 
-void SkyBox::Draw(Object3dCommon* object3dCommon) {
-    assert(object3dCommon);
+void SkyBox::Draw() {
     // コマンドリストの取得
     ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
 
-    // 【必須】Skybox専用のパイプラインとルートシグネチャに切り替える！
+    //シングルトンからインスタンスを直接取得する
+    Object3dCommon* object3dCommon = Object3dCommon::GetInstance();
+    assert(object3dCommon);
+
+    //Skybox専用のパイプラインとシグネチャに切り替える
     commandList->SetGraphicsRootSignature(object3dCommon->GetSkyboxRootSignature());
     commandList->SetPipelineState(object3dCommon->GetSkyboxPipelineState());
 

@@ -34,7 +34,7 @@ public:
 
     void Initialize(DirectXCommon* dxCommon, Camera* camera);
     void Update();
-    void Draw(Object3dCommon* object3dCommon);
+    void Draw();
     void SetTexture(const std::string& filePath) { texture_ = filePath; }//キューブマップのDDSのパスを指定
     void CreateRootSignature();
 
