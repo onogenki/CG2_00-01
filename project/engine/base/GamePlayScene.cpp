@@ -301,11 +301,11 @@ void GamePlayScene::Draw()
 			object3d->Draw();
 		}
 	}
-
 	//skyBox描画
 	if (skyBox_) {
 		skyBox_->Draw();
 	}
+
 
 	// アニメーションモデル用の描画
 	object3dCommon->SetSkinningCommonDrawSetting();

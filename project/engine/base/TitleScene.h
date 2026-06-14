@@ -30,6 +30,7 @@ private:
     //タイトルシーン固有のデータ
 
     std::unique_ptr<Sprite> sprite_;
+    std::unique_ptr<SkyBox> skyBox_;
 
     std::vector<std::unique_ptr<Object3d>> normalObjects;//通常モデル  
     Object3d* obj = nullptr;
