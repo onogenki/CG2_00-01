@@ -25,12 +25,16 @@ public:
 	///getter
 	DirectXCommon* GetDxCommon() const { return dxCommon_; }
 	Camera* GetDefaultCamera() const { return defaultCamera_; }
+	const std::string& GetEnvironmentTexturePath() const { return environmentTexturePath_; }
 
 	//共通描画設定
 	void SetCommonDrawSetting();
 
 	//setter
 	void SetDefaultCamera(Camera* camera) { this->defaultCamera_ = camera; }
+	void SetEnvironmentTexturePath(const std::string& path) {
+		environmentTexturePath_ = path;
+	}
 
 	//スキニング用の共通描画設定
 	void SetSkinningCommonDrawSetting();
@@ -47,6 +51,8 @@ private:
 	DirectXCommon* dxCommon_ = nullptr;
 
 	Camera* defaultCamera_ = nullptr;
+	// Environment map used by Object3D reflection. Scenes load the texture and set this path.
+	std::string environmentTexturePath_ = "";
 
 	// ルートシグネチャの生成
 	void CreateRootSignature();

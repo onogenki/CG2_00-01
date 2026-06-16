@@ -64,8 +64,11 @@ void GamePlayScene::Initialize()
 	humanAnimation_ = Model::LoadAnimationFile("./resources", "human.gltf");//持ってきたもの
 	hissatu_ = Model::LoadAnimationFile("./resources", "playerCloudAnimation.gltf");//持ってきたもの
 
-	//ddsの読み込み
+	// Load the cubemap used by both Skybox drawing and Object3D reflection.
 	TextureManager::GetInstance()->LoadTexture("Resources/rostock_laage_airport_4k.dds");
+
+	// Object3dCommon only stores the path; the Scene owns which environment map is used.
+	object3dCommon->SetEnvironmentTexturePath("Resources/rostock_laage_airport_4k.dds");
 
 	//Skybox
 	skyBox_ = std::make_unique<SkyBox>();
@@ -301,7 +304,6 @@ void GamePlayScene::Draw()
 			object3d->Draw();
 		}
 	}
-
 	//skyBox描画
 	if (skyBox_) {
 		skyBox_->Draw();

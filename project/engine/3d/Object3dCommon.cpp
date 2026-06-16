@@ -56,8 +56,14 @@ void Object3dCommon::CreateRootSignature()
 	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV; // SRVを使う
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND; // Offsetを自動計算
 
+	D3D12_DESCRIPTOR_RANGE environmentDescriptorRange[1] = {};
+	environmentDescriptorRange[0].BaseShaderRegister = 1;
+	environmentDescriptorRange[0].NumDescriptors = 1;
+	environmentDescriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	environmentDescriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
 	// RootParameter作成。複数設定できるので配列
-	D3D12_ROOT_PARAMETER rootParameters[7] = {};
+	D3D12_ROOT_PARAMETER rootParameters[8] = {};
 
 	// [0] Material (CBV)
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; // CBVを使う
@@ -97,6 +103,12 @@ void Object3dCommon::CreateRootSignature()
 	rootParameters[6].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // ピクセルシェーダーで使う
 	rootParameters[6].Descriptor.ShaderRegister = 4;                    // b4 に対応
 	rootParameters[6].Descriptor.RegisterSpace = 0;
+
+	//[7] EnvironmentMap(TextureCube t1)
+	rootParameters[7].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[7].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[7].DescriptorTable.pDescriptorRanges = environmentDescriptorRange;
+	rootParameters[7].DescriptorTable.NumDescriptorRanges = _countof(environmentDescriptorRange);
 
 	descriptionRootSignature.pParameters = rootParameters; // ルートパレメーター配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters); // 配列の長さ
@@ -233,6 +245,12 @@ void Object3dCommon::CreateSkinningRootSignature()
 	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV; // SRVを使う
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND; // Offsetを自動計算
 
+	D3D12_DESCRIPTOR_RANGE environmentDescriptorRange[1] = {};
+	environmentDescriptorRange[0].BaseShaderRegister = 1;
+	environmentDescriptorRange[0].NumDescriptors = 1;
+	environmentDescriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	environmentDescriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
 	D3D12_DESCRIPTOR_RANGE paletteRange[1] = {};
 	paletteRange[0].BaseShaderRegister = 0;//t0
 	paletteRange[0].NumDescriptors = 1;
@@ -240,7 +258,7 @@ void Object3dCommon::CreateSkinningRootSignature()
 	paletteRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// RootParameter作成。複数設定できるので配列
-	D3D12_ROOT_PARAMETER rootParameters[8] = {};
+	D3D12_ROOT_PARAMETER rootParameters[9] = {};
 
 	// [0] Material (CBV)
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; // CBVを使う
@@ -283,6 +301,12 @@ void Object3dCommon::CreateSkinningRootSignature()
 	rootParameters[7].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX; // VSで使う
 	rootParameters[7].DescriptorTable.pDescriptorRanges = paletteRange;
 	rootParameters[7].DescriptorTable.NumDescriptorRanges = _countof(paletteRange);
+
+	//[8] EnvironmentMap(TextureCube t1)
+	rootParameters[8].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[8].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[8].DescriptorTable.pDescriptorRanges = environmentDescriptorRange;
+	rootParameters[8].DescriptorTable.NumDescriptorRanges = _countof(environmentDescriptorRange);
 
 	descriptionRootSignature.pParameters = rootParameters; // ルートパレメーター配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters); // 配列の長さ

@@ -1,6 +1,7 @@
 #include "Object3d.h"
 #include "Object3dCommon.h"
 #include "ModelManager.h"
+#include "TextureManager.h"
 #include <cassert>
 #include "MyMath.h"
 using namespace MyMath;
@@ -84,6 +85,14 @@ void Object3d::Draw()
 	commandList->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(5, pointLightResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(6, spotLightResource->GetGPUVirtualAddress());
+	const std::string& environmentTexturePath = object3dCommon->GetEnvironmentTexturePath();
+	// Only scenes that set an environment map, and materials that reflect it, bind the cubemap SRV.
+	if (!environmentTexturePath.empty() && GetEnvironmentCoefficient() > 0.0f)
+	{
+		D3D12_GPU_DESCRIPTOR_HANDLE environmentTextureSrvHandle =
+			TextureManager::GetInstance()->GetSrvHandleGPU(environmentTexturePath);
+		commandList->SetGraphicsRootDescriptorTable(isSkeletal_ ? 8 : 7, environmentTextureSrvHandle);
+	}
 
 	if (model_)
 	{
@@ -218,4 +227,19 @@ void Object3d::CreateSpotLightData()
 	spotLightData->decay = 2.0f;
 	spotLightData->cosAngle = std::cos(std::numbers::pi_v<float> / 3.0f);// 限界の角度 (60度)
 	spotLightData->cosFalloffStart = 1.0f;//1.0 = 中心(0度)から減衰が始まる
+}
+
+void Object3d::SetEnvironmentCoefficient(float coefficient) {
+	// Forward the reflection strength to the material owned by the current Model.
+	if (model_) {
+		model_->SetEnvironmentCoefficient(coefficient);
+	}
+}
+
+float Object3d::GetEnvironmentCoefficient() const {
+	// Objects without a Model cannot reflect the environment, so treat them as 0.0f.
+	if (model_) {
+		return model_->GetEnvironmentCoefficient();
+	}
+	return 0.0f;
 }

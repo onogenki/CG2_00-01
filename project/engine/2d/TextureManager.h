@@ -31,6 +31,11 @@ public:
 	//GPUハンドルの取得
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU(const std::string& filePath);
 
+	//テクスチャが読み込み済みかチェック
+	bool Contains(const std::string& filePath) const {
+		return textureDatas.contains(filePath);
+	}
+
 private:
 
 	static TextureManager* instance;

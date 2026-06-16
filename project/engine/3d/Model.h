@@ -44,6 +44,9 @@ public:
 		float padding[3];
 		Matrix4x4 uvTransform;
 		float shininess;
+		// Strength of the environment map reflection. 0.0f disables reflection.
+		float environmentCoefficient;
+		float padding2[2];
 	};
 
 	struct DirectionalLight {
@@ -174,6 +177,18 @@ public:
 	void Draw(const SkinCluster& skinCluster);
 
 	void SetTexture(const std::string& filePath);
+
+	void SetEnvironmentCoefficient(float coefficient) {
+		if (materialData) {
+			materialData->environmentCoefficient = coefficient;
+		}
+	}
+	float GetEnvironmentCoefficient() const {
+		if (materialData) {
+			return materialData->environmentCoefficient;
+		}
+		return 0.0f;
+	}
 
 	//アニメーション適用
 	void ApplyAnimation(Skeleton& skeleton, const Animation& animation, float animationTime);
