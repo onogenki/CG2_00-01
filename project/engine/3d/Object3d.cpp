@@ -86,7 +86,6 @@ void Object3d::Draw()
 	commandList->SetGraphicsRootConstantBufferView(5, pointLightResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(6, spotLightResource->GetGPUVirtualAddress());
 	const std::string& environmentTexturePath = object3dCommon->GetEnvironmentTexturePath();
-	// Only scenes that set an environment map, and materials that reflect it, bind the cubemap SRV.
 	if (!environmentTexturePath.empty() && GetEnvironmentCoefficient() > 0.0f)
 	{
 		D3D12_GPU_DESCRIPTOR_HANDLE environmentTextureSrvHandle =
@@ -230,14 +229,12 @@ void Object3d::CreateSpotLightData()
 }
 
 void Object3d::SetEnvironmentCoefficient(float coefficient) {
-	// Forward the reflection strength to the material owned by the current Model.
 	if (model_) {
 		model_->SetEnvironmentCoefficient(coefficient);
 	}
 }
 
 float Object3d::GetEnvironmentCoefficient() const {
-	// Objects without a Model cannot reflect the environment, so treat them as 0.0f.
 	if (model_) {
 		return model_->GetEnvironmentCoefficient();
 	}

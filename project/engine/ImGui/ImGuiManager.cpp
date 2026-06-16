@@ -239,8 +239,6 @@ void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& nor
 		ImGui::DragFloat3("Rotate", &transform.rotate.x, 0.01f);
 		ImGui::DragFloat3("Scale", &transform.scale.x, 0.01f);
 
-		// Environment reflection strength for the selected model.
-		// 0.0f means no reflection, and larger values make the skybox reflection stronger.
 		float environmentCoefficient = targetObject->GetEnvironmentCoefficient();
 		if (ImGui::SliderFloat("Environment Reflection", &environmentCoefficient, 0.0f, 1.0f)) {
 			targetObject->SetEnvironmentCoefficient(environmentCoefficient);

@@ -64,10 +64,10 @@ void GamePlayScene::Initialize()
 	humanAnimation_ = Model::LoadAnimationFile("./resources", "human.gltf");//持ってきたもの
 	hissatu_ = Model::LoadAnimationFile("./resources", "playerCloudAnimation.gltf");//持ってきたもの
 
-	// Load the cubemap used by both Skybox drawing and Object3D reflection.
+	// skyBoxの背景
 	TextureManager::GetInstance()->LoadTexture("Resources/rostock_laage_airport_4k.dds");
 
-	// Object3dCommon only stores the path; the Scene owns which environment map is used.
+	// skyBoxによってモデルの反射が映り込む
 	object3dCommon->SetEnvironmentTexturePath("Resources/rostock_laage_airport_4k.dds");
 
 	//Skybox
@@ -97,6 +97,7 @@ void GamePlayScene::Initialize()
 	objAxis->Initialize(object3dCommon);
 	objAxis->SetModel("human.gltf");//アニメーションモデル読み込み
 	objAxis->InitializeAnimation();//skinClusterが1回だけ作られてisSkeletal_がtrueになる
+	objAxis->SetEnvironmentCoefficient(0.3f);//このモデルの反射の強さ
 	objAxis->GetTransform().translate = { 2.0f, 0.0f, 0.0f };
 	objAxis->GetTransform().rotate = { 0.0f,0.0f,0.0f };
 	objAxis->GetTransform().scale = { 0.2f,0.2f,0.2f };
@@ -280,13 +281,13 @@ void GamePlayScene::Update()
 	//数字の0キーが押されていたら
 	if (Input::GetInstance()->PushKey(DIK_0))
 	{
-		OutputDebugStringA("Hit 0\n");//出力ウィンドウに「Hit 0」と表示
+		OutputDebugStringA("Hit 0\n");
 	}
 
 	//数字の0キーが押されていたら
 	if (Input::GetInstance()->TriggerKey(DIK_P))
 	{
-		OutputDebugStringA("Hit p\n");//出力ウィンドウに「Hit p」と表示
+		OutputDebugStringA("Hit p\n");
 	}
 }
 
@@ -339,7 +340,7 @@ void GamePlayScene::Finalize()
 	//GPUの完了待ち
 	DirectXCommon::GetInstance()->WaitForGPU();
 
-	// これにより、中途半端に生き残っている粒子が原因のアクセス違反を防げます
+	// 中途半端に生き残っている粒子が原因のアクセス違反を防ぐ
 	ParticleManager::GetInstance()->ClearAllParticles();
 
 	sprites.clear();

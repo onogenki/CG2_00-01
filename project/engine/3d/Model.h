@@ -44,7 +44,6 @@ public:
 		float padding[3];
 		Matrix4x4 uvTransform;
 		float shininess;
-		// Strength of the environment map reflection. 0.0f disables reflection.
 		float environmentCoefficient;
 		float padding2[2];
 	};

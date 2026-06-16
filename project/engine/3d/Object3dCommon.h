@@ -51,7 +51,7 @@ private:
 	DirectXCommon* dxCommon_ = nullptr;
 
 	Camera* defaultCamera_ = nullptr;
-	// Environment map used by Object3D reflection. Scenes load the texture and set this path.
+
 	std::string environmentTexturePath_ = "";
 
 	// ルートシグネチャの生成
