@@ -107,12 +107,14 @@ public:
 	void SetSpotLight(const SpotLight& light) {
 		*spotLightData = light;
 	}
+	void SetEnvironmentCoefficient(float coefficient);
 
 	//getter
 	const Vector3& GetScale()const { return transform.scale; }
 	const Vector3& GetRotate()const { return transform.rotate; }
 	const Vector3& GetTranslate()const { return transform.translate; }
 	const DirectionalLight& GetDirectionalLight()const { return *directionalLightData; }
+	float GetEnvironmentCoefficient() const;
 
 	//外部からアニメーションモデルかどうか判定
 	bool IsSkeletal() const { return isSkeletal_; }

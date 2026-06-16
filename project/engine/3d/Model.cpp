@@ -394,7 +394,7 @@ void Model::CreateVertexData()
 	// 2. 頂点バッファビューを作成
 	// リソースの先頭のアドレスから使う
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
-	// 使用するリソースのサイズ
+	// 使用するリソース of サイズ
 	vertexBufferView.SizeInBytes = static_cast<UINT>(sizeInBytes);
 	// 1頂点あたりのサイズ
 	vertexBufferView.StrideInBytes = sizeof(VertexData);
@@ -421,6 +421,8 @@ void Model::CreateMaterialData()
 	materialData->enableLighting = true;
 
 	materialData->shininess = 50.0f;
+
+	materialData->environmentCoefficient = 0.0f;
 
 	materialData->uvTransform = MakeIdentity4x4();
 }

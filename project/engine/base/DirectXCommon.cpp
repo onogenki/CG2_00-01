@@ -122,8 +122,6 @@ void DirectXCommon::InitializeDevice()//デバイスの初期化
 		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
 		//緊急時に止まる
 		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
-		//解放
-		//infoQueue->Release();
 		//抑制するメッセージのID
 		D3D12_MESSAGE_ID denyIds[] =
 		{
@@ -385,10 +383,6 @@ void DirectXCommon::PreDraw()
 
 	//指定した深度で画面全体をクリアする
 	commandList_->ClearDepthStencilView(dsvHandle_, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-
-	//ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
-	//commandList_->SetDescriptorHeaps(1, descriptorHeaps);
 
 	commandList_->RSSetViewports(1, &viewport_);
 

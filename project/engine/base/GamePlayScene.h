@@ -7,7 +7,7 @@
 #include "Object3d.h"
 #include "Sprite.h"
 #include "ParticleEmitter.h"
-#include "Audio.h" // SoundDataを使うために必要
+#include "Audio.h"
 #include"BaseScene.h"
 #include "SkyBox.h"
 #include <vector>
