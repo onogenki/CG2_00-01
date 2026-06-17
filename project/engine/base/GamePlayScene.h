@@ -53,6 +53,7 @@ private:
     Transform emitterTransform{};
 
     int selectedUI = 0;
+    bool isCylinderEffectVisible_ = false;
   
     //アニメーション
     Model::Animation walkAnimation_;

@@ -197,6 +197,7 @@ void ParticleManager::CreateRingParticleGroup(const std::string name, const std:
 
     ParticleGroup newGroup;
     newGroup.textureFilePath = textureFilePath;
+    newGroup.useBillboard = false;
 
     newGroup.instancingResource = dxCommon_->CreateBufferResource(sizeof(ParticleForGPU) * kNumMaxInstance);
     newGroup.instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&newGroup.mappedData));
@@ -244,6 +245,63 @@ void ParticleManager::CreateRingParticleGroup(const std::string name, const std:
     particleGroups_[name] = newGroup;
 }
 
+void ParticleManager::CreateCylinderParticleGroup(const std::string name, const std::string textureFilePath)
+{
+    assert(particleGroups_.find(name) == particleGroups_.end() && "Particle group already exists");
+
+    ParticleGroup newGroup;
+    newGroup.textureFilePath = textureFilePath;
+    newGroup.useBillboard = false;
+
+    newGroup.instancingResource = dxCommon_->CreateBufferResource(sizeof(ParticleForGPU) * kNumMaxInstance);
+    newGroup.instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&newGroup.mappedData));
+
+    newGroup.instancingSrvIndex = srvManager_->Allocate();
+    srvManager_->CreateSRVforStructuredBuffer(
+        newGroup.instancingSrvIndex,
+        newGroup.instancingResource.Get(),
+        kNumMaxInstance,
+        sizeof(ParticleForGPU)
+    );
+
+    const uint32_t kCylinderDivide = 32;
+    const float kTopRadius = 1.0f;
+    const float kBottomRadius = 1.0f;
+    const float kHeight = 3.0f;
+    const float radianPerDivide = 2.0f * std::numbers::pi_v<float> / float(kCylinderDivide);
+
+    newGroup.vertexCount = kCylinderDivide * 6;
+    newGroup.vertexResource = dxCommon_->CreateBufferResource(sizeof(VertexData) * newGroup.vertexCount);
+    newGroup.vertexBufferView.BufferLocation = newGroup.vertexResource->GetGPUVirtualAddress();
+    newGroup.vertexBufferView.SizeInBytes = sizeof(VertexData) * newGroup.vertexCount;
+    newGroup.vertexBufferView.StrideInBytes = sizeof(VertexData);
+
+    VertexData* vertexData = nullptr;
+    newGroup.vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+
+    for (uint32_t index = 0; index < kCylinderDivide; ++index) {
+        float sin = std::sin(index * radianPerDivide);
+        float cos = std::cos(index * radianPerDivide);
+        float sinNext = std::sin((index + 1) * radianPerDivide);
+        float cosNext = std::cos((index + 1) * radianPerDivide);
+        float u = float(index) / float(kCylinderDivide);
+        float uNext = float(index + 1) / float(kCylinderDivide);
+
+        Vector3 normal0 = { -sin, 0.0f, cos };
+        Vector3 normal1 = { -sinNext, 0.0f, cosNext };
+
+        uint32_t vertexIndex = index * 6;
+        vertexData[vertexIndex + 0] = { { -sin * kTopRadius, kHeight, cos * kTopRadius, 1.0f }, { u, 1.0f }, normal0 };
+        vertexData[vertexIndex + 1] = { { -sinNext * kTopRadius, kHeight, cosNext * kTopRadius, 1.0f }, { uNext, 1.0f }, normal1 };
+        vertexData[vertexIndex + 2] = { { -sin * kBottomRadius, 0.0f, cos * kBottomRadius, 1.0f }, { u, 0.0f }, normal0 };
+        vertexData[vertexIndex + 3] = { { -sinNext * kTopRadius, kHeight, cosNext * kTopRadius, 1.0f }, { uNext, 1.0f }, normal1 };
+        vertexData[vertexIndex + 4] = { { -sinNext * kBottomRadius, 0.0f, cosNext * kBottomRadius, 1.0f }, { uNext, 0.0f }, normal1 };
+        vertexData[vertexIndex + 5] = { { -sin * kBottomRadius, 0.0f, cos * kBottomRadius, 1.0f }, { u, 0.0f }, normal0 };
+    }
+
+    particleGroups_[name] = newGroup;
+}
+
 void ParticleManager::ClearAllParticles()
 {
     for (auto& pair : particleGroups_) {
@@ -255,6 +313,14 @@ void ParticleManager::ClearAllParticles()
 void ParticleManager::ClearAllGroups()
 {
     particleGroups_.clear();
+}
+
+void ParticleManager::ClearParticles(const std::string name)
+{
+    auto it = particleGroups_.find(name);
+    assert(it != particleGroups_.end() && "Particle group not found");
+    it->second.particles.clear();
+    it->second.instanceCount = 0;
 }
 
 bool ParticleManager::IsCollision(const AABB aabb, const Vector3& point)
@@ -321,6 +387,7 @@ void ParticleManager::EmitHitEffect(const std::string name, uint32_t count, cons
         newParticle.color = { 1.0f, 1.0f, 1.0f, 1.0f };
         newParticle.lifeTime = distTime(randomEngine_);
         newParticle.currentTime = 0.0f;
+        newParticle.receivesWind = false;
 
         group.particles.push_back(newParticle);
     }
@@ -332,17 +399,47 @@ void ParticleManager::EmitRingEffect(const std::string name, uint32_t count, con
     assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
 
     ParticleGroup& group = particleGroups_[name];
+    std::uniform_real_distribution<float> distRotate(-std::numbers::pi_v<float>, std::numbers::pi_v<float>);
+    std::uniform_real_distribution<float> distScale(1.0f, 1.8f);
+    std::uniform_real_distribution<float> distLifeTime(0.3f, 0.6f);
 
     for (uint32_t i = 0; i < count; ++i) {
         Particle newParticle;
-        newParticle.transform.scale = { 1.5f, 1.5f, 1.0f };
+        float scale = distScale(randomEngine_);
+        newParticle.transform.scale = { scale, scale, 1.0f };
+        newParticle.transform.rotate = { distRotate(randomEngine_), distRotate(randomEngine_), distRotate(randomEngine_) };
+        newParticle.transform.translate = translate;
+        newParticle.velocity = { 0.0f, 0.0f, 0.0f };
+        newParticle.color = { 1.0f, 1.0f, 1.0f, 0.8f };
+        newParticle.lifeTime = distLifeTime(randomEngine_);
+        newParticle.currentTime = 0.0f;
+        newParticle.receivesWind = false;
+
+        group.particles.push_back(newParticle);
+    }
+}
+
+//ポータル(円柱)エフェクト発生
+void ParticleManager::EmitCylinderEffect(const std::string name, uint32_t count, const Vector3& translate)
+{
+    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
+
+    ParticleGroup& group = particleGroups_[name];
+    std::uniform_real_distribution<float> distHeight(0.5f, 1.2f);
+    std::uniform_real_distribution<float> distStretchSpeed(0.5f, 0.7f);
+
+    for (uint32_t i = 0; i < count; ++i) {
+        Particle newParticle;
+        newParticle.transform.scale = { 0.75f, distHeight(randomEngine_), 0.75f };
         newParticle.transform.rotate = { 0.0f, 0.0f, 0.0f };
         newParticle.transform.translate = translate;
         newParticle.velocity = { 0.0f, 0.0f, 0.0f };
-        newParticle.color = { 1.0f, 1.0f, 1.0f, 1.0f };
-        newParticle.lifeTime = 0.3f;
+        newParticle.color = { 0.6f, 0.8f, 1.0f, 0.8f };
+        newParticle.lifeTime = 0.0f;
         newParticle.currentTime = 0.0f;
         newParticle.receivesWind = false;
+        newParticle.isEndless = true;
+        newParticle.scaleVelocityY = distStretchSpeed(randomEngine_);
 
         group.particles.push_back(newParticle);
     }
@@ -385,12 +482,25 @@ void ParticleManager::Update() {
         for (auto it = group.particles.begin(); it != group.particles.end();) {
             Particle& particle = *it;
 
-            if (particle.currentTime >= particle.lifeTime) {
+            if (!particle.isEndless && particle.currentTime >= particle.lifeTime) {
                 it = group.particles.erase(it);
                 continue;
             }
 
             //Fieldの範囲内のParticleには加速度を適用
+            if (pair.first == "Cylinder") {
+                particle.transform.rotate.y += 1.5f * kDeltaTime_;
+                particle.transform.scale.y += particle.scaleVelocityY * kDeltaTime_;
+
+                if (particle.transform.scale.y >= 1.2f) {
+                    particle.transform.scale.y = 1.2f;
+                    particle.scaleVelocityY *= -1.0f;
+                } else if (particle.transform.scale.y <= 0.5f) {
+                    particle.transform.scale.y = 0.5f;
+                    particle.scaleVelocityY *= -1.0f;
+                }
+            }
+
             if (isField_ && particle.receivesWind)
             {
                 if (IsCollision(accelerationField_.area, particle.transform.translate))
@@ -404,15 +514,22 @@ void ParticleManager::Update() {
             particle.transform.translate.x += particle.velocity.x * kDeltaTime_;
             particle.transform.translate.y += particle.velocity.y * kDeltaTime_;
             particle.transform.translate.z += particle.velocity.z * kDeltaTime_;
-            particle.currentTime += kDeltaTime_;
 
-            float alpha = 1.0f - (particle.currentTime / particle.lifeTime);
+            float alpha = particle.color.w;
+            if (!particle.isEndless) {
+                particle.currentTime += kDeltaTime_;
+                alpha = particle.color.w * (1.0f - (particle.currentTime / particle.lifeTime));
+            }
 
             Matrix4x4 scale = MakeScaleMatrix(particle.transform.scale);
             Matrix4x4 rotateZ = MakeRotateZMatrix(particle.transform.rotate.z);
             Matrix4x4 translate = MakeTranslateMatrix(particle.transform.translate);
 
-            Matrix4x4 worldMatrix = Multiply(Multiply(Multiply(scale, rotateZ), billboardMatrix), translate);
+            Matrix4x4 rotateY = MakeRotateYMatrix(particle.transform.rotate.y);
+            Matrix4x4 rotateX = MakeRotateXMatrix(particle.transform.rotate.x);
+            Matrix4x4 rotate = Multiply(Multiply(rotateX, rotateY), rotateZ);
+            Matrix4x4 rotateOrBillboard = group.useBillboard ? Multiply(rotateZ, billboardMatrix) : rotate;
+            Matrix4x4 worldMatrix = Multiply(Multiply(scale, rotateOrBillboard), translate);
 
             // 取得したactiveCameraからビュープロジェクション行列をもらう(カメラの向きを向く)
             Matrix4x4 worldViewProjectionMatrix = Multiply(activeCamera->GetViewMatrix(),activeCamera->GetProjectionMatrix());
