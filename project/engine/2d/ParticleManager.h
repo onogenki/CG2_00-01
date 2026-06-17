@@ -23,6 +23,8 @@ public:
     float lifeTime;
     float currentTime;
     bool receivesWind;//風を受けるかどうか
+    bool isEndless = false;
+    float scaleVelocityY = 0.0f;
 };
 
 struct AccelerationField
@@ -68,6 +70,7 @@ struct ParticleGroup
     Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource;
     D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
     uint32_t vertexCount = 6;
+    bool useBillboard = true;
 };
 
 class ParticleManager
@@ -92,12 +95,15 @@ public:
 	void Emit(const std::string name, const Vector3& position, uint32_t count,bool receivesWind);
 	void EmitHitEffect(const std::string name, uint32_t count, const Vector3& translate);
     void EmitRingEffect(const std::string name, uint32_t count, const Vector3& translate);
+    void EmitCylinderEffect(const std::string name, uint32_t count, const Vector3& translate);
 
 	void CreateParticleGroup(const std::string name, const std::string textureFilePath);
     void CreateRingParticleGroup(const std::string name, const std::string textureFilePath);
+    void CreateCylinderParticleGroup(const std::string name, const std::string textureFilePath);
 
     // 全てのパーティクル（粒子）を削除する
     void ClearAllParticles();
+    void ClearParticles(const std::string name);
 
     // 特定のグループのパーティクルだけを削除する
     void ClearAllGroups();

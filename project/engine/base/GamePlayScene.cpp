@@ -52,6 +52,7 @@ void GamePlayScene::Initialize()
 	ParticleManager::GetInstance()->CreateParticleGroup("Plane", "Resources/uvChecker.png");
 	ParticleManager::GetInstance()->CreateParticleGroup("Hit", "Resources/circle2.png");
 	ParticleManager::GetInstance()->CreateRingParticleGroup("Ring", "Resources/gradationLine.png");
+	ParticleManager::GetInstance()->CreateCylinderParticleGroup("Cylinder", "Resources/gradationLine.png");
 	
 	//.objファイルからモデルを読み込む
 	ModelManager::GetInstance()->LoadModel("terrain.obj");
@@ -282,10 +283,21 @@ void GamePlayScene::Update()
 	ImGuiManager::GetInstance()->End();
 
 
-	//数字の0キーが押されていたら
-	if (Input::GetInstance()->PushKey(DIK_0))
+	//Cキーが押されたらCylinderエフェクトの表示を切り替える
+	if (Input::GetInstance()->TriggerKey(DIK_0))
 	{
-		OutputDebugStringA("Hit 0\n");
+		if (isCylinderEffectVisible_) {
+			ParticleManager::GetInstance()->ClearParticles("Cylinder");
+			isCylinderEffectVisible_ = false;
+		} else {
+			OutputDebugStringA("Hit C\n");
+			Vector3 hitPosition = objectAxis->GetTransform().translate;
+			hitPosition.x -= 0.2f;
+			hitPosition.y -= 0.2f;
+			hitPosition.z += 0.4f;
+			ParticleManager::GetInstance()->EmitCylinderEffect("Cylinder", 1, hitPosition);
+			isCylinderEffectVisible_ = true;
+		}
 	}
 
 	//数字のPキーが押されていたら
@@ -296,7 +308,7 @@ void GamePlayScene::Update()
 		hitPosition.y += 1.0f;
 		OutputDebugStringA("Hit p\n");
 		ParticleManager::GetInstance()->EmitHitEffect("Hit", 8, hitPosition);
-		ParticleManager::GetInstance()->EmitRingEffect("Ring", 1, hitPosition);
+		ParticleManager::GetInstance()->EmitRingEffect("Ring", 3, hitPosition);
 	}
 }
 
