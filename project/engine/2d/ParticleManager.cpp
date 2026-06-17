@@ -249,7 +249,29 @@ void ParticleManager::Emit(const std::string name, const Vector3& position, uint
     }
 }
 
-// 更新処理
+void ParticleManager::EmitHitEffect(const std::string name, uint32_t count, const Vector3& translate) {
+    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
+
+    ParticleGroup& group = particleGroups_[name];
+
+    std::uniform_real_distribution<float> distRotate(-std::numbers::pi_v<float>, std::numbers::pi_v<float>);
+    std::uniform_real_distribution<float> distScale(0.4f, 1.5f);
+    std::uniform_real_distribution<float> distTime(0.15f, 0.35f);
+
+    for (uint32_t i = 0; i < count; ++i) {
+        Particle newParticle;
+        newParticle.transform.scale = { 0.05f, distScale(randomEngine_), 1.0f };
+        newParticle.transform.rotate = { 0.0f, 0.0f, distRotate(randomEngine_) };
+        newParticle.transform.translate = translate;
+        newParticle.velocity = { 0.0f, 0.0f, 0.0f };
+        newParticle.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+        newParticle.lifeTime = distTime(randomEngine_);
+        newParticle.currentTime = 0.0f;
+
+        group.particles.push_back(newParticle);
+    }
+}
+
 void ParticleManager::Update() {
 
     if (!cameraManager_)return;
@@ -311,9 +333,10 @@ void ParticleManager::Update() {
             float alpha = 1.0f - (particle.currentTime / particle.lifeTime);
 
             Matrix4x4 scale = MakeScaleMatrix(particle.transform.scale);
+            Matrix4x4 rotateZ = MakeRotateZMatrix(particle.transform.rotate.z);
             Matrix4x4 translate = MakeTranslateMatrix(particle.transform.translate);
 
-            Matrix4x4 worldMatrix = Multiply(Multiply(scale, billboardMatrix), translate);
+            Matrix4x4 worldMatrix = Multiply(Multiply(Multiply(scale, rotateZ), billboardMatrix), translate);
 
             // 取得したactiveCameraからビュープロジェクション行列をもらう(カメラの向きを向く)
             Matrix4x4 worldViewProjectionMatrix = Multiply(activeCamera->GetViewMatrix(),activeCamera->GetProjectionMatrix());
