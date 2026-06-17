@@ -65,6 +65,9 @@ struct ParticleGroup
     uint32_t instanceCount;
     // インスタンシングデータを書き込むためのポインタ
     ParticleForGPU* mappedData;
+    Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource;
+    D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
+    uint32_t vertexCount = 6;
 };
 
 class ParticleManager
@@ -88,8 +91,10 @@ public:
 	//パーティクルの発生
 	void Emit(const std::string name, const Vector3& position, uint32_t count,bool receivesWind);
 	void EmitHitEffect(const std::string name, uint32_t count, const Vector3& translate);
+    void EmitRingEffect(const std::string name, uint32_t count, const Vector3& translate);
 
 	void CreateParticleGroup(const std::string name, const std::string textureFilePath);
+    void CreateRingParticleGroup(const std::string name, const std::string textureFilePath);
 
     // 全てのパーティクル（粒子）を削除する
     void ClearAllParticles();
