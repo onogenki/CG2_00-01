@@ -46,10 +46,12 @@ void GamePlayScene::Initialize()
 	TextureManager::GetInstance()->LoadTexture("Resources/grass.png");//terrainのpng
 	TextureManager::GetInstance()->LoadTexture("Resources/circle.png");
 	TextureManager::GetInstance()->LoadTexture("Resources/circle2.png");
+	TextureManager::GetInstance()->LoadTexture("Resources/gradationLine.png");
 
 	ParticleManager::GetInstance()->CreateParticleGroup("Circle", "Resources/circle.png");
 	ParticleManager::GetInstance()->CreateParticleGroup("Plane", "Resources/uvChecker.png");
 	ParticleManager::GetInstance()->CreateParticleGroup("Hit", "Resources/circle2.png");
+	ParticleManager::GetInstance()->CreateRingParticleGroup("Ring", "Resources/gradationLine.png");
 	
 	//.objファイルからモデルを読み込む
 	ModelManager::GetInstance()->LoadModel("terrain.obj");
@@ -289,8 +291,12 @@ void GamePlayScene::Update()
 	//数字のPキーが押されていたら
 	if (Input::GetInstance()->TriggerKey(DIK_P))
 	{
+		Vector3 hitPosition = objectAxis->GetTransform().translate;
+		hitPosition.x += 1.0f;
+		hitPosition.y += 1.0f;
 		OutputDebugStringA("Hit p\n");
-		ParticleManager::GetInstance()->EmitHitEffect("Hit",8, objectAxis->GetTransform().translate);
+		ParticleManager::GetInstance()->EmitHitEffect("Hit", 8, hitPosition);
+		ParticleManager::GetInstance()->EmitRingEffect("Ring", 1, hitPosition);
 	}
 }
 

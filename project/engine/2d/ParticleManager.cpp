@@ -50,7 +50,7 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
     D3D12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
     staticSamplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
     staticSamplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    staticSamplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    staticSamplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
     staticSamplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
     staticSamplers[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
     staticSamplers[0].MaxLOD = D3D12_FLOAT32_MAX;
@@ -103,7 +103,7 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
     blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
 
     D3D12_RASTERIZER_DESC rasterizerDesc{};
-    rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
+    rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
     rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 
     D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -191,6 +191,59 @@ void ParticleManager::CreateParticleGroup(const std::string name, const std::str
     particleGroups_[name] = newGroup;
 }
 
+void ParticleManager::CreateRingParticleGroup(const std::string name, const std::string textureFilePath)
+{
+    assert(particleGroups_.find(name) == particleGroups_.end() && "Particle group already exists");
+
+    ParticleGroup newGroup;
+    newGroup.textureFilePath = textureFilePath;
+
+    newGroup.instancingResource = dxCommon_->CreateBufferResource(sizeof(ParticleForGPU) * kNumMaxInstance);
+    newGroup.instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&newGroup.mappedData));
+
+    newGroup.instancingSrvIndex = srvManager_->Allocate();
+    srvManager_->CreateSRVforStructuredBuffer(
+        newGroup.instancingSrvIndex,
+        newGroup.instancingResource.Get(),
+        kNumMaxInstance,
+        sizeof(ParticleForGPU)
+    );
+
+    const uint32_t kRingDivide = 32;
+    const float kOuterRadius = 1.0f;
+    const float kInnerRadius = 0.6f;
+    const float radianPerDivide = 2.0f * std::numbers::pi_v<float> / float(kRingDivide);
+    const Vector3 normal = { 0.0f, 0.0f, -1.0f };
+
+    newGroup.vertexCount = kRingDivide * 6;
+    newGroup.vertexResource = dxCommon_->CreateBufferResource(sizeof(VertexData) * newGroup.vertexCount);
+    newGroup.vertexBufferView.BufferLocation = newGroup.vertexResource->GetGPUVirtualAddress();
+    newGroup.vertexBufferView.SizeInBytes = sizeof(VertexData) * newGroup.vertexCount;
+    newGroup.vertexBufferView.StrideInBytes = sizeof(VertexData);
+
+    VertexData* vertexData = nullptr;
+    newGroup.vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+
+    for (uint32_t index = 0; index < kRingDivide; ++index) {
+        float sin = std::sin(index * radianPerDivide);
+        float cos = std::cos(index * radianPerDivide);
+        float sinNext = std::sin((index + 1) * radianPerDivide);
+        float cosNext = std::cos((index + 1) * radianPerDivide);
+        float u = float(index) / float(kRingDivide);
+        float uNext = float(index + 1) / float(kRingDivide);
+
+        uint32_t vertexIndex = index * 6;
+        vertexData[vertexIndex + 0] = { { -sin * kOuterRadius, cos * kOuterRadius, 0.0f, 1.0f }, { u, 0.0f }, normal };
+        vertexData[vertexIndex + 1] = { { -sinNext * kOuterRadius, cosNext * kOuterRadius, 0.0f, 1.0f }, { uNext, 0.0f }, normal };
+        vertexData[vertexIndex + 2] = { { -sin * kInnerRadius, cos * kInnerRadius, 0.0f, 1.0f }, { u, 1.0f }, normal };
+        vertexData[vertexIndex + 3] = { { -sinNext * kOuterRadius, cosNext * kOuterRadius, 0.0f, 1.0f }, { uNext, 0.0f }, normal };
+        vertexData[vertexIndex + 4] = { { -sinNext * kInnerRadius, cosNext * kInnerRadius, 0.0f, 1.0f }, { uNext, 1.0f }, normal };
+        vertexData[vertexIndex + 5] = { { -sin * kInnerRadius, cos * kInnerRadius, 0.0f, 1.0f }, { u, 1.0f }, normal };
+    }
+
+    particleGroups_[name] = newGroup;
+}
+
 void ParticleManager::ClearAllParticles()
 {
     for (auto& pair : particleGroups_) {
@@ -249,6 +302,7 @@ void ParticleManager::Emit(const std::string name, const Vector3& position, uint
     }
 }
 
+//ヒット(斬撃みたいな細長い円)エフェクト発生
 void ParticleManager::EmitHitEffect(const std::string name, uint32_t count, const Vector3& translate) {
     assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
 
@@ -267,6 +321,28 @@ void ParticleManager::EmitHitEffect(const std::string name, uint32_t count, cons
         newParticle.color = { 1.0f, 1.0f, 1.0f, 1.0f };
         newParticle.lifeTime = distTime(randomEngine_);
         newParticle.currentTime = 0.0f;
+
+        group.particles.push_back(newParticle);
+    }
+}
+
+//インパクト(円)エフェクト発生
+void ParticleManager::EmitRingEffect(const std::string name, uint32_t count, const Vector3& translate)
+{
+    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
+
+    ParticleGroup& group = particleGroups_[name];
+
+    for (uint32_t i = 0; i < count; ++i) {
+        Particle newParticle;
+        newParticle.transform.scale = { 1.5f, 1.5f, 1.0f };
+        newParticle.transform.rotate = { 0.0f, 0.0f, 0.0f };
+        newParticle.transform.translate = translate;
+        newParticle.velocity = { 0.0f, 0.0f, 0.0f };
+        newParticle.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+        newParticle.lifeTime = 0.3f;
+        newParticle.currentTime = 0.0f;
+        newParticle.receivesWind = false;
 
         group.particles.push_back(newParticle);
     }
@@ -362,7 +438,6 @@ void ParticleManager::Draw() {
     commandList->SetGraphicsRootSignature(rootSignature_.Get());
     commandList->SetPipelineState(graphicsPipelineState_.Get());
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
 
     // マテリアル定数バッファ
     commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
@@ -372,6 +447,9 @@ void ParticleManager::Draw() {
 
         if (group.instanceCount == 0) continue;
 
+        D3D12_VERTEX_BUFFER_VIEW vertexBufferView = group.vertexResource ? group.vertexBufferView : vertexBufferView_;
+        commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+
         // 5. インスタンシング用 SRV
         srvManager_->SetGraphicsRootDescriptorTable(1, group.instancingSrvIndex);
 
@@ -380,6 +458,6 @@ void ParticleManager::Draw() {
         commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
 
         // 7. インスタンシング描画
-        commandList->DrawInstanced(6, group.instanceCount, 0, 0);
+        commandList->DrawInstanced(group.vertexCount, group.instanceCount, 0, 0);
     }
 }
