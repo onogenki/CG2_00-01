@@ -286,7 +286,7 @@ void GamePlayScene::Update()
 		OutputDebugStringA("Hit 0\n");
 	}
 
-	//数字の0キーが押されていたら
+	//数字のPキーが押されていたら
 	if (Input::GetInstance()->TriggerKey(DIK_P))
 	{
 		OutputDebugStringA("Hit p\n");
