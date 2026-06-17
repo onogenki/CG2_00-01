@@ -45,9 +45,11 @@ void GamePlayScene::Initialize()
 	TextureManager::GetInstance()->LoadTexture("Resources/monsterBall.png");//2枚目
 	TextureManager::GetInstance()->LoadTexture("Resources/grass.png");//terrainのpng
 	TextureManager::GetInstance()->LoadTexture("Resources/circle.png");
+	TextureManager::GetInstance()->LoadTexture("Resources/circle2.png");
 
 	ParticleManager::GetInstance()->CreateParticleGroup("Circle", "Resources/circle.png");
 	ParticleManager::GetInstance()->CreateParticleGroup("Plane", "Resources/uvChecker.png");
+	ParticleManager::GetInstance()->CreateParticleGroup("Hit", "Resources/circle2.png");
 	
 	//.objファイルからモデルを読み込む
 	ModelManager::GetInstance()->LoadModel("terrain.obj");
@@ -284,10 +286,11 @@ void GamePlayScene::Update()
 		OutputDebugStringA("Hit 0\n");
 	}
 
-	//数字の0キーが押されていたら
+	//数字のPキーが押されていたら
 	if (Input::GetInstance()->TriggerKey(DIK_P))
 	{
 		OutputDebugStringA("Hit p\n");
+		ParticleManager::GetInstance()->EmitHitEffect("Hit",8, objectAxis->GetTransform().translate);
 	}
 }
 

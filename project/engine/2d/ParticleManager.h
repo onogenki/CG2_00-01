@@ -87,6 +87,7 @@ public:
 
 	//パーティクルの発生
 	void Emit(const std::string name, const Vector3& position, uint32_t count,bool receivesWind);
+	void EmitHitEffect(const std::string name, uint32_t count, const Vector3& translate);
 
 	void CreateParticleGroup(const std::string name, const std::string textureFilePath);
 
