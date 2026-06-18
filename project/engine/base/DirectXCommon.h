@@ -9,6 +9,7 @@
 #include<string>
 #include <dxcapi.h>
 #include<chrono>
+#include "Vector4.h"
 
 class DirectXCommon
 {
@@ -40,6 +41,8 @@ public:
 
 	//描画前処理
 	void PreDraw();
+	// Scene描画後、ImGuiを描画するSwapChainへ描画先を切り替える
+	void PreDrawForSwapChain();
 	//描画後処理
 	void PostDraw();
 
@@ -70,6 +73,13 @@ public:
 	//テクスチャリソースの生成
 	Microsoft::WRL::ComPtr<ID3D12Resource>CreateTextureResource(const DirectX::TexMetadata& metadata);
 
+	// オフスクリーン描画の描画先として使うRenderTextureを生成する
+	Microsoft::WRL::ComPtr<ID3D12Resource> CreateRenderTextureResource(
+		uint32_t width, uint32_t height, DXGI_FORMAT format, const Vector4& clearColor);
+
+	// SrvManagerの初期化後にRenderTextureを読み取るためのSRVを生成する
+	void CreateRenderTextureSRV(class SrvManager* srvManager);
+
 	//CPUのMap/memcpyだけを行う
 	[[nodiscard]]
 	Microsoft::WRL::ComPtr<ID3D12Resource> WriteToIntermediateResource(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages, ID3D12Device* device);
@@ -85,6 +95,7 @@ public:
 
 	ID3D12CommandQueue* GetCommandQueue() const { return commandQueue.Get(); }
 	ID3D12CommandAllocator* GetCommandAllocator() const { return commandAllocator.Get(); }
+	uint32_t GetRenderTextureSrvIndex() const { return renderTextureSrvIndex_; }
 
 	//最大SRV数(最大テクスチャ枚数)
 	static const uint32_t kMaxSRVCount;
@@ -149,6 +160,13 @@ private:
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle_;
 
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle_[2];
+
+	// Sceneの描画先として使うオフスクリーンRenderTexture
+	Microsoft::WRL::ComPtr<ID3D12Resource> renderTextureResource_;
+	D3D12_CPU_DESCRIPTOR_HANDLE renderTextureRtvHandle_{};
+	uint32_t renderTextureSrvIndex_ = UINT32_MAX;
+	bool isRenderTextureShaderResource_ = false;
+	const Vector4 renderTextureClearColor_{ 1.0f, 0.0f, 0.0f, 1.0f };
 
 	//ビューポート
 	D3D12_VIEWPORT viewport_;

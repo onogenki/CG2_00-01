@@ -2,6 +2,7 @@
 #include "TextureManager.h"
 #include "ModelManager.h"
 #include "ParticleManager.h"
+#include "PostEffect.h"
 #include "ImGuiManager.h"
 #include "Input.h"
 #include"SceneManager.h"
@@ -94,6 +95,10 @@ void TitleScene::Draw()
 	spriteCommon->SetCommonDrawSetting();
 	sprite_->Draw();
 
+	// SceneはRenderTextureへ描画済みなので、ImGuiの直前にSwapChainへ切り替える
+	DirectXCommon::GetInstance()->PreDrawForSwapChain();
+	// RenderTextureのSceneを全画面三角形でSwapChainへコピーする
+	PostEffect::GetInstance()->Draw();
 	ImGuiManager::GetInstance()->Draw(DirectXCommon::GetInstance());
 
 	DirectXCommon::GetInstance()->PostDraw();

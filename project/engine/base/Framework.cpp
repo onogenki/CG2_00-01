@@ -13,6 +13,7 @@
 #include "TextureManager.h"
 #include "ModelManager.h"
 #include "ParticleManager.h"
+#include "PostEffect.h"
 #include "Audio.h"
 #include "AbstractSceneFactory.h"
 
@@ -74,6 +75,10 @@ void Framework::Initialize()
 	//SRVマネージャの初期化
 	srvManager_ = SrvManager::GetInstance();
 	srvManager_->Initialize(dxCommon_);
+	// RenderTextureをShaderから読めるよう、SrvManager初期化後にSRVを生成する
+	dxCommon_->CreateRenderTextureSRV(srvManager_);
+	// RenderTextureをSwapChainへコピーするPostEffectを初期化する
+	PostEffect::GetInstance()->Initialize(dxCommon_, srvManager_);
 
 	TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
 	ModelManager::GetInstance()->Initialize(dxCommon_);

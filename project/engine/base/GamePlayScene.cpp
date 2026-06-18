@@ -2,6 +2,7 @@
 #include "TextureManager.h"
 #include "ModelManager.h"
 #include "ParticleManager.h"
+#include "PostEffect.h"
 #include "ImGuiManager.h"
 #include "Input.h"
 #include"SceneManager.h"
@@ -255,28 +256,25 @@ void GamePlayScene::Update()
 		activeEmitter = emitterPlane.get();  // 既に作ってあるPlaneの方を指す
 	}
 
-	// 3Dオブジェクトの更新が終わった後あたり
-	Transform& axisTrans = objectAxis->GetTransform();
-
-	// 1. ワールド行列を計算する（Transformはただの構造体なので、関数を使って作る）
-	Matrix4x4 axisWorldMatrix = MakeAffineMatrix(axisTrans.scale, axisTrans.rotate, axisTrans.translate);
-
 	ImGuiManager::GetInstance()->CameraWindow(cameraManager.get());
 
-	if (!animationObjects.empty()) {
-		Object3d* animationObject = animationObjects[0].get(); // アニメーションモデルを取得
-
-		if (animationObject->IsSkeletal()) {
-			Transform& animationTrans = animationObject->GetTransform();
-
-			// アニメーションモデルのワールド行列を作る
-			Matrix4x4 animationWorldMatrix = MakeAffineMatrix(animationTrans.scale, animationTrans.rotate, animationTrans.translate);
+	// スケルトンはImGuiのBackgroundDrawListを使い、ImGuiウィンドウの後ろへ表示する。
+	// SceneがRenderTextureへ描画されている確認中でも、デバッグ表示としてSwapChain上に残る。
+	if (!animationObjects.empty())
+	{
+		Object3d* animationObject = animationObjects[0].get();
+		if (animationObject->IsSkeletal())
+		{
+			const Transform& animationTransform = animationObject->GetTransform();
+			const Matrix4x4 animationWorldMatrix = MakeAffineMatrix(
+				animationTransform.scale,
+				animationTransform.rotate,
+				animationTransform.translate);
 
 			ImGuiManager::GetInstance()->SkeletonDebugDraw(
-				animationObject->GetSkeleton(),//アニメーションモデルの骨を渡す
-				axisWorldMatrix, // 表示したい場所のワールド行列
-				cameraManager->GetActiveCamera()->GetViewProjectionMatrix()// Update内で計算した合成行列
-			);
+				animationObject->GetSkeleton(),
+				animationWorldMatrix,
+				cameraManager->GetActiveCamera()->GetViewProjectionMatrix());
 		}
 	}
 
@@ -350,6 +348,10 @@ void GamePlayScene::Draw()
 		sprite->Draw();
 	}
 
+	// SceneはRenderTextureへ描画済みなので、ImGuiの直前にSwapChainへ切り替える
+	DirectXCommon::GetInstance()->PreDrawForSwapChain();
+	// RenderTextureのSceneを全画面三角形でSwapChainへコピーする
+	PostEffect::GetInstance()->Draw();
 	ImGuiManager::GetInstance()->Draw(DirectXCommon::GetInstance());
 
 	DirectXCommon::GetInstance()->PostDraw();
