@@ -350,7 +350,8 @@ void ImGuiManager::CameraWindow(CameraManager* cameraManager)
 void ImGuiManager::SkeletonDebugDraw(const Model::Skeleton& skeleton, const Matrix4x4& worldMatrix, const Matrix4x4& viewProjectionMatrix)
 {
 #ifdef USE_IMGUI
-	ImDrawList* drawList = ImGui::GetForegroundDrawList();
+	// BackgroundDrawListを使い、スケルトンをImGuiウィンドウより後ろへ描画する
+	ImDrawList* drawList = ImGui::GetBackgroundDrawList();
 	float sWidth = ImGui::GetIO().DisplaySize.x;
 	float sHeight = ImGui::GetIO().DisplaySize.y;
 	Matrix4x4 matWVP = Multiply(worldMatrix, viewProjectionMatrix);
