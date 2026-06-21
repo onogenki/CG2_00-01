@@ -130,15 +130,15 @@ void TitleScene::Update()
 	const Vector3 effectPosition = emitterTransform.translate;
 
 	// 0キーで光の柱として使用するCylinderを表示・非表示にする
-	if (Input::GetInstance()->TriggerKey(DIK_0)) {
-		if (isCylinderEffectVisible_) {
-			ParticleManager::GetInstance()->ClearParticles("Cylinder");
-			isCylinderEffectVisible_ = false;
-		} else {
-			ParticleManager::GetInstance()->EmitCylinderEffect("Cylinder", 1, effectPosition);
-			isCylinderEffectVisible_ = true;
-		}
-	}
+	//if (Input::GetInstance()->TriggerKey(DIK_0)) {
+	//	if (isCylinderEffectVisible_) {
+	//		ParticleManager::GetInstance()->ClearParticles("Cylinder");
+	//		isCylinderEffectVisible_ = false;
+	//	} else {
+	//		ParticleManager::GetInstance()->EmitCylinderEffect("Cylinder", 1, effectPosition);
+	//		isCylinderEffectVisible_ = true;
+	//	}
+	//}
 
 	skyBox_->Update();
 
@@ -150,11 +150,11 @@ void TitleScene::Update()
 
 	// 今はゲームシーンに移動しない
 	// spaceキーが押されていたら
-	 if (Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->IsPadButtonPressed(0, 1))
-	 {
-	 	// シーン切り替え
-	 	SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
-	 }
+	//if (Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->IsPadButtonPressed(0, 1))
+	//{
+	//	// シーン切り替え
+	//	SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
+	//}
 }
 
 // カメラのワールド行列から前方向を取得し、共通の発生位置を正面へ置く
