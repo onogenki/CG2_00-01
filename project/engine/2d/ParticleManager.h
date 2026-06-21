@@ -25,6 +25,23 @@ public:
     bool receivesWind;//風を受けるかどうか
     bool isEndless = false;
     float scaleVelocityY = 0.0f;
+
+    // 螺旋運動をするパーティクルだけが使用する値
+    bool isSpiral = false;
+    Vector3 spiralCenter{};
+    Vector3 spiralRight{ 1.0f, 0.0f, 0.0f };
+    Vector3 spiralUp{ 0.0f, 1.0f, 0.0f };
+    float spiralAngle = 0.0f;
+    float spiralRadius = 0.0f;
+    float spiralAngularVelocity = 0.0f;
+    float spiralRadialVelocity = 0.0f;
+
+    // 寿命に合わせて大きさと色を変化させる光エフェクト用の値
+    bool useColorAndScaleOverLife = false;
+    Vector3 startScale{};
+    Vector3 endScale{};
+    Vector4 startColor{};
+    Vector4 endColor{};
 };
 
 struct AccelerationField
@@ -96,6 +113,18 @@ public:
 	void EmitHitEffect(const std::string name, uint32_t count, const Vector3& translate);
     void EmitRingEffect(const std::string name, uint32_t count, const Vector3& translate);
     void EmitCylinderEffect(const std::string name, uint32_t count, const Vector3& translate);
+
+    // 光柱の周囲を上昇しながら消える星形の光粒を発生させる
+    void EmitPillarSparkle(const std::string name, uint32_t count, const Vector3& position);
+
+    // 中心の周りを回転する二本の螺旋状の光を発生させる
+    void EmitLightSpiral(const std::string name, uint32_t count, const Vector3& translate);
+
+    // 中心から広がりながら色と透明度が変化する光球を発生させる
+    void EmitLightCore(const std::string name, uint32_t count, const Vector3& position);
+
+    // 画面上部から下方向へ流れる細長い光の雨を発生させる
+    void EmitLightRain(const std::string name, uint32_t count, const Vector3& position);
 
 	void CreateParticleGroup(const std::string name, const std::string textureFilePath);
     void CreateRingParticleGroup(const std::string name, const std::string textureFilePath);

@@ -280,6 +280,12 @@ void GamePlayScene::Update()
 
 	ImGuiManager::GetInstance()->End();
 
+	//sapceキーが押されていたら
+	//if (Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->IsPadButtonPressed(0, 1))
+	//{
+	//	//シーン切り替え
+	//	SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
+	//}
 
 	//Cキーが押されたらCylinderエフェクトの表示を切り替える
 	if (Input::GetInstance()->TriggerKey(DIK_0))

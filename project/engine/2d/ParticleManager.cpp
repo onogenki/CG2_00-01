@@ -1,6 +1,7 @@
 #include "ParticleManager.h"
 #include "TextureManager.h"
 #include "CameraManager.h"
+#include <algorithm>
 
 using namespace MyMath;
 
@@ -197,6 +198,7 @@ void ParticleManager::CreateRingParticleGroup(const std::string name, const std:
 
     ParticleGroup newGroup;
     newGroup.textureFilePath = textureFilePath;
+    // Ringごとの傾きを残すため、描画時の自動ビルボードは使用しない
     newGroup.useBillboard = false;
 
     newGroup.instancingResource = dxCommon_->CreateBufferResource(sizeof(ParticleForGPU) * kNumMaxInstance);
@@ -375,16 +377,16 @@ void ParticleManager::EmitHitEffect(const std::string name, uint32_t count, cons
     ParticleGroup& group = particleGroups_[name];
 
     std::uniform_real_distribution<float> distRotate(-std::numbers::pi_v<float>, std::numbers::pi_v<float>);
-    std::uniform_real_distribution<float> distScale(0.4f, 1.5f);
+    std::uniform_real_distribution<float> distScale(0.15f, 0.55f);
     std::uniform_real_distribution<float> distTime(0.15f, 0.35f);
 
     for (uint32_t i = 0; i < count; ++i) {
         Particle newParticle;
-        newParticle.transform.scale = { 0.05f, distScale(randomEngine_), 1.0f };
+        newParticle.transform.scale = { 0.02f, distScale(randomEngine_), 1.0f };
         newParticle.transform.rotate = { 0.0f, 0.0f, distRotate(randomEngine_) };
         newParticle.transform.translate = translate;
         newParticle.velocity = { 0.0f, 0.0f, 0.0f };
-        newParticle.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+        newParticle.color = { 1.0f, 0.9f, 0.55f, 1.0f };
         newParticle.lifeTime = distTime(randomEngine_);
         newParticle.currentTime = 0.0f;
         newParticle.receivesWind = false;
@@ -400,17 +402,28 @@ void ParticleManager::EmitRingEffect(const std::string name, uint32_t count, con
 
     ParticleGroup& group = particleGroups_[name];
     std::uniform_real_distribution<float> distRotate(-std::numbers::pi_v<float>, std::numbers::pi_v<float>);
-    std::uniform_real_distribution<float> distScale(1.0f, 1.8f);
+    std::uniform_real_distribution<float> distTilt(-0.55f, 0.55f);
+    std::uniform_real_distribution<float> distScale(0.25f, 0.6f);
     std::uniform_real_distribution<float> distLifeTime(0.3f, 0.6f);
+
+    // カメラ正面を基準にすることで、真横を向いて細線になることを防ぐ
+    Vector3 cameraRotation = { 0.0f, 0.0f, 0.0f };
+    if (cameraManager_ && cameraManager_->GetActiveCamera()) {
+        cameraRotation = cameraManager_->GetActiveCamera()->GetRotate();
+    }
 
     for (uint32_t i = 0; i < count; ++i) {
         Particle newParticle;
         float scale = distScale(randomEngine_);
         newParticle.transform.scale = { scale, scale, 1.0f };
-        newParticle.transform.rotate = { distRotate(randomEngine_), distRotate(randomEngine_), distRotate(randomEngine_) };
+        newParticle.transform.rotate = {
+            cameraRotation.x + distTilt(randomEngine_),
+            cameraRotation.y + distTilt(randomEngine_),
+            distRotate(randomEngine_)
+        };
         newParticle.transform.translate = translate;
         newParticle.velocity = { 0.0f, 0.0f, 0.0f };
-        newParticle.color = { 1.0f, 1.0f, 1.0f, 0.8f };
+        newParticle.color = { 1.0f, 0.78f, 0.28f, 0.8f };
         newParticle.lifeTime = distLifeTime(randomEngine_);
         newParticle.currentTime = 0.0f;
         newParticle.receivesWind = false;
@@ -425,16 +438,17 @@ void ParticleManager::EmitCylinderEffect(const std::string name, uint32_t count,
     assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
 
     ParticleGroup& group = particleGroups_[name];
-    std::uniform_real_distribution<float> distHeight(0.5f, 1.2f);
-    std::uniform_real_distribution<float> distStretchSpeed(0.5f, 0.7f);
+    std::uniform_real_distribution<float> distHeight(0.2f, 0.45f);
+    std::uniform_real_distribution<float> distStretchSpeed(0.15f, 0.25f);
 
     for (uint32_t i = 0; i < count; ++i) {
         Particle newParticle;
-        newParticle.transform.scale = { 0.75f, distHeight(randomEngine_), 0.75f };
+        newParticle.transform.scale = { 0.35f, distHeight(randomEngine_), 0.35f };
         newParticle.transform.rotate = { 0.0f, 0.0f, 0.0f };
         newParticle.transform.translate = translate;
         newParticle.velocity = { 0.0f, 0.0f, 0.0f };
-        newParticle.color = { 0.6f, 0.8f, 1.0f, 0.8f };
+        // 柱本体は薄くし、周囲のキラキラを主役にする
+        newParticle.color = { 1.0f, 0.9f, 0.55f, 0.38f };
         newParticle.lifeTime = 0.0f;
         newParticle.currentTime = 0.0f;
         newParticle.receivesWind = false;
@@ -445,6 +459,224 @@ void ParticleManager::EmitCylinderEffect(const std::string name, uint32_t count,
     }
 }
 
+// 光柱の周囲へ星形PNGを散らし、上昇しながら小さく消える光粒を発生させる
+void ParticleManager::EmitPillarSparkle(const std::string name, uint32_t count, const Vector3& position)
+{
+    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
+
+    ParticleGroup& group = particleGroups_[name];
+    std::uniform_real_distribution<float> rightOffsetDistribution(-0.45f, 0.45f);
+    std::uniform_real_distribution<float> upOffsetDistribution(-0.1f, 1.25f);
+    std::uniform_real_distribution<float> sideSpeedDistribution(-0.18f, 0.18f);
+    std::uniform_real_distribution<float> upSpeedDistribution(0.4f, 1.1f);
+    std::uniform_real_distribution<float> scaleDistribution(0.025f, 0.07f);
+    std::uniform_real_distribution<float> lifeTimeDistribution(0.35f, 0.9f);
+    std::uniform_real_distribution<float> rotateDistribution(-std::numbers::pi_v<float>, std::numbers::pi_v<float>);
+
+    Vector3 cameraRight = { 1.0f, 0.0f, 0.0f };
+    Vector3 cameraUp = { 0.0f, 1.0f, 0.0f };
+    if (cameraManager_ && cameraManager_->GetActiveCamera()) {
+        const Matrix4x4& cameraWorld = cameraManager_->GetActiveCamera()->GetWorldMatrix();
+        cameraRight = Normalize({ cameraWorld.m[0][0], cameraWorld.m[0][1], cameraWorld.m[0][2] });
+        cameraUp = Normalize({ cameraWorld.m[1][0], cameraWorld.m[1][1], cameraWorld.m[1][2] });
+    }
+
+    for (uint32_t index = 0; index < count; ++index) {
+        Particle newParticle{};
+        const float offsetRight = rightOffsetDistribution(randomEngine_);
+        const float offsetUp = upOffsetDistribution(randomEngine_);
+        const float sideSpeed = sideSpeedDistribution(randomEngine_);
+        const float upSpeed = upSpeedDistribution(randomEngine_);
+        const float startScale = scaleDistribution(randomEngine_);
+
+        newParticle.transform.translate = {
+            position.x + cameraRight.x * offsetRight + cameraUp.x * offsetUp,
+            position.y + cameraRight.y * offsetRight + cameraUp.y * offsetUp,
+            position.z + cameraRight.z * offsetRight + cameraUp.z * offsetUp
+        };
+        newParticle.velocity = {
+            cameraRight.x * sideSpeed + cameraUp.x * upSpeed,
+            cameraRight.y * sideSpeed + cameraUp.y * upSpeed,
+            cameraRight.z * sideSpeed + cameraUp.z * upSpeed
+        };
+        newParticle.transform.rotate.z = rotateDistribution(randomEngine_);
+
+        newParticle.useColorAndScaleOverLife = true;
+        newParticle.startScale = { startScale, startScale, startScale };
+        newParticle.endScale = { startScale * 0.2f, startScale * 0.2f, startScale * 0.2f };
+        newParticle.startColor = { 1.0f, 1.0f, 0.92f, 1.0f };
+        newParticle.endColor = { 1.0f, 0.62f, 0.08f, 0.0f };
+        newParticle.transform.scale = newParticle.startScale;
+        newParticle.color = newParticle.startColor;
+        newParticle.lifeTime = lifeTimeDistribution(randomEngine_);
+        newParticle.currentTime = 0.0f;
+        newParticle.receivesWind = false;
+
+        group.particles.push_back(newParticle);
+    }
+}
+
+// 大きさと色の異なる円形PNGを重ね、中心で脈動する光球を発生させる
+void ParticleManager::EmitLightCore(const std::string name, uint32_t count, const Vector3& position)
+{
+    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
+
+    ParticleGroup& group = particleGroups_[name];
+    std::uniform_real_distribution<float> offsetDistribution(-0.08f, 0.08f);
+
+    // カメラから見た横方向と上方向を使い、画面上で自然に散らす
+    Vector3 cameraRight = { 1.0f, 0.0f, 0.0f };
+    Vector3 cameraUp = { 0.0f, 1.0f, 0.0f };
+    if (cameraManager_ && cameraManager_->GetActiveCamera()) {
+        const Matrix4x4& cameraWorld = cameraManager_->GetActiveCamera()->GetWorldMatrix();
+        cameraRight = Normalize({ cameraWorld.m[0][0], cameraWorld.m[0][1], cameraWorld.m[0][2] });
+        cameraUp = Normalize({ cameraWorld.m[1][0], cameraWorld.m[1][1], cameraWorld.m[1][2] });
+    }
+
+    for (uint32_t index = 0; index < count; ++index) {
+        Particle newParticle{};
+
+        // 少しだけ位置をずらして、複数の光が重なって見えるようにする
+        const float offsetRight = offsetDistribution(randomEngine_);
+        const float offsetUp = offsetDistribution(randomEngine_);
+        newParticle.transform.translate = {
+            position.x + cameraRight.x * offsetRight + cameraUp.x * offsetUp,
+            position.y + cameraRight.y * offsetRight + cameraUp.y * offsetUp,
+            position.z + cameraRight.z * offsetRight + cameraUp.z * offsetUp
+        };
+        newParticle.velocity = { 0.0f, 0.0f, 0.0f };
+
+        newParticle.useColorAndScaleOverLife = true;
+        newParticle.startScale = { 0.08f, 0.08f, 0.08f };
+        newParticle.endScale = { 0.9f, 0.9f, 0.9f };
+        newParticle.startColor = { 1.0f, 1.0f, 0.92f, 1.0f };
+        newParticle.endColor = { 1.0f, 0.65f, 0.12f, 0.0f };
+        newParticle.transform.scale = newParticle.startScale;
+        newParticle.color = newParticle.startColor;
+
+        newParticle.lifeTime = 1.2f;
+        newParticle.currentTime = 0.0f;
+        newParticle.receivesWind = false;
+        group.particles.push_back(newParticle);
+    }
+}
+
+// 細長い円形PNGを画面上部に散らし、下方向へ流れる光の雨を発生させる
+void ParticleManager::EmitLightRain(const std::string name, uint32_t count, const Vector3& position)
+{
+    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
+
+    ParticleGroup& group = particleGroups_[name];
+    std::uniform_real_distribution<float> positionXDistribution(-1.7f, 1.7f);
+    std::uniform_real_distribution<float> positionYDistribution(1.8f, 3.5f);
+    std::uniform_real_distribution<float> speedDistribution(-4.0f, -2.5f);
+    std::uniform_real_distribution<float> lifeTimeDistribution(1.2f, 2.2f);
+
+    // 雨の横幅をカメラの右方向へ広げる
+    Vector3 cameraRight = { 1.0f, 0.0f, 0.0f };
+    Vector3 cameraUp = { 0.0f, 1.0f, 0.0f };
+    if (cameraManager_ && cameraManager_->GetActiveCamera()) {
+        const Matrix4x4& cameraWorld = cameraManager_->GetActiveCamera()->GetWorldMatrix();
+        cameraRight = Normalize({ cameraWorld.m[0][0], cameraWorld.m[0][1], cameraWorld.m[0][2] });
+        cameraUp = Normalize({ cameraWorld.m[1][0], cameraWorld.m[1][1], cameraWorld.m[1][2] });
+    }
+
+    for (uint32_t index = 0; index < count; ++index) {
+        Particle newParticle{};
+
+        const float offsetRight = positionXDistribution(randomEngine_);
+        const float offsetUp = positionYDistribution(randomEngine_);
+        const float fallSpeed = speedDistribution(randomEngine_);
+        newParticle.transform.translate = {
+            position.x + cameraRight.x * offsetRight + cameraUp.x * offsetUp,
+            position.y + cameraRight.y * offsetRight + cameraUp.y * offsetUp,
+            position.z + cameraRight.z * offsetRight + cameraUp.z * offsetUp
+        };
+        newParticle.velocity = {
+            cameraUp.x * fallSpeed,
+            cameraUp.y * fallSpeed,
+            cameraUp.z * fallSpeed
+        };
+
+        newParticle.useColorAndScaleOverLife = true;
+        newParticle.startScale = { 0.035f, 0.45f, 0.035f };
+        newParticle.endScale = { 0.01f, 0.15f, 0.01f };
+        newParticle.startColor = { 1.0f, 0.98f, 0.72f, 0.9f };
+        newParticle.endColor = { 1.0f, 0.55f, 0.05f, 0.0f };
+        newParticle.transform.scale = newParticle.startScale;
+        newParticle.color = newParticle.startColor;
+
+        newParticle.lifeTime = lifeTimeDistribution(randomEngine_);
+        newParticle.currentTime = 0.0f;
+        newParticle.receivesWind = false;
+        group.particles.push_back(newParticle);
+    }
+}
+
+// 円形PNGを二本の螺旋状に並べ、光が渦を巻くエフェクトを発生させる
+void ParticleManager::EmitLightSpiral(const std::string name, uint32_t count, const Vector3& translate)
+{
+    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
+
+    ParticleGroup& group = particleGroups_[name];
+
+    // 片方の螺旋に最低1個は配置する
+    const uint32_t particlesPerArm = (std::max)(count / 2, 1u);
+    const float minimumRadius = 0.2f;
+    const float maximumRadius = 1.4f;
+    const float twoRotations = std::numbers::pi_v<float> * 4.0f;
+
+    Vector3 cameraRight = { 1.0f, 0.0f, 0.0f };
+    Vector3 cameraUp = { 0.0f, 1.0f, 0.0f };
+    if (cameraManager_ && cameraManager_->GetActiveCamera()) {
+        const Matrix4x4& cameraWorld = cameraManager_->GetActiveCamera()->GetWorldMatrix();
+        cameraRight = Normalize({ cameraWorld.m[0][0], cameraWorld.m[0][1], cameraWorld.m[0][2] });
+        cameraUp = Normalize({ cameraWorld.m[1][0], cameraWorld.m[1][1], cameraWorld.m[1][2] });
+    }
+
+    for (uint32_t index = 0; index < count; ++index) {
+        Particle newParticle{};
+
+        // 前半を1本目、後半を半回転ずらした2本目として扱う
+        const uint32_t armIndex = index / particlesPerArm;
+        const uint32_t indexInArm = index % particlesPerArm;
+        const float progress = static_cast<float>(indexInArm) / static_cast<float>(particlesPerArm);
+        const float armOffset = (armIndex % 2) * std::numbers::pi_v<float>;
+
+        newParticle.isSpiral = true;
+        newParticle.spiralCenter = translate;
+        newParticle.spiralRight = cameraRight;
+        newParticle.spiralUp = cameraUp;
+        newParticle.spiralAngle = twoRotations * progress + armOffset;
+        newParticle.spiralRadius = minimumRadius + (maximumRadius - minimumRadius) * progress;
+        newParticle.spiralAngularVelocity = 1.8f;
+        newParticle.spiralRadialVelocity = -0.08f;
+
+        const float spiralX = std::cos(newParticle.spiralAngle) * newParticle.spiralRadius;
+        const float spiralY = std::sin(newParticle.spiralAngle) * newParticle.spiralRadius;
+        newParticle.transform.translate = {
+            translate.x + cameraRight.x * spiralX + cameraUp.x * spiralY,
+            translate.y + cameraRight.y * spiralX + cameraUp.y * spiralY,
+            translate.z + cameraRight.z * spiralX + cameraUp.z * spiralY
+        };
+        newParticle.transform.scale = { 0.08f, 0.08f, 0.08f };
+        newParticle.velocity = { 0.0f, 0.0f, 0.0f };
+
+        // 2本の螺旋を白寄りの黄色と濃い金色に分ける
+        if (armIndex % 2 == 0) {
+            newParticle.color = { 1.0f, 0.96f, 0.72f, 0.9f };
+        } else {
+            newParticle.color = { 1.0f, 0.62f, 0.08f, 0.9f };
+        }
+
+        newParticle.lifeTime = 4.0f;
+        newParticle.currentTime = 0.0f;
+        newParticle.receivesWind = false;
+        group.particles.push_back(newParticle);
+    }
+}
+
+// 全パーティクルの移動、寿命、透明度、描画用データを毎フレーム更新する
 void ParticleManager::Update() {
 
     if (!cameraManager_)return;
@@ -492,13 +724,28 @@ void ParticleManager::Update() {
                 particle.transform.rotate.y += 1.5f * kDeltaTime_;
                 particle.transform.scale.y += particle.scaleVelocityY * kDeltaTime_;
 
-                if (particle.transform.scale.y >= 1.2f) {
-                    particle.transform.scale.y = 1.2f;
+                if (particle.transform.scale.y >= 0.45f) {
+                    particle.transform.scale.y = 0.45f;
                     particle.scaleVelocityY *= -1.0f;
-                } else if (particle.transform.scale.y <= 0.5f) {
-                    particle.transform.scale.y = 0.5f;
+                } else if (particle.transform.scale.y <= 0.2f) {
+                    particle.transform.scale.y = 0.2f;
                     particle.scaleVelocityY *= -1.0f;
                 }
+            }
+
+            // 螺旋の角度を進め、中心の周りを回転させる
+            if (particle.isSpiral) {
+                particle.spiralAngle += particle.spiralAngularVelocity * kDeltaTime_;
+                particle.spiralRadius += particle.spiralRadialVelocity * kDeltaTime_;
+                particle.spiralRadius = (std::max)(particle.spiralRadius, 0.1f);
+
+                const float spiralX = std::cos(particle.spiralAngle) * particle.spiralRadius;
+                const float spiralY = std::sin(particle.spiralAngle) * particle.spiralRadius;
+                particle.transform.translate = {
+                    particle.spiralCenter.x + particle.spiralRight.x * spiralX + particle.spiralUp.x * spiralY,
+                    particle.spiralCenter.y + particle.spiralRight.y * spiralX + particle.spiralUp.y * spiralY,
+                    particle.spiralCenter.z + particle.spiralRight.z * spiralX + particle.spiralUp.z * spiralY
+                };
             }
 
             if (isField_ && particle.receivesWind)
@@ -518,7 +765,21 @@ void ParticleManager::Update() {
             float alpha = particle.color.w;
             if (!particle.isEndless) {
                 particle.currentTime += kDeltaTime_;
-                alpha = particle.color.w * (1.0f - (particle.currentTime / particle.lifeTime));
+
+                const float progress = std::clamp(particle.currentTime / particle.lifeTime, 0.0f, 1.0f);
+
+                if (particle.useColorAndScaleOverLife) {
+                    // progressが0なら開始値、1なら終了値になるように補間する
+                    particle.transform.scale = Lerp(particle.startScale, particle.endScale, progress);
+                    particle.color.x = particle.startColor.x + (particle.endColor.x - particle.startColor.x) * progress;
+                    particle.color.y = particle.startColor.y + (particle.endColor.y - particle.startColor.y) * progress;
+                    particle.color.z = particle.startColor.z + (particle.endColor.z - particle.startColor.z) * progress;
+                    particle.color.w = particle.startColor.w + (particle.endColor.w - particle.startColor.w) * progress;
+                    alpha = particle.color.w;
+                } else {
+                    // 従来のパーティクルは、色を変えずに透明度だけを下げる
+                    alpha = particle.color.w * (1.0f - progress);
+                }
             }
 
             Matrix4x4 scale = MakeScaleMatrix(particle.transform.scale);
