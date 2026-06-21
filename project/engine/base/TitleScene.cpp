@@ -148,13 +148,12 @@ void TitleScene::Update()
 	//	ParticleManager::GetInstance()->EmitRingEffect("Ring", 3, effectPosition);
 	//}
 
-	// 今はゲームシーンに移動しない
 	// spaceキーが押されていたら
-	//if (Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->IsPadButtonPressed(0, 1))
-	//{
-	//	// シーン切り替え
-	//	SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
-	//}
+	if (Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->IsPadButtonPressed(0, 1))
+	{
+		// シーン切り替え
+		SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
+	}
 }
 
 // カメラのワールド行列から前方向を取得し、共通の発生位置を正面へ置く
