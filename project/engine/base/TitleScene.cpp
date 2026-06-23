@@ -68,7 +68,7 @@ void TitleScene::Update()
 
 	sprite_->Update();
 
-	ImGuiManager::GetInstance()->Begin();
+	ImGuiManager::GetInstance()->Begin("Title");
 	ImGuiManager::GetInstance()->End();
 
 	//sapceキーが押されていたら

@@ -16,6 +16,7 @@ class DirectXCommon
 public:
 
 	void Initialize(WinApp* winApp);
+	void ResizeIfNeeded();
 
 	void InitializeDevice();
 
@@ -96,6 +97,8 @@ public:
 	ID3D12CommandQueue* GetCommandQueue() const { return commandQueue.Get(); }
 	ID3D12CommandAllocator* GetCommandAllocator() const { return commandAllocator.Get(); }
 	uint32_t GetRenderTextureSrvIndex() const { return renderTextureSrvIndex_; }
+	uint32_t GetClientWidth() const { return width; }
+	uint32_t GetClientHeight() const { return height; }
 
 	//最大SRV数(最大テクスチャ枚数)
 	static const uint32_t kMaxSRVCount;

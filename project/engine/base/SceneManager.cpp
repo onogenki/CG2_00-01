@@ -16,10 +16,13 @@ void SceneManager::Update()
 		if (scene_)
 		{
 			scene_->Finalize();
+			scene_.reset();
 		}
 		//シーン切り替え
 		scene_ = std::move(nextScene_);
 		nextScene_ = nullptr;
+		currentSceneName_ = pendingSceneName_;
+		pendingSceneName_.clear();
 
 		//次シーンを初期化する
 		scene_->Initialize();
@@ -40,13 +43,31 @@ void SceneManager::Draw()
 	}
 }
 
-void SceneManager::ChangeScene(const std::string& sceneName)
+bool SceneManager::ChangeScene(const std::string& sceneName)
 {
-	assert(sceneFactory_);// ファクトリーがセットされているか（nullptrじゃないか）チェック
-	assert(nextScene_ == nullptr);// すでに次のシーンが予約済みでないかチェック
+	if (sceneFactory_ == nullptr || nextScene_ != nullptr) {
+		return false;
+	}
 
-	//次シーンを生成
-	nextScene_ = std::unique_ptr<BaseScene>(sceneFactory_->CreateScene(sceneName));
+	std::unique_ptr<BaseScene> newScene(sceneFactory_->CreateScene(sceneName));
+	if (!newScene) {
+		return false;
+	}
+
+	nextScene_ = std::move(newScene);
+	pendingSceneName_ = sceneName;
+	return true;
+}
+
+bool SceneManager::RestartCurrentScene()
+{
+	return !currentSceneName_.empty() && ChangeScene(currentSceneName_);
+}
+
+const std::vector<std::string>& SceneManager::GetAvailableSceneNames() const
+{
+	static const std::vector<std::string> empty;
+	return sceneFactory_ != nullptr ? sceneFactory_->GetSceneNames() : empty;
 }
 
 SceneManager::~SceneManager()

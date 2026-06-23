@@ -21,6 +21,8 @@ void DirectXCommon::Initialize(WinApp* winApp)
 
 	//メンバ変数に記録
 	this->winApp = winApp;
+	width = winApp->GetClientWidth();
+	height = winApp->GetClientHeight();
 
 	//FPS固定初期化
 	InitializeFixFPS();
@@ -47,6 +49,43 @@ void DirectXCommon::Initialize(WinApp* winApp)
 	scissorRect();
 	//DXCコンパイラの生成();
 	CreateDxcCompiler();
+}
+
+void DirectXCommon::ResizeIfNeeded()
+{
+	const uint32_t newWidth = winApp->GetClientWidth();
+	const uint32_t newHeight = winApp->GetClientHeight();
+	if (newWidth == 0 || newHeight == 0 || (newWidth == width && newHeight == height)) {
+		return;
+	}
+
+	WaitForGPU();
+	for (auto& swapChainResource : swapChainResources) {
+		swapChainResource.Reset();
+	}
+	renderTextureResource_.Reset();
+	depthStencilResource.Reset();
+	resource.Reset();
+
+	width = newWidth;
+	height = newHeight;
+	const HRESULT resizeResult = swapChain->ResizeBuffers(
+		static_cast<UINT>(GetSwapChainResourcesNum()), width, height,
+		swapChainDesc_.Format, swapChainDesc_.Flags);
+	assert(SUCCEEDED(resizeResult));
+
+	for (UINT i = 0; i < GetSwapChainResourcesNum(); ++i) {
+		const HRESULT getBufferResult = swapChain->GetBuffer(i, IID_PPV_ARGS(&swapChainResources[i]));
+		assert(SUCCEEDED(getBufferResult));
+	}
+
+	RenderTargetView();
+	depthBuffer();
+	DepthStencilView();
+	viewportRect();
+	scissorRect();
+	CreateRenderTextureSRV(SrvManager::GetInstance());
+	isRenderTextureShaderResource_ = false;
 }
 
 void DirectXCommon::InitializeDevice()//デバイスの初期化
@@ -193,6 +232,8 @@ void DirectXCommon::SwapChain()
 	swapChainDesc_.BufferCount = 2;//ダブルバッファ
 	swapChainDesc_.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;//モニタにうつしたら、中身を破棄
 	//コマンドキュー、ウィンドウハンドル、設定を渡して生成する
+	swapChainDesc_.Width = width;
+	swapChainDesc_.Height = height;
 	hr = dxgiFactory->CreateSwapChainForHwnd(commandQueue.Get(), winApp->GetHwnd(), &swapChainDesc_, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf()));
 	assert(SUCCEEDED(hr));
 
@@ -291,8 +332,8 @@ void DirectXCommon::RenderTargetView()
 
 	// Sceneを描画するRenderTextureをSwapChainと同じ大きさ・Formatで生成する
 	renderTextureResource_ = CreateRenderTextureResource(
-		WinApp::kClientWidth,
-		WinApp::kClientHeight,
+		width,
+		height,
 		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
 		renderTextureClearColor_);
 
@@ -338,8 +379,8 @@ void DirectXCommon::viewportRect()
 	//ビューポート矩形の設定
 
 	//クライアント領域のサイズと一緒にして画面全体に表示
-	viewport_.Width = WinApp::kClientWidth;
-	viewport_.Height = WinApp::kClientHeight;
+	viewport_.Width = static_cast<float>(width);
+	viewport_.Height = static_cast<float>(height);
 	viewport_.TopLeftX = 0;
 	viewport_.TopLeftY = 0;
 	viewport_.MinDepth = 0.0f;
@@ -350,9 +391,9 @@ void DirectXCommon::scissorRect()
 {
 	//基本的にはビューポートと同じ短形が構成されるようにする
 	scissorRect_.left = 0;
-	scissorRect_.right = WinApp::kClientWidth;
+	scissorRect_.right = static_cast<LONG>(width);
 	scissorRect_.top = 0;
-	scissorRect_.bottom = WinApp::kClientHeight;
+	scissorRect_.bottom = static_cast<LONG>(height);
 }
 
 
@@ -731,14 +772,17 @@ void DirectXCommon::CreateRenderTextureSRV(SrvManager* srvManager)
 	assert(renderTextureResource_);
 
 	// RenderTextureの描画結果をShaderから読めるよう、SRVの場所を1個確保する
-	renderTextureSrvIndex_ = srvManager->Allocate();
+	if (renderTextureSrvIndex_ == UINT32_MAX) {
+		renderTextureSrvIndex_ = srvManager->Allocate();
+	}
 
 	// Resourceと同じFormat、ミップレベル1でTexture2D用SRVを生成する
 	srvManager->CreateSRVforTexture2D(
 		renderTextureSrvIndex_,
 		renderTextureResource_.Get(),
 		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
-		1);
+		1,
+		true);
 }
 
 //CPUのMap/memcpy

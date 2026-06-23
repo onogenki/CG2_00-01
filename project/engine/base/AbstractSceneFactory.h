@@ -2,6 +2,7 @@
 
 #include"BaseScene.h"
 #include<string>
+#include<vector>
 
 //シーン工場
 class AbstractSceneFactory
@@ -12,5 +13,7 @@ public:
 	virtual ~AbstractSceneFactory() = default;
 	//シーン生成
 	virtual BaseScene* CreateScene(const std::string& sceneName) = 0;
+	// 登録されているシーン名一覧
+	virtual const std::vector<std::string>& GetSceneNames() const = 0;
 
 };

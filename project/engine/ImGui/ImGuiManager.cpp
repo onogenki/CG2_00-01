@@ -6,6 +6,10 @@
 #include "ParticleEmitter.h"
 #include "CameraManager.h"
 #include "ModelManager.h"
+#include "SceneManager.h"
+#ifdef USE_IMGUI
+#include "externals/imgui/imgui_internal.h"
+#endif
 using namespace MyMath;
 
 void ImGuiManager::Initialize([[maybe_unused]] WinApp* winApp, [[maybe_unused]]DirectXCommon* directXCommon, [[maybe_unused]]SrvManager* srvManager)
@@ -14,8 +18,18 @@ void ImGuiManager::Initialize([[maybe_unused]] WinApp* winApp, [[maybe_unused]]D
 
 	//ImGuiのコンテキストを生成
 	ImGui::CreateContext();
+	winApp_ = winApp;
+	dxCommon_ = directXCommon;
+	srvManager_ = srvManager;
+	ImGuiIO& io = ImGui::GetIO();
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	//ImGuiのスタイルを設定
 	ImGui::StyleColorsDark();
+	ImGuiStyle& style = ImGui::GetStyle();
+	style.WindowRounding = 3.0f;
+	style.FrameRounding = 3.0f;
+	style.TabRounding = 3.0f;
 
 	ImGui_ImplWin32_Init(winApp->GetHwnd());
 
@@ -56,23 +70,216 @@ void ImGuiManager::Initialize([[maybe_unused]] WinApp* winApp, [[maybe_unused]]D
 
 }
 
-void ImGuiManager::Begin()
+void ImGuiManager::Begin(const char* sceneName)
 {
 #ifdef USE_IMGUI
 	//ゲームの処理
 	ImGui_ImplDX12_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
+	BeginDockSpace(sceneName != nullptr ? sceneName : "Unknown");
 #endif
 }
 
 void ImGuiManager::End()
 {
 #ifdef USE_IMGUI
+	ImGui::End();
 	//ImGuiの内部コマンドを生成する
 	ImGui::Render();
 #endif
 }
+
+#ifdef USE_IMGUI
+void ImGuiManager::BeginDockSpace(const char* sceneName)
+{
+	gameViewDrawList_ = nullptr;
+	gameViewImageMin_ = {};
+	gameViewImageSize_ = {};
+	if (layoutSceneName_ != sceneName) {
+		// 1フレーム目でウィンドウを登録し、2フレーム目で配置を確定する。
+		layoutSceneName_ = sceneName;
+		layoutResetFrames_ = 2;
+	}
+	if (layoutResetFrames_ > 0) {
+		resetDockLayout_ = true;
+		--layoutResetFrames_;
+	}
+
+	const ImGuiViewport* viewport = ImGui::GetMainViewport();
+	ImGui::SetNextWindowPos(viewport->WorkPos);
+	ImGui::SetNextWindowSize(viewport->WorkSize);
+	ImGui::SetNextWindowViewport(viewport->ID);
+
+	const ImGuiWindowFlags hostFlags =
+		ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking |
+		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+		ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
+		ImGuiWindowFlags_NoBackground;
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+	ImGui::Begin("Debug Dockspace", nullptr, hostFlags);
+	ImGui::PopStyleVar(3);
+
+	if (ImGui::BeginMenuBar()) {
+		if (ImGui::BeginMenu("Display")) {
+			const WinApp::WindowMode currentMode = winApp_->GetWindowMode();
+			if (ImGui::MenuItem("Windowed (Current Size)", nullptr, currentMode == WinApp::WindowMode::Windowed)) {
+				winApp_->SetWindowMode(WinApp::WindowMode::Windowed);
+			}
+			if (ImGui::MenuItem("Maximized (With Close Button)", nullptr, currentMode == WinApp::WindowMode::Maximized)) {
+				winApp_->SetWindowMode(WinApp::WindowMode::Maximized);
+			}
+			if (ImGui::MenuItem("Borderless Fullscreen", nullptr, currentMode == WinApp::WindowMode::BorderlessFullscreen)) {
+				winApp_->SetWindowMode(WinApp::WindowMode::BorderlessFullscreen);
+			}
+			ImGui::Separator();
+			ImGui::TextDisabled("Current: %u x %u", winApp_->GetClientWidth(), winApp_->GetClientHeight());
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Windows")) {
+			ImGui::MenuItem("Game View", nullptr, &showGameView_);
+			ImGui::MenuItem("Scene", nullptr, &showSceneWindow_);
+			ImGui::MenuItem("Performance", nullptr, &showFpsWindow_);
+			ImGui::MenuItem("ImGui Demo", nullptr, &showDemoWindow_);
+			ImGui::EndMenu();
+		}
+		if (ImGui::BeginMenu("Layout")) {
+			if (ImGui::MenuItem("Reset to Default")) {
+				resetDockLayout_ = true;
+			}
+			ImGui::EndMenu();
+		}
+		ImGui::TextDisabled("Scene: %s", sceneName);
+		ImGui::EndMenuBar();
+	}
+
+	const ImGuiID dockspaceId = ImGui::GetID("MainDockspaceV2");
+	if (resetDockLayout_ || ImGui::DockBuilderGetNode(dockspaceId) == nullptr) {
+		BuildDefaultDockLayout(dockspaceId);
+		resetDockLayout_ = false;
+	}
+	ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+
+	if (showGameView_) {
+		GameViewWindow();
+	}
+	if (showSceneWindow_) {
+		SceneWindow(sceneName);
+	}
+	if (showFpsWindow_) {
+		FPSWindow();
+	}
+	if (showDemoWindow_) {
+		ImGui::ShowDemoWindow(&showDemoWindow_);
+	}
+}
+
+void ImGuiManager::BuildDefaultDockLayout(ImGuiID dockspaceId)
+{
+	const ImGuiViewport* viewport = ImGui::GetMainViewport();
+	ImGui::DockBuilderRemoveNode(dockspaceId);
+	ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
+	ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->WorkSize);
+
+	ImGuiID centerId = dockspaceId;
+	const ImGuiID leftId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Left, 0.18f, nullptr, &centerId);
+	const ImGuiID rightId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Right, 0.24f, nullptr, &centerId);
+	const ImGuiID bottomId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Down, 0.22f, nullptr, &centerId);
+
+	ImGui::DockBuilderDockWindow("Game View", centerId);
+	ImGui::DockBuilderDockWindow("Scene", leftId);
+	ImGui::DockBuilderDockWindow("FPS", leftId);
+	ImGui::DockBuilderDockWindow("Editing Object", rightId);
+	ImGui::DockBuilderDockWindow("Camera Control", rightId);
+	ImGui::DockBuilderDockWindow("Editing UVTranslate ( Sprite )", bottomId);
+	ImGui::DockBuilderDockWindow("Editing Particle", bottomId);
+	ImGui::DockBuilderFinish(dockspaceId);
+}
+
+void ImGuiManager::GameViewWindow()
+{
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+	ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.015f, 0.015f, 0.015f, 1.0f));
+	const bool isVisible = ImGui::Begin(
+		"Game View",
+		&showGameView_,
+		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+	ImGui::PopStyleColor();
+	ImGui::PopStyleVar();
+
+	if (isVisible) {
+		const ImVec2 available = ImGui::GetContentRegionAvail();
+		const float textureWidth = static_cast<float>(dxCommon_->GetClientWidth());
+		const float textureHeight = static_cast<float>(dxCommon_->GetClientHeight());
+		if (available.x > 0.0f && available.y > 0.0f && textureWidth > 0.0f && textureHeight > 0.0f) {
+			// 映像全体が必ず収まる倍率を選び、余った部分をレターボックスにする。
+			const float scale = (available.x / textureWidth < available.y / textureHeight)
+				? available.x / textureWidth
+				: available.y / textureHeight;
+			gameViewImageSize_ = ImVec2(textureWidth * scale, textureHeight * scale);
+			const ImVec2 contentStart = ImGui::GetCursorScreenPos();
+			gameViewImageMin_ = ImVec2(
+				contentStart.x + (available.x - gameViewImageSize_.x) * 0.5f,
+				contentStart.y + (available.y - gameViewImageSize_.y) * 0.5f);
+			gameViewDrawList_ = ImGui::GetWindowDrawList();
+
+			const D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = srvManager_->GetGPUDescriptorHandle(
+				dxCommon_->GetRenderTextureSrvIndex());
+			ImGui::SetCursorScreenPos(gameViewImageMin_);
+			ImGui::Image(ImTextureRef(static_cast<ImTextureID>(textureHandle.ptr)), gameViewImageSize_);
+		}
+	}
+	ImGui::End();
+}
+
+void ImGuiManager::SceneWindow(const char* sceneName)
+{
+	if (!ImGui::Begin("Scene", &showSceneWindow_)) {
+		ImGui::End();
+		return;
+	}
+	SceneManager* sceneManager = SceneManager::GetInstance();
+	const std::string& currentScene = sceneManager->GetCurrentSceneName();
+	const char* currentLabel = currentScene.empty() ? sceneName : currentScene.c_str();
+
+	ImGui::Text("Current Scene");
+	ImGui::Separator();
+	ImGui::TextUnformatted(currentLabel);
+	ImGui::Spacing();
+
+	// Factoryへ登録したシーンを一覧表示し、選択時に切り替えを予約する。
+	ImGui::BeginDisabled(sceneManager->HasPendingScene());
+	if (ImGui::BeginCombo("Scene", currentLabel)) {
+		for (const std::string& availableScene : sceneManager->GetAvailableSceneNames()) {
+			const bool isCurrent = availableScene == currentScene;
+			if (ImGui::Selectable(availableScene.c_str(), isCurrent) && !isCurrent) {
+				sceneManager->ChangeScene(availableScene);
+			}
+			if (isCurrent) {
+				ImGui::SetItemDefaultFocus();
+			}
+		}
+		ImGui::EndCombo();
+	}
+
+	if (ImGui::Button("Restart Current Scene")) {
+		sceneManager->RestartCurrentScene();
+	}
+	ImGui::EndDisabled();
+
+	if (sceneManager->HasPendingScene()) {
+		ImGui::TextDisabled("Loading: %s", sceneManager->GetPendingSceneName().c_str());
+	}
+	ImGui::Spacing();
+	ImGui::TextDisabled("Drag any debug window by its tab to rearrange it.");
+	ImGui::TextDisabled("Use Layout > Reset to Default to restore the layout.");
+	ImGui::End();
+}
+#endif
 
 void ImGuiManager::DemoWindow()
 {
@@ -346,58 +553,61 @@ void ImGuiManager::CameraWindow(CameraManager* cameraManager)
 #endif
 }
 
-//アニメーションデバック
+// アニメーションのスケルトンをデバッグ表示する。
 void ImGuiManager::SkeletonDebugDraw(const Model::Skeleton& skeleton, const Matrix4x4& worldMatrix, const Matrix4x4& viewProjectionMatrix)
 {
 #ifdef USE_IMGUI
-	// BackgroundDrawListを使い、スケルトンをImGuiウィンドウより後ろへ描画する
-	ImDrawList* drawList = ImGui::GetBackgroundDrawList();
-	float sWidth = ImGui::GetIO().DisplaySize.x;
-	float sHeight = ImGui::GetIO().DisplaySize.y;
-	Matrix4x4 matWVP = Multiply(worldMatrix, viewProjectionMatrix);
+	ImDrawList* drawList = gameViewDrawList_;
+	ImVec2 imageMin = gameViewImageMin_;
+	ImVec2 imageSize = gameViewImageSize_;
+	if (drawList == nullptr || imageSize.x <= 0.0f || imageSize.y <= 0.0f) {
+		drawList = ImGui::GetBackgroundDrawList();
+		imageMin = ImVec2(0.0f, 0.0f);
+		imageSize = ImGui::GetIO().DisplaySize;
+	}
 
-	// 1. まず「骨（線）」をすべて描く
-	for (size_t i = 0; i < skeleton.joints.size(); i++) {
-		const auto& joint = skeleton.joints[i];
+	const Matrix4x4 matWVP = Multiply(worldMatrix, viewProjectionMatrix);
+	const auto projectToGameView = [&](const Vector3& position, ImVec2& screenPosition) {
+		const float x = position.x * matWVP.m[0][0] + position.y * matWVP.m[1][0] + position.z * matWVP.m[2][0] + matWVP.m[3][0];
+		const float y = position.x * matWVP.m[0][1] + position.y * matWVP.m[1][1] + position.z * matWVP.m[2][1] + matWVP.m[3][1];
+		const float w = position.x * matWVP.m[0][3] + position.y * matWVP.m[1][3] + position.z * matWVP.m[2][3] + matWVP.m[3][3];
+		if (w <= 0.0f) {
+			return false;
+		}
+		screenPosition = ImVec2(
+			imageMin.x + (x / w + 1.0f) * 0.5f * imageSize.x,
+			imageMin.y + (1.0f - y / w) * 0.5f * imageSize.y);
+		return true;
+	};
 
-		if (joint.parent.has_value()) {
-			const auto& parentJoint = skeleton.joints[joint.parent.value()];
-
-			// 自分と親の3D座標
-			Vector3 pos3d = { joint.skeletonSpaceMatrix.m[3][0], joint.skeletonSpaceMatrix.m[3][1], joint.skeletonSpaceMatrix.m[3][2] };
-			Vector3 pPos3d = { parentJoint.skeletonSpaceMatrix.m[3][0], parentJoint.skeletonSpaceMatrix.m[3][1], parentJoint.skeletonSpaceMatrix.m[3][2] };
-
-			// 2D座標に変換（計算式はそのまま）
-			float x = pos3d.x * matWVP.m[0][0] + pos3d.y * matWVP.m[1][0] + pos3d.z * matWVP.m[2][0] + matWVP.m[3][0];
-			float y = pos3d.x * matWVP.m[0][1] + pos3d.y * matWVP.m[1][1] + pos3d.z * matWVP.m[2][1] + matWVP.m[3][1];
-			float w = pos3d.x * matWVP.m[0][3] + pos3d.y * matWVP.m[1][3] + pos3d.z * matWVP.m[2][3] + matWVP.m[3][3];
-
-			float px = pPos3d.x * matWVP.m[0][0] + pPos3d.y * matWVP.m[1][0] + pPos3d.z * matWVP.m[2][0] + matWVP.m[3][0];
-			float py = pPos3d.x * matWVP.m[0][1] + pPos3d.y * matWVP.m[1][1] + pPos3d.z * matWVP.m[2][1] + matWVP.m[3][1];
-			float pw = pPos3d.x * matWVP.m[0][3] + pPos3d.y * matWVP.m[1][3] + pPos3d.z * matWVP.m[2][3] + matWVP.m[3][3];
-
-			if (w > 0.0f && pw > 0.0f) {
-				ImVec2 screenPos = { (x / w + 1.0f) * 0.5f * sWidth, (1.0f - y / w) * 0.5f * sHeight };
-				ImVec2 pScreenPos = { (px / pw + 1.0f) * 0.5f * sWidth, (1.0f - py / pw) * 0.5f * sHeight };
-				drawList->AddLine(pScreenPos, screenPos, IM_COL32(255, 255, 0, 255), 2.0f);
-			}
+	// Game Viewの外側へデバッグ線がはみ出さないようにする。
+	drawList->PushClipRect(imageMin, ImVec2(imageMin.x + imageSize.x, imageMin.y + imageSize.y), true);
+	for (const auto& joint : skeleton.joints) {
+		if (!joint.parent.has_value()) {
+			continue;
+		}
+		const auto& parentJoint = skeleton.joints[joint.parent.value()];
+		const Vector3 jointPosition{
+			joint.skeletonSpaceMatrix.m[3][0], joint.skeletonSpaceMatrix.m[3][1], joint.skeletonSpaceMatrix.m[3][2] };
+		const Vector3 parentPosition{
+			parentJoint.skeletonSpaceMatrix.m[3][0], parentJoint.skeletonSpaceMatrix.m[3][1], parentJoint.skeletonSpaceMatrix.m[3][2] };
+		ImVec2 jointScreenPosition{};
+		ImVec2 parentScreenPosition{};
+		if (projectToGameView(jointPosition, jointScreenPosition) &&
+			projectToGameView(parentPosition, parentScreenPosition)) {
+			drawList->AddLine(parentScreenPosition, jointScreenPosition, IM_COL32(255, 255, 0, 255), 2.0f);
 		}
 	}
 
-	// 2. 次に「関節（点）」をすべて描く（線の上に重なるように）
-	for (size_t i = 0; i < skeleton.joints.size(); i++) {
-		const auto& joint = skeleton.joints[i];
-		Vector3 pos3d = { joint.skeletonSpaceMatrix.m[3][0], joint.skeletonSpaceMatrix.m[3][1], joint.skeletonSpaceMatrix.m[3][2] };
-
-		float x = pos3d.x * matWVP.m[0][0] + pos3d.y * matWVP.m[1][0] + pos3d.z * matWVP.m[2][0] + matWVP.m[3][0];
-		float y = pos3d.x * matWVP.m[0][1] + pos3d.y * matWVP.m[1][1] + pos3d.z * matWVP.m[2][1] + matWVP.m[3][1];
-		float w = pos3d.x * matWVP.m[0][3] + pos3d.y * matWVP.m[1][3] + pos3d.z * matWVP.m[2][3] + matWVP.m[3][3];
-
-		if (w > 0.0f) {
-			ImVec2 screenPos = { (x / w + 1.0f) * 0.5f * sWidth, (1.0f - y / w) * 0.5f * sHeight };
-			drawList->AddCircleFilled(screenPos, 5.0f, IM_COL32(255, 0, 0, 255)); // ちょっと大きめに
+	for (const auto& joint : skeleton.joints) {
+		const Vector3 jointPosition{
+			joint.skeletonSpaceMatrix.m[3][0], joint.skeletonSpaceMatrix.m[3][1], joint.skeletonSpaceMatrix.m[3][2] };
+		ImVec2 jointScreenPosition{};
+		if (projectToGameView(jointPosition, jointScreenPosition)) {
+			drawList->AddCircleFilled(jointScreenPosition, 5.0f, IM_COL32(255, 0, 0, 255));
 		}
 	}
+	drawList->PopClipRect();
 #endif
 }
 

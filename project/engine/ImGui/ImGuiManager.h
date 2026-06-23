@@ -1,30 +1,29 @@
 #pragma once
-#include "WinApp.h"
+
+#include "CameraManager.h"
 #include "DirectXCommon.h"
-#include "SrvManager.h"
 #include "Object3d.h"
 #include "ParticleEmitter.h"
-#include "CameraManager.h"
-#include<vector>
+#include "SrvManager.h"
+#include "WinApp.h"
+
+#include <vector>
+#include <string>
+
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui.h"
 #include "externals/imgui/imgui_impl_dx12.h"
 #include "externals/imgui/imgui_impl_win32.h"
 #endif
 
-class WinApp;
 class Sprite;
 struct Transform;
-struct DirectionalLightData;
-class CameraManager;
-class Object3d;
-class ParticleEmitter;
 
 class ImGuiManager
 {
 public:
-
-	static ImGuiManager* GetInstance() {
+	static ImGuiManager* GetInstance()
+	{
 		static ImGuiManager instance;
 		return &instance;
 	}
@@ -32,33 +31,55 @@ public:
 	ImGuiManager(const ImGuiManager&) = delete;
 	ImGuiManager& operator=(const ImGuiManager&) = delete;
 
-	//初期化
+	// ImGuiの初期化とフレーム制御
 	void Initialize(WinApp* winApp, DirectXCommon* dxCommon, SrvManager* srvManager);
-	//受付開始
-	void Begin();
-	//ImGui受付終了
+	void Begin(const char* sceneName = nullptr);
 	void End();
-	//デモウィンドウ
-	void DemoWindow();
-	//FPS確認
-	void FPSWindow();
-	//スプライト編集
-	void SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprites);
-	//3Dモデル編集
-	void ModelWindow(const std::vector<std::unique_ptr<Object3d>>& normalObjects, const std::vector<std::unique_ptr<Object3d>>& animationObjects, Object3d::DirectionalLight& light,Object3d::PointLight& pointLight,Object3d::SpotLight& spotLight);
-	//カメラ編集
-	void CameraWindow(CameraManager* cameraManager);
-	//アニメーション編集
-	void SkeletonDebugDraw(const Model::Skeleton& skeleton, const Matrix4x4& worldMatrix, const Matrix4x4& viewProjectionMatrix);
-	//描画
 	void Draw(DirectXCommon* dxCommon);
-	//終了処理
 	void Finalize();
 
-	//パーティクル編集
+	// 共通デバッグウィンドウ
+	void DemoWindow();
+	void FPSWindow();
+	void SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprites);
+	void ModelWindow(
+		const std::vector<std::unique_ptr<Object3d>>& normalObjects,
+		const std::vector<std::unique_ptr<Object3d>>& animationObjects,
+		Object3d::DirectionalLight& light,
+		Object3d::PointLight& pointLight,
+		Object3d::SpotLight& spotLight);
+	void CameraWindow(CameraManager* cameraManager);
 	std::string ParticleWindow(Transform& emitterTransform);
+
+	// Game View上へスケルトンを重ねて描画する
+	void SkeletonDebugDraw(
+		const Model::Skeleton& skeleton,
+		const Matrix4x4& worldMatrix,
+		const Matrix4x4& viewProjectionMatrix);
+
 private:
 	ImGuiManager() = default;
 	~ImGuiManager() = default;
-};
 
+#ifdef USE_IMGUI
+	void BeginDockSpace(const char* sceneName);
+	void BuildDefaultDockLayout(ImGuiID dockspaceId);
+	void GameViewWindow();
+	void SceneWindow(const char* sceneName);
+
+	bool showGameView_ = true;
+	bool showSceneWindow_ = true;
+	bool showFpsWindow_ = true;
+	bool showDemoWindow_ = false;
+	bool resetDockLayout_ = false;
+	std::string layoutSceneName_;
+	int layoutResetFrames_ = 0;
+
+	WinApp* winApp_ = nullptr;
+	DirectXCommon* dxCommon_ = nullptr;
+	SrvManager* srvManager_ = nullptr;
+	ImVec2 gameViewImageMin_{};
+	ImVec2 gameViewImageSize_{};
+	ImDrawList* gameViewDrawList_ = nullptr;
+#endif
+};

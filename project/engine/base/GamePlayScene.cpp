@@ -239,9 +239,7 @@ void GamePlayScene::Update()
 
 	//ゲームの処理
 
-	ImGuiManager::GetInstance()->Begin();
-	ImGuiManager::GetInstance()->DemoWindow();
-	ImGuiManager::GetInstance()->FPSWindow();
+	ImGuiManager::GetInstance()->Begin("GamePlay");
 	ImGuiManager::GetInstance()->SpriteWindow(sprites);
 	ImGuiManager::GetInstance()->ModelWindow(normalObjects,animationObjects, directionalLight, pointLight, spotLight);
 	// ImGuiのParticleWindowから、どのボタンが押されたかの結果（文字列）を受け取る
@@ -258,8 +256,7 @@ void GamePlayScene::Update()
 
 	ImGuiManager::GetInstance()->CameraWindow(cameraManager.get());
 
-	// スケルトンはImGuiのBackgroundDrawListを使い、ImGuiウィンドウの後ろへ表示する。
-	// SceneがRenderTextureへ描画されている確認中でも、デバッグ表示としてSwapChain上に残る。
+	// スケルトンをGame Viewの映像座標へ合わせ、モデルの上へ重ねて表示する。
 	if (!animationObjects.empty())
 	{
 		Object3d* animationObject = animationObjects[0].get();
@@ -364,8 +361,15 @@ void GamePlayScene::Finalize()
 	DirectXCommon::GetInstance()->WaitForGPU();
 
 	// 中途半端に生き残っている粒子が原因のアクセス違反を防ぐ
-	ParticleManager::GetInstance()->ClearAllParticles();
+	ParticleManager::GetInstance()->SetCameraManager(nullptr);
+	ParticleManager::GetInstance()->ClearAllGroups();
 
+	activeEmitter = nullptr;
+	objectPlane = nullptr;
+	objectAxis = nullptr;
+	emitterCircle.reset();
+	emitterPlane.reset();
+	skyBox_.reset();
 	sprites.clear();
 	normalObjects.clear();
 	animationObjects.clear();

@@ -1,38 +1,43 @@
 #pragma once
+
+#include <Windows.h>
 #include <cstdint>
-#include<Windows.h>
 
 class WinApp
 {
 public:
-	//クライアント領域のサイズ
+	// ゲームウィンドウの表示方法
+	enum class WindowMode
+	{
+		Windowed,
+		Maximized,
+		BorderlessFullscreen,
+	};
+
+	// 通常ウィンドウへ戻すときのクライアント領域
 	static const int32_t kClientWidth = 1280;
 	static const int32_t kClientHeight = 720;
-	/// 静的メンバ関数
-	static LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM, LPARAM lparam);
 
-	//メンバ関数
+	static LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+
 	void Initialize();
-
 	void Update();
-	
-	//終了
 	void Finalize();
-
-	//getter
-	HINSTANCE GetHInstance() const { return wc.hInstance; }
-
-	//getter
-	HWND GetHwnd() const { return hwnd; }
-
-	//メッセージの処理
 	bool ProcessMessage();
 
+	void SetWindowMode(WindowMode mode);
+
+	HINSTANCE GetHInstance() const { return wc.hInstance; }
+	HWND GetHwnd() const { return hwnd; }
+	WindowMode GetWindowMode() const { return windowMode_; }
+	uint32_t GetClientWidth() const;
+	uint32_t GetClientHeight() const;
+
 private:
-
-	//ウィンドウハンドル
 	HWND hwnd = nullptr;
-	//ウィンドウクラスの設定
 	WNDCLASS wc{};
-};
+	WindowMode windowMode_ = WindowMode::Maximized;
+	RECT windowedRect_{};
 
+	void ToggleFullscreen();
+};

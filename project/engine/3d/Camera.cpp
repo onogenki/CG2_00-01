@@ -1,13 +1,13 @@
 #include "Camera.h"
 #include "MyMath.h"
-#include"WinApp.h"
+#include "DirectXCommon.h"
 
 using namespace MyMath;
 
 Camera::Camera()
 	: transform({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.0f,0.0f,0.0f })
 	, fovY(0.45f)
-	, aspectRatio(float(WinApp::kClientWidth) / float(WinApp::kClientHeight))
+	, aspectRatio(float(DirectXCommon::GetInstance()->GetClientWidth()) / float(DirectXCommon::GetInstance()->GetClientHeight()))
 	, nearClip(0.1f)
 	, farClip(100.0f)
 	, worldMatrix(MakeAffineMatrix(transform.scale, transform.rotate, transform.translate))
@@ -18,6 +18,11 @@ Camera::Camera()
 
 void Camera::Update()
 {
+	const uint32_t clientWidth = DirectXCommon::GetInstance()->GetClientWidth();
+	const uint32_t clientHeight = DirectXCommon::GetInstance()->GetClientHeight();
+	if (clientHeight != 0) {
+		aspectRatio = static_cast<float>(clientWidth) / static_cast<float>(clientHeight);
+	}
 	//カメラのワールド行列
 	worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 	//ビュー行列行列

@@ -105,6 +105,7 @@ void Framework::Update()
 		//終了フラグを立てて、このフレームの更新処理をする抜ける
 		endRequest_ = true;
 	}
+	dxCommon_->ResizeIfNeeded();
 	input_->Update();
 
 	//マネージャーにシーンの更新(と切り替え)を任せる
