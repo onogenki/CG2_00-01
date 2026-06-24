@@ -144,12 +144,18 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 			ImGui::MenuItem("Game View", nullptr, &showGameView_);
 			ImGui::MenuItem("Scene", nullptr, &showSceneWindow_);
 			ImGui::MenuItem("Performance", nullptr, &showFpsWindow_);
+			ImGui::Separator();
+			ImGui::MenuItem("Sprite Editor", nullptr, &showSpriteWindow_);
+			ImGui::MenuItem("Model Editor", nullptr, &showModelWindow_);
+			ImGui::MenuItem("Particle Editor", nullptr, &showParticleWindow_);
+			ImGui::MenuItem("Camera Control", nullptr, &showCameraWindow_);
+			ImGui::Separator();
 			ImGui::MenuItem("ImGui Demo", nullptr, &showDemoWindow_);
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Layout")) {
 			if (ImGui::MenuItem("Reset to Default")) {
-				resetDockLayout_ = true;
+				ResetLayoutToDefault();
 			}
 			ImGui::EndMenu();
 		}
@@ -176,6 +182,19 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 	if (showDemoWindow_) {
 		ImGui::ShowDemoWindow(&showDemoWindow_);
 	}
+}
+
+void ImGuiManager::ResetLayoutToDefault()
+{
+	showGameView_ = true;
+	showSceneWindow_ = true;
+	showFpsWindow_ = true;
+	showSpriteWindow_ = true;
+	showModelWindow_ = true;
+	showParticleWindow_ = true;
+	showCameraWindow_ = true;
+	showDemoWindow_ = false;
+	resetDockLayout_ = true;
 }
 
 void ImGuiManager::BuildDefaultDockLayout(ImGuiID dockspaceId)
@@ -294,7 +313,7 @@ void ImGuiManager::FPSWindow()
 
 #ifdef USE_IMGUI
 	// ウィンドウ作成
-	ImGui::Begin("FPS");
+	ImGui::Begin("FPS", &showFpsWindow_);
 
 	// FPS波形グラフの描画
 	static float fps_values[90] = {};
@@ -326,7 +345,10 @@ void ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& spri
 	static float my_color[4] = { 1.0f, 1.0f, 1.0f, 1.0f }; // カラーピッカーの色
 
 	// ウィンドウ作成
-	ImGui::Begin("Editing UVTranslate ( Sprite )");
+	if (!showSpriteWindow_) {
+		return;
+	}
+	ImGui::Begin("Editing UVTranslate ( Sprite )", &showSpriteWindow_);
 	ImGui::Separator();
 
 	// ここで色を変えたら、配列内の全スプライトに色を適用する
@@ -396,7 +418,10 @@ void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& nor
 	static int selectedIndex = 0; //選択されている番号
 	static bool useMonsterBall = false;//png入れ替え
 	// ウィンドウ作成
-	ImGui::Begin("Editing Object");
+	if (!showModelWindow_) {
+		return;
+	}
+	ImGui::Begin("Editing Object", &showModelWindow_);
 
 	if (ImGui::Button("Select NormalModel")) {
 		targetArray = 0;
@@ -492,7 +517,10 @@ std::string ImGuiManager::ParticleWindow(Transform& emitterTransform)
 #ifdef USE_IMGUI
 	std::string result = ""; // 何も押されていなければ空文字を返す
 	// ウィンドウ作成
-	ImGui::Begin("Editing Particle");
+	if (!showParticleWindow_) {
+		return "";
+	}
+	ImGui::Begin("Editing Particle", &showParticleWindow_);
 	ImGui::Separator();
 
 	if (ImGui::Button("Circle Texture"))
@@ -518,7 +546,10 @@ void ImGuiManager::CameraWindow(CameraManager* cameraManager)
 #ifdef USE_IMGUI
 
 	// ウィンドウ作成
-	ImGui::Begin("Camera Control");
+	if (!showCameraWindow_) {
+		return;
+	}
+	ImGui::Begin("Camera Control", &showCameraWindow_);
 	ImGui::Separator();
 
 	//カメラ

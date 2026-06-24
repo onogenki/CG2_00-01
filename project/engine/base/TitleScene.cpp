@@ -43,6 +43,15 @@ void TitleScene::Initialize()
 	sprite_->Initialize(spriteCommon, "Resources/uvChecker.png");
 	sprite_->SetPosition({ 0.0f, 0.0f });
 
+	// skyBoxの背景
+	TextureManager::GetInstance()->LoadTexture("Resources/qwantani_moonrise_puresky_1k.dds");
+
+	//Skybox
+	skyBox_ = std::make_unique<SkyBox>();
+	skyBox_->Initialize(dxCommon, cameraManager->GetActiveCamera());
+	// 添付されていたDDSテクスチャのパスを指定する
+	skyBox_->SetTexture("Resources/qwantani_moonrise_puresky_1k.dds");
+
 	//音声読み込み
 	Audio::GetInstance()->LoadFile("Resources/Alarm01.wav");
 	//音声再生
@@ -67,6 +76,7 @@ void TitleScene::Update()
 	Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 
 	sprite_->Update();
+	skyBox_->Update();
 
 	ImGuiManager::GetInstance()->Begin("Title");
 	ImGuiManager::GetInstance()->End();
@@ -91,6 +101,10 @@ void TitleScene::Draw()
 			obj->Draw();
 		}
 	}
+	//skyBox描画
+	if (skyBox_) {
+		skyBox_->Draw();
+	}
 
 	spriteCommon->SetCommonDrawSetting();
 	sprite_->Draw();
@@ -109,5 +123,6 @@ void TitleScene::Finalize()
 {
 	//GPUの完了待ち
 	DirectXCommon::GetInstance()->WaitForGPU();
+	skyBox_.reset();
 
 }
