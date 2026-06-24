@@ -18,16 +18,32 @@ public:
 
 	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
 	void Draw();
+	void SetGrayscale(bool isGrayscale) { isGrayscale_ = isGrayscale; }
+	void SetSepia(bool isSepia) { isSepia_ = isSepia; }
+	bool IsGrayscale() const { return isGrayscale_; }
+	bool IsSepia() const { return isSepia_; }
+	bool IsEnabled() const { return isGrayscale_ || isSepia_; }
 
 private:
 	PostEffect() = default;
 	~PostEffect() = default;
 
+	enum class PipelineType
+	{
+		Fullscreen,
+		Grayscale,
+		Sepia,
+		Count
+	};
+
 	void CreateRootSignature();
 	void CreateGraphicsPipeline();
+	void CreateGraphicsPipelineState(PipelineType type, const wchar_t* pixelShaderPath);
 
 	DirectXCommon* dxCommon_ = nullptr;
 	SrvManager* srvManager_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineStates_[static_cast<int>(PipelineType::Count)];
+	bool isGrayscale_ = false;
+	bool isSepia_ = false;
 };

@@ -12,6 +12,8 @@ using namespace MyMath;
 void TitleScene::Initialize()
 {
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+	PostEffect::GetInstance()->SetGrayscale(false);
+	PostEffect::GetInstance()->SetSepia(false);
 
 	cameraManager = std::make_unique<CameraManager>();
 	mainCamera = std::make_unique<Camera>();

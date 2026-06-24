@@ -64,6 +64,7 @@ void DirectXCommon::ResizeIfNeeded()
 		swapChainResource.Reset();
 	}
 	renderTextureResource_.Reset();
+	postEffectTextureResource_.Reset();
 	depthStencilResource.Reset();
 	resource.Reset();
 
@@ -86,6 +87,7 @@ void DirectXCommon::ResizeIfNeeded()
 	scissorRect();
 	CreateRenderTextureSRV(SrvManager::GetInstance());
 	isRenderTextureShaderResource_ = false;
+	isPostEffectTextureShaderResource_ = false;
 }
 
 void DirectXCommon::InitializeDevice()//デバイスの初期化
@@ -293,7 +295,7 @@ void DirectXCommon::DescriptorHeap()
 	//ディスクリプタヒープの生成
 	//RTV用のヒープでディスクリプタの数は2。RTVはShader内で触るものではないので、ShaderVisibleはfalse
 	// SwapChainの2枚にRenderTextureの1枚を加え、RTVを3個確保する
-	rtvDescriptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 3, false);
+	rtvDescriptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 4, false);
 	//SRV用のヒープでディスクリプタのの数は128。SRVはShader内で触るものなので、ShaderVisibleはtrue
 	srvDescriptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSRVCount, true);
 	//DSV用のヒープでディスクリプタの数は1。DSVはShader内で触れるものではないので、ShaderVisibleはfalse
@@ -343,6 +345,20 @@ void DirectXCommon::RenderTargetView()
 		renderTextureResource_.Get(),
 		&rtvDesc_,
 		renderTextureRtvHandle_);
+
+	handle.ptr += increment;
+
+	postEffectTextureResource_ = CreateRenderTextureResource(
+		width,
+		height,
+		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+		renderTextureClearColor_);
+
+	postEffectTextureRtvHandle_ = handle;
+	device_->CreateRenderTargetView(
+		postEffectTextureResource_.Get(),
+		&rtvDesc_,
+		postEffectTextureRtvHandle_);
 }
 
 void DirectXCommon::DepthStencilView()
@@ -454,18 +470,76 @@ void DirectXCommon::PreDraw()
 
 }
 
+void DirectXCommon::PreDrawForPostEffectTexture()
+{
+	if (!isRenderTextureShaderResource_)
+	{
+		D3D12_RESOURCE_BARRIER renderTextureBarrier{};
+		renderTextureBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		renderTextureBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		renderTextureBarrier.Transition.pResource = renderTextureResource_.Get();
+		renderTextureBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		renderTextureBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		renderTextureBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		commandList_->ResourceBarrier(1, &renderTextureBarrier);
+		isRenderTextureShaderResource_ = true;
+	}
+
+	if (isPostEffectTextureShaderResource_)
+	{
+		D3D12_RESOURCE_BARRIER postEffectTextureBarrier{};
+		postEffectTextureBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		postEffectTextureBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		postEffectTextureBarrier.Transition.pResource = postEffectTextureResource_.Get();
+		postEffectTextureBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		postEffectTextureBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		postEffectTextureBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		commandList_->ResourceBarrier(1, &postEffectTextureBarrier);
+		isPostEffectTextureShaderResource_ = false;
+	}
+
+	commandList_->OMSetRenderTargets(1, &postEffectTextureRtvHandle_, false, nullptr);
+
+	const float clearColor[] = {
+		renderTextureClearColor_.x,
+		renderTextureClearColor_.y,
+		renderTextureClearColor_.z,
+		renderTextureClearColor_.w
+	};
+	commandList_->ClearRenderTargetView(postEffectTextureRtvHandle_, clearColor, 0, nullptr);
+
+	commandList_->RSSetViewports(1, &viewport_);
+	commandList_->RSSetScissorRects(1, &scissorRect_);
+}
+
 void DirectXCommon::PreDrawForSwapChain()
 {
 	// Sceneの描画結果を後でSRVから読めるよう、RenderTextureを書き込み状態から読み取り状態へ変更する
-	D3D12_RESOURCE_BARRIER renderTextureBarrier{};
-	renderTextureBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	renderTextureBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	renderTextureBarrier.Transition.pResource = renderTextureResource_.Get();
-	renderTextureBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-	renderTextureBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-	renderTextureBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	commandList_->ResourceBarrier(1, &renderTextureBarrier);
-	isRenderTextureShaderResource_ = true;
+	if (!isRenderTextureShaderResource_)
+	{
+		D3D12_RESOURCE_BARRIER renderTextureBarrier{};
+		renderTextureBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		renderTextureBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		renderTextureBarrier.Transition.pResource = renderTextureResource_.Get();
+		renderTextureBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		renderTextureBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		renderTextureBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		commandList_->ResourceBarrier(1, &renderTextureBarrier);
+		isRenderTextureShaderResource_ = true;
+	}
+
+	if (!isPostEffectTextureShaderResource_)
+	{
+		D3D12_RESOURCE_BARRIER postEffectTextureBarrier{};
+		postEffectTextureBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		postEffectTextureBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		postEffectTextureBarrier.Transition.pResource = postEffectTextureResource_.Get();
+		postEffectTextureBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		postEffectTextureBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		postEffectTextureBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		commandList_->ResourceBarrier(1, &postEffectTextureBarrier);
+		isPostEffectTextureShaderResource_ = true;
+	}
 
 	// ImGuiを表示するため、SwapChainを描画可能な状態へ変更する
 	const UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
@@ -770,16 +844,27 @@ void DirectXCommon::CreateRenderTextureSRV(SrvManager* srvManager)
 {
 	assert(srvManager);
 	assert(renderTextureResource_);
+	assert(postEffectTextureResource_);
 
 	// RenderTextureの描画結果をShaderから読めるよう、SRVの場所を1個確保する
 	if (renderTextureSrvIndex_ == UINT32_MAX) {
 		renderTextureSrvIndex_ = srvManager->Allocate();
+	}
+	if (postEffectTextureSrvIndex_ == UINT32_MAX) {
+		postEffectTextureSrvIndex_ = srvManager->Allocate();
 	}
 
 	// Resourceと同じFormat、ミップレベル1でTexture2D用SRVを生成する
 	srvManager->CreateSRVforTexture2D(
 		renderTextureSrvIndex_,
 		renderTextureResource_.Get(),
+		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+		1,
+		true);
+
+	srvManager->CreateSRVforTexture2D(
+		postEffectTextureSrvIndex_,
+		postEffectTextureResource_.Get(),
 		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
 		1,
 		true);

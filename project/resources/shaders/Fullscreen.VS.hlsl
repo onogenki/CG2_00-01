@@ -1,4 +1,4 @@
-#include "CopyImage.hlsli"
+#include "Fullscreen.hlsli"
 
 // 頂点バッファを使わず、SV_VertexIDから全画面三角形を作る
 static const uint32_t kNumVertex = 3;

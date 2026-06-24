@@ -7,6 +7,7 @@
 #include "CameraManager.h"
 #include "ModelManager.h"
 #include "SceneManager.h"
+#include "PostEffect.h"
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui_internal.h"
 #endif
@@ -246,8 +247,10 @@ void ImGuiManager::GameViewWindow()
 				contentStart.y + (available.y - gameViewImageSize_.y) * 0.5f);
 			gameViewDrawList_ = ImGui::GetWindowDrawList();
 
-			const D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = srvManager_->GetGPUDescriptorHandle(
-				dxCommon_->GetRenderTextureSrvIndex());
+			const uint32_t textureSrvIndex = PostEffect::GetInstance()->IsEnabled()
+				? dxCommon_->GetPostEffectTextureSrvIndex()
+				: dxCommon_->GetRenderTextureSrvIndex();
+			const D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = srvManager_->GetGPUDescriptorHandle(textureSrvIndex);
 			ImGui::SetCursorScreenPos(gameViewImageMin_);
 			ImGui::Image(ImTextureRef(static_cast<ImTextureID>(textureHandle.ptr)), gameViewImageSize_);
 		}
@@ -293,6 +296,21 @@ void ImGuiManager::SceneWindow(const char* sceneName)
 	if (sceneManager->HasPendingScene()) {
 		ImGui::TextDisabled("Loading: %s", sceneManager->GetPendingSceneName().c_str());
 	}
+
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Text("Post Effect");
+	bool isGrayscale = PostEffect::GetInstance()->IsGrayscale();
+	bool isSepia = PostEffect::GetInstance()->IsSepia();
+	if (ImGui::Checkbox("Grayscale", &isGrayscale) && isGrayscale) {
+		isSepia = false;
+	}
+	if (ImGui::Checkbox("Sepia", &isSepia) && isSepia) {
+		isGrayscale = false;
+	}
+	PostEffect::GetInstance()->SetGrayscale(isGrayscale);
+	PostEffect::GetInstance()->SetSepia(isSepia);
+
 	ImGui::Spacing();
 	ImGui::TextDisabled("Drag any debug window by its tab to rearrange it.");
 	ImGui::TextDisabled("Use Layout > Reset to Default to restore the layout.");
@@ -581,6 +599,26 @@ void ImGuiManager::CameraWindow(CameraManager* cameraManager)
 	}
 
 	ImGui::End();
+#endif
+}
+
+void ImGuiManager::PostEffectWindow(bool& isGrayscale, bool& isSepia)
+{
+#ifdef USE_IMGUI
+	if (!showPostEffectWindow_) {
+		return;
+	}
+	ImGui::Begin("Post Effect", &showPostEffectWindow_);
+	if (ImGui::Checkbox("Grayscale", &isGrayscale) && isGrayscale) {
+		isSepia = false;
+	}
+	if (ImGui::Checkbox("Sepia", &isSepia) && isSepia) {
+		isGrayscale = false;
+	}
+	ImGui::End();
+#else
+	(void)isGrayscale;
+	(void)isSepia;
 #endif
 }
 
