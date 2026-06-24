@@ -71,16 +71,16 @@ void GamePlayScene::Initialize()
 	hissatu_ = Model::LoadAnimationFile("./resources", "playerCloudAnimation.gltf");//持ってきたもの
 
 	// skyBoxの背景
-	TextureManager::GetInstance()->LoadTexture("Resources/rostock_laage_airport_4k.dds");
+	TextureManager::GetInstance()->LoadTexture("Resources/qwantani_moon_noon_puresky_1k.dds");
 
 	// skyBoxによってモデルの反射が映り込む
-	object3dCommon->SetEnvironmentTexturePath("Resources/rostock_laage_airport_4k.dds");
+	object3dCommon->SetEnvironmentTexturePath("Resources/qwantani_moon_noon_puresky_1k.dds");
 
 	//Skybox
 	skyBox_ = std::make_unique<SkyBox>();
 	skyBox_->Initialize(dxCommon, cameraManager->GetActiveCamera());
 	// 添付されていたDDSテクスチャのパスを指定する
-	skyBox_->SetTexture("Resources/rostock_laage_airport_4k.dds");
+	skyBox_->SetTexture("Resources/qwantani_moon_noon_puresky_1k.dds");
 
 	//音声読み込み
 	Audio::GetInstance()->LoadFile("Resources/Alarm01.wav");

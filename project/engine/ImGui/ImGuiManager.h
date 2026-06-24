@@ -63,6 +63,7 @@ private:
 
 #ifdef USE_IMGUI
 	void BeginDockSpace(const char* sceneName);
+	void ResetLayoutToDefault();
 	void BuildDefaultDockLayout(ImGuiID dockspaceId);
 	void GameViewWindow();
 	void SceneWindow(const char* sceneName);
@@ -70,6 +71,10 @@ private:
 	bool showGameView_ = true;
 	bool showSceneWindow_ = true;
 	bool showFpsWindow_ = true;
+	bool showSpriteWindow_ = true;
+	bool showModelWindow_ = true;
+	bool showParticleWindow_ = true;
+	bool showCameraWindow_ = true;
 	bool showDemoWindow_ = false;
 	bool resetDockLayout_ = false;
 	std::string layoutSceneName_;
