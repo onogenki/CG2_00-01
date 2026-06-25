@@ -24,6 +24,7 @@ public:
 	void Update();
 	void Finalize();
 	bool ProcessMessage();
+	void RequestClose();
 
 	void SetWindowMode(WindowMode mode);
 

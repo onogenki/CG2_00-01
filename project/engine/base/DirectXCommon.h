@@ -96,11 +96,12 @@ public:
 	ID3D12GraphicsCommandList* GetCommandList()const { return commandList_.Get(); }
 
 	ID3D12CommandQueue* GetCommandQueue() const { return commandQueue.Get(); }
-	ID3D12CommandAllocator* GetCommandAllocator() const { return commandAllocator.Get(); }
+	ID3D12CommandAllocator* GetCommandAllocator() const { return commandAllocators_[frameIndex_].Get(); }
 	uint32_t GetRenderTextureSrvIndex() const { return renderTextureSrvIndex_; }
 	uint32_t GetPostEffectTextureSrvIndex() const { return postEffectTextureSrvIndex_; }
 	uint32_t GetClientWidth() const { return width; }
 	uint32_t GetClientHeight() const { return height; }
+	float GetDeltaTime() const { return deltaTime_; }
 
 	//最大SRV数(最大テクスチャ枚数)
 	static const uint32_t kMaxSRVCount;
@@ -124,7 +125,7 @@ private:
 	Microsoft::WRL::ComPtr < ID3D12Debug1> debugController;
 	Microsoft::WRL::ComPtr < IDXGIAdapter4> useAdapter;
 	Microsoft::WRL::ComPtr < ID3D12InfoQueue> infoQueue;
-	Microsoft::WRL::ComPtr < ID3D12CommandAllocator> commandAllocator;
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocators_[2];
 	Microsoft::WRL::ComPtr < ID3D12CommandQueue> commandQueue;
 	Microsoft::WRL::ComPtr < ID3D12Resource> resource;
 	Microsoft::WRL::ComPtr < ID3D12Fence> fence;
@@ -137,6 +138,8 @@ private:
 
 	//フェンス値
 	UINT64 fenceVal = 0;
+	UINT64 frameFenceValues_[2] = {};
+	UINT frameIndex_ = 0;
 
 	//スワップチェーンを生成する
 	Microsoft::WRL::ComPtr < IDXGISwapChain4> swapChain;
@@ -201,6 +204,7 @@ private:
 	std::chrono::steady_clock::time_point reference_;
 	std::chrono::microseconds kMinTime_;
 	std::chrono::microseconds kMinCheckTime_;
+	float deltaTime_ = 1.0f / 60.0f;
 
 	uint32_t width = WinApp::kClientWidth; // 幅・高さをメンバに
 	uint32_t height = WinApp::kClientHeight;

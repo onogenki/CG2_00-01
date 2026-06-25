@@ -1,4 +1,5 @@
 #include "Object3d.h"
+#include "DirectXCommon.h"
 #include "Object3dCommon.h"
 #include "ModelManager.h"
 #include "TextureManager.h"
@@ -33,7 +34,7 @@ void Object3d::Update()
 
 	if (model_ && isAnimating_)
 	{// 実時間を 1/60 秒ずつ進める
-		animationTime_ += 1.0f / 60.0f;
+		animationTime_ += DirectXCommon::GetInstance()->GetDeltaTime();
 
 		// ループOFFなら、自動的にアニメーションの1本分の長さ（duration)にする
 		if (!isLoop_ && maxPlayTime_ == 0.0f) {
@@ -142,6 +143,9 @@ void Object3d::PlayAnimation(const Model::Animation& animation)
 	currentAnimation_ = animation;
 	animationTime_ = 0.0f;
 	isAnimating_ = true;
+	if (model_ && isSkeletal_) {
+		model_->BuildAnimationMapping(skeleton_, currentAnimation_);
+	}
 }
 
 void Object3d::CreateTransformationMatrixData()

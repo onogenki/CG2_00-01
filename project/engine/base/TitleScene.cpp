@@ -117,12 +117,14 @@ void TitleScene::Draw()
 		PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), true);
 	}
 	DirectXCommon::GetInstance()->PreDrawForSwapChain(PostEffect::GetInstance()->IsEnabled());
+#ifndef USE_IMGUI
 	// RenderTextureのSceneを全画面三角形でSwapChainへコピーする
 	if (PostEffect::GetInstance()->IsEnabled()) {
 		PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetPostEffectTextureSrvIndex(), false);
 	} else {
 		PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), false);
 	}
+#endif
 	ImGuiManager::GetInstance()->Draw(DirectXCommon::GetInstance());
 
 	DirectXCommon::GetInstance()->PostDraw();

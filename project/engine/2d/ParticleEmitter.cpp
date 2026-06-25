@@ -29,5 +29,5 @@ void ParticleEmitter::Update()
 void ParticleEmitter::Emit()
 {
     // 設定値に従ってParticleManagerのEmitを呼び出す
-    ParticleManager::GetInstance()->Emit(name_, transform_.translate, count_, receivesWind_);
+    ParticleManager::GetInstance()->Emit(name_, transform_.translate, count_, receivesWind_, transform_.scale.x);
 }

@@ -23,8 +23,6 @@ void PostEffect::Draw(uint32_t sourceSrvIndex, bool useEffect)
 	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
 
 	// RenderTextureのSRVが入ったDescriptorHeapを使用する
-	srvManager_->PreDraw();
-
 	// CopyImage用の描画設定をCommandListへ積む
 	commandList->SetGraphicsRootSignature(rootSignature_.Get());
 	const PipelineType pipelineType = !useEffect

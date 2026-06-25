@@ -22,9 +22,9 @@ PixelShaderOutput main(VertexShaderOutput input)
     PixelShaderOutput output;
     
     // UVトランスフォームを適用
-    float4 transformedUV = mul(float4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
+    float32_t4 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
     // テクスチャの色を取得
-    float4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
+    float32_t4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
     
     //マテリアルカラー × テクスチャカラー を出力（ライティングなし）
     output.color = gMaterial.color * textureColor;

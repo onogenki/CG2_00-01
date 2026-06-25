@@ -4,6 +4,7 @@
 #include"StringUtility.h"
 #include "SrvManager.h"
 #include "externals/DirectXTex/d3dx12.h"
+#include<algorithm>
 #include<cassert>
 #include <thread>
 #include<vector>
@@ -94,7 +95,7 @@ void DirectXCommon::InitializeDevice()//デバイスの初期化
 {
 	HRESULT hr;
 
-#ifdef _DEBUG
+#if defined(_DEBUG) && defined(ENABLE_D3D12_DEBUG_LAYER)
 
 	ComPtr < ID3D12Debug1> debugController = nullptr;
 	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
@@ -185,24 +186,13 @@ void DirectXCommon::InitializeDevice()//デバイスの初期化
 void DirectXCommon::commandList()
 {
 	//コマンドアロケータ
-	hr = device_->CreateCommandAllocator(
-		D3D12_COMMAND_LIST_TYPE_DIRECT, 
-		IID_PPV_ARGS(commandAllocator.GetAddressOf())
-	);
-	assert(SUCCEEDED(hr));
-
-	hr = device_->CreateCommandList(
-		0,
-		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		commandAllocator.Get(),
-		nullptr,
-		IID_PPV_ARGS(&commandList_)
-	);
-
-	assert(SUCCEEDED(hr));
-
-	hr = GetCommandList()->Close();
-	assert(SUCCEEDED(hr));
+	for (auto& commandAllocator : commandAllocators_) {
+		hr = device_->CreateCommandAllocator(
+			D3D12_COMMAND_LIST_TYPE_DIRECT,
+			IID_PPV_ARGS(commandAllocator.GetAddressOf())
+		);
+		assert(SUCCEEDED(hr));
+	}
 
 	D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
 	hr = device_->CreateCommandQueue(&commandQueueDesc,
@@ -214,16 +204,13 @@ void DirectXCommon::commandList()
 	//描画用のDescriptorHeapの設定
 
 	//コマンドリストの実行
-	ID3D12CommandList* commandLists[] = { GetCommandList() };
-	commandQueue->ExecuteCommandLists(1, commandLists);
-
 }
 
 void DirectXCommon::SwapChain()
 {
 	//スワップチェーン
 	//コマンドを生成する
-	hr = device_->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator.Get(), nullptr,
+	hr = device_->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocators_[frameIndex_].Get(), nullptr,
 		IID_PPV_ARGS(&commandList_));
 	assert(SUCCEEDED(hr));
 	swapChainDesc_.Width = WinApp::kClientWidth;//画面の幅。ウィンドウのクライアント領域を同じものにしておく
@@ -556,7 +543,7 @@ void DirectXCommon::PreDrawForSwapChain(bool usePostEffectTexture)
 	commandList_->OMSetRenderTargets(1, &rtvHandle_[backBufferIndex], false, nullptr);
 
 	// ImGuiの背景となるSwapChainを青色でクリアする
-	const float clearColor[] = { 0.1f, 0.25f, 0.5f, 1.0f };
+	const float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
 	commandList_->ClearRenderTargetView(rtvHandle_[backBufferIndex], clearColor, 0, nullptr);
 
 	commandList_->RSSetViewports(1, &viewport_);
@@ -594,23 +581,25 @@ void DirectXCommon::PostDraw()
 	swapChain->Present(1, 0);
 
 	//Fenceの値を更新
-	fenceVal++;
+	const UINT64 signalValue = ++fenceVal;
 	//GPUがここまでたどり着いたときに、Fenceの値を指定した値に代入するようにSignalを送る
-	commandQueue->Signal(fence.Get(), ++fenceVal);
+	commandQueue->Signal(fence.Get(), signalValue);
+	frameFenceValues_[frameIndex_] = signalValue;
 	//Fenceの値が指定したSignal値にたどり着いているか確認する
 	//GetCompletedValueの初期値はFence作成時に渡した初期値
-	if (fence->GetCompletedValue() < fenceVal)
+	frameIndex_ = swapChain->GetCurrentBackBufferIndex();
+	if (frameFenceValues_[frameIndex_] != 0 && fence->GetCompletedValue() < frameFenceValues_[frameIndex_])
 	{
 		//指定したSignalにたどり着いていないので、たどり着くまで待つようにイベントを設定する
-		fence->SetEventOnCompletion(fenceVal, fenceEvent_);
+		fence->SetEventOnCompletion(frameFenceValues_[frameIndex_], fenceEvent_);
 		//イベント待つ
 		WaitForSingleObject(fenceEvent_, INFINITE);
 	}
 
 	//次のフレーム用のコマンドリストを準備
-	hr = commandAllocator->Reset();
+	hr = commandAllocators_[frameIndex_]->Reset();
 	assert(SUCCEEDED(hr));
-	hr = GetCommandList()->Reset(commandAllocator.Get(), nullptr);
+	hr = GetCommandList()->Reset(commandAllocators_[frameIndex_].Get(), nullptr);
 	assert(SUCCEEDED(hr));
 
 	//FPS固定
@@ -642,6 +631,24 @@ void DirectXCommon::InitializeFixFPS()
 
 void DirectXCommon::UpdateFixFPS()
 {
+	const std::chrono::steady_clock::time_point target = reference_ + kMinTime_;
+	std::chrono::steady_clock::time_point currentTime = std::chrono::steady_clock::now();
+	if (currentTime < target) {
+		// Sleepの粒度で大きく遅れないよう、最後の1msだけ短く待つ。
+		const std::chrono::steady_clock::time_point sleepUntil = target - std::chrono::milliseconds(1);
+		if (currentTime < sleepUntil) {
+			std::this_thread::sleep_until(sleepUntil);
+		}
+		while (std::chrono::steady_clock::now() < target) {
+			std::this_thread::yield();
+		}
+	}
+	const std::chrono::steady_clock::time_point frameEndTime = std::chrono::steady_clock::now();
+	const std::chrono::duration<float> elapsedTime = frameEndTime - reference_;
+	deltaTime_ = std::clamp(elapsedTime.count(), 0.0f, 0.1f);
+	reference_ = frameEndTime;
+	return;
+
 	//現在時間を取得する
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 	//前回記録からの経過時間を取得する
@@ -671,6 +678,9 @@ void DirectXCommon::WaitForGPU() {
 	if (fence->GetCompletedValue() < fenceVal) {
 		fence->SetEventOnCompletion(fenceVal, fenceEvent_);
 		WaitForSingleObject(fenceEvent_, INFINITE);
+	}
+	for (UINT64& frameFenceValue : frameFenceValues_) {
+		frameFenceValue = fenceVal;
 	}
 }
 

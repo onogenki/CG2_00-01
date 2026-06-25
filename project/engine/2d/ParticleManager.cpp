@@ -1,6 +1,7 @@
 #include "ParticleManager.h"
 #include "TextureManager.h"
 #include "CameraManager.h"
+#include <algorithm>
 
 using namespace MyMath;
 
@@ -245,9 +246,19 @@ void ParticleManager::CreateRingParticleGroup(const std::string name, const std:
     particleGroups_[name] = newGroup;
 }
 
-void ParticleManager::CreateCylinderParticleGroup(const std::string name, const std::string textureFilePath)
+void ParticleManager::CreateCylinderParticleGroup(
+    const std::string name,
+    const std::string textureFilePath,
+    uint32_t divide,
+    float topRadius,
+    float bottomRadius,
+    float height)
 {
     assert(particleGroups_.find(name) == particleGroups_.end() && "Particle group already exists");
+    assert(divide >= 3);
+    assert(topRadius > 0.0f);
+    assert(bottomRadius > 0.0f);
+    assert(height > 0.0f);
 
     ParticleGroup newGroup;
     newGroup.textureFilePath = textureFilePath;
@@ -264,13 +275,10 @@ void ParticleManager::CreateCylinderParticleGroup(const std::string name, const 
         sizeof(ParticleForGPU)
     );
 
-    const uint32_t kCylinderDivide = 32;
-    const float kTopRadius = 1.0f;
-    const float kBottomRadius = 1.0f;
-    const float kHeight = 3.0f;
-    const float radianPerDivide = 2.0f * std::numbers::pi_v<float> / float(kCylinderDivide);
+    const uint32_t verticesPerDivide = 6;
+    const float radianPerDivide = 2.0f * std::numbers::pi_v<float> / float(divide);
 
-    newGroup.vertexCount = kCylinderDivide * 6;
+    newGroup.vertexCount = divide * verticesPerDivide;
     newGroup.vertexResource = dxCommon_->CreateBufferResource(sizeof(VertexData) * newGroup.vertexCount);
     newGroup.vertexBufferView.BufferLocation = newGroup.vertexResource->GetGPUVirtualAddress();
     newGroup.vertexBufferView.SizeInBytes = sizeof(VertexData) * newGroup.vertexCount;
@@ -279,24 +287,24 @@ void ParticleManager::CreateCylinderParticleGroup(const std::string name, const 
     VertexData* vertexData = nullptr;
     newGroup.vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 
-    for (uint32_t index = 0; index < kCylinderDivide; ++index) {
+    for (uint32_t index = 0; index < divide; ++index) {
         float sin = std::sin(index * radianPerDivide);
         float cos = std::cos(index * radianPerDivide);
         float sinNext = std::sin((index + 1) * radianPerDivide);
         float cosNext = std::cos((index + 1) * radianPerDivide);
-        float u = float(index) / float(kCylinderDivide);
-        float uNext = float(index + 1) / float(kCylinderDivide);
+        float u = float(index) / float(divide);
+        float uNext = float(index + 1) / float(divide);
 
         Vector3 normal0 = { -sin, 0.0f, cos };
         Vector3 normal1 = { -sinNext, 0.0f, cosNext };
 
-        uint32_t vertexIndex = index * 6;
-        vertexData[vertexIndex + 0] = { { -sin * kTopRadius, kHeight, cos * kTopRadius, 1.0f }, { u, 1.0f }, normal0 };
-        vertexData[vertexIndex + 1] = { { -sinNext * kTopRadius, kHeight, cosNext * kTopRadius, 1.0f }, { uNext, 1.0f }, normal1 };
-        vertexData[vertexIndex + 2] = { { -sin * kBottomRadius, 0.0f, cos * kBottomRadius, 1.0f }, { u, 0.0f }, normal0 };
-        vertexData[vertexIndex + 3] = { { -sinNext * kTopRadius, kHeight, cosNext * kTopRadius, 1.0f }, { uNext, 1.0f }, normal1 };
-        vertexData[vertexIndex + 4] = { { -sinNext * kBottomRadius, 0.0f, cosNext * kBottomRadius, 1.0f }, { uNext, 0.0f }, normal1 };
-        vertexData[vertexIndex + 5] = { { -sin * kBottomRadius, 0.0f, cos * kBottomRadius, 1.0f }, { u, 0.0f }, normal0 };
+        uint32_t vertexIndex = index * verticesPerDivide;
+        vertexData[vertexIndex + 0] = { { -sin * topRadius, height, cos * topRadius, 1.0f }, { u, 1.0f }, normal0 };
+        vertexData[vertexIndex + 1] = { { -sinNext * topRadius, height, cosNext * topRadius, 1.0f }, { uNext, 1.0f }, normal1 };
+        vertexData[vertexIndex + 2] = { { -sin * bottomRadius, 0.0f, cos * bottomRadius, 1.0f }, { u, 0.0f }, normal0 };
+        vertexData[vertexIndex + 3] = { { -sinNext * topRadius, height, cosNext * topRadius, 1.0f }, { uNext, 1.0f }, normal1 };
+        vertexData[vertexIndex + 4] = { { -sinNext * bottomRadius, 0.0f, cosNext * bottomRadius, 1.0f }, { uNext, 0.0f }, normal1 };
+        vertexData[vertexIndex + 5] = { { -sin * bottomRadius, 0.0f, cos * bottomRadius, 1.0f }, { u, 0.0f }, normal0 };
     }
 
     particleGroups_[name] = newGroup;
@@ -323,6 +331,20 @@ void ParticleManager::ClearParticles(const std::string name)
     it->second.instanceCount = 0;
 }
 
+bool ParticleManager::GetBillboardEnabled(const std::string& name) const
+{
+    auto it = particleGroups_.find(name);
+    assert(it != particleGroups_.end() && "Particle group not found");
+    return it->second.useBillboard;
+}
+
+void ParticleManager::SetBillboardEnabled(const std::string& name, bool isEnabled)
+{
+    auto it = particleGroups_.find(name);
+    assert(it != particleGroups_.end() && "Particle group not found");
+    it->second.useBillboard = isEnabled;
+}
+
 bool ParticleManager::IsCollision(const AABB aabb, const Vector3& point)
 {
     return (point.x >= aabb.min.x && point.x <= aabb.max.x) &&
@@ -331,7 +353,7 @@ bool ParticleManager::IsCollision(const AABB aabb, const Vector3& point)
 }
 
 // パーティクルの発生
-void ParticleManager::Emit(const std::string name, const Vector3& position, uint32_t count,bool receivesWind) {
+void ParticleManager::Emit(const std::string name, const Vector3& position, uint32_t count,bool receivesWind, float scaleMultiplier) {
     // 登録済みのパーティクルグループ名かチェックしてassert
     assert(particleGroups_.find(name) != particleGroups_.end() && "指定されたグループ名が見つかりません");
 
@@ -347,7 +369,7 @@ void ParticleManager::Emit(const std::string name, const Vector3& position, uint
 
     for (uint32_t i = 0; i < count; ++i) {
         Particle newParticle;
-        newParticle.transform.scale = { 1.0f, 1.0f, 1.0f };
+        newParticle.transform.scale = { scaleMultiplier, scaleMultiplier, scaleMultiplier };
         newParticle.transform.rotate = { 0.0f, 0.0f, 0.0f };
         newParticle.transform.translate = position;
 
@@ -369,7 +391,7 @@ void ParticleManager::Emit(const std::string name, const Vector3& position, uint
 }
 
 //ヒット(斬撃みたいな細長い円)エフェクト発生
-void ParticleManager::EmitHitEffect(const std::string name, uint32_t count, const Vector3& translate) {
+void ParticleManager::EmitHitEffect(const std::string name, uint32_t count, const Vector3& translate, float scaleMultiplier) {
     assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
 
     ParticleGroup& group = particleGroups_[name];
@@ -380,7 +402,7 @@ void ParticleManager::EmitHitEffect(const std::string name, uint32_t count, cons
 
     for (uint32_t i = 0; i < count; ++i) {
         Particle newParticle;
-        newParticle.transform.scale = { 0.05f, distScale(randomEngine_), 1.0f };
+        newParticle.transform.scale = { 0.05f * scaleMultiplier, distScale(randomEngine_) * scaleMultiplier, 1.0f };
         newParticle.transform.rotate = { 0.0f, 0.0f, distRotate(randomEngine_) };
         newParticle.transform.translate = translate;
         newParticle.velocity = { 0.0f, 0.0f, 0.0f };
@@ -394,7 +416,7 @@ void ParticleManager::EmitHitEffect(const std::string name, uint32_t count, cons
 }
 
 //インパクト(円)エフェクト発生
-void ParticleManager::EmitRingEffect(const std::string name, uint32_t count, const Vector3& translate)
+void ParticleManager::EmitRingEffect(const std::string name, uint32_t count, const Vector3& translate, float scaleMultiplier)
 {
     assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
 
@@ -406,7 +428,7 @@ void ParticleManager::EmitRingEffect(const std::string name, uint32_t count, con
     for (uint32_t i = 0; i < count; ++i) {
         Particle newParticle;
         float scale = distScale(randomEngine_);
-        newParticle.transform.scale = { scale, scale, 1.0f };
+        newParticle.transform.scale = { scale * scaleMultiplier, scale * scaleMultiplier, 1.0f };
         newParticle.transform.rotate = { distRotate(randomEngine_), distRotate(randomEngine_), distRotate(randomEngine_) };
         newParticle.transform.translate = translate;
         newParticle.velocity = { 0.0f, 0.0f, 0.0f };
@@ -420,7 +442,7 @@ void ParticleManager::EmitRingEffect(const std::string name, uint32_t count, con
 }
 
 //ポータル(円柱)エフェクト発生
-void ParticleManager::EmitCylinderEffect(const std::string name, uint32_t count, const Vector3& translate)
+void ParticleManager::EmitCylinderEffect(const std::string name, uint32_t count, const Vector3& translate, float scaleMultiplier)
 {
     assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
 
@@ -430,7 +452,7 @@ void ParticleManager::EmitCylinderEffect(const std::string name, uint32_t count,
 
     for (uint32_t i = 0; i < count; ++i) {
         Particle newParticle;
-        newParticle.transform.scale = { 0.75f, distHeight(randomEngine_), 0.75f };
+        newParticle.transform.scale = { 0.75f * scaleMultiplier, distHeight(randomEngine_) * scaleMultiplier, 0.75f * scaleMultiplier };
         newParticle.transform.rotate = { 0.0f, 0.0f, 0.0f };
         newParticle.transform.translate = translate;
         newParticle.velocity = { 0.0f, 0.0f, 0.0f };
@@ -445,6 +467,199 @@ void ParticleManager::EmitCylinderEffect(const std::string name, uint32_t count,
     }
 }
 
+void ParticleManager::EmitPillarSparkle(const std::string name, uint32_t count, const Vector3& position, float scaleMultiplier)
+{
+    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
+
+    ParticleGroup& group = particleGroups_[name];
+    std::uniform_real_distribution<float> rightOffsetDistribution(-0.45f, 0.45f);
+    std::uniform_real_distribution<float> upOffsetDistribution(-0.1f, 1.25f);
+    std::uniform_real_distribution<float> sideSpeedDistribution(-0.18f, 0.18f);
+    std::uniform_real_distribution<float> upSpeedDistribution(0.4f, 1.1f);
+    std::uniform_real_distribution<float> scaleDistribution(0.025f, 0.07f);
+    std::uniform_real_distribution<float> lifeTimeDistribution(0.35f, 0.9f);
+    std::uniform_real_distribution<float> rotateDistribution(-std::numbers::pi_v<float>, std::numbers::pi_v<float>);
+
+    Vector3 cameraRight = { 1.0f, 0.0f, 0.0f };
+    Vector3 cameraUp = { 0.0f, 1.0f, 0.0f };
+    if (cameraManager_ && cameraManager_->GetActiveCamera()) {
+        const Matrix4x4& cameraWorld = cameraManager_->GetActiveCamera()->GetWorldMatrix();
+        cameraRight = Normalize({ cameraWorld.m[0][0], cameraWorld.m[0][1], cameraWorld.m[0][2] });
+        cameraUp = Normalize({ cameraWorld.m[1][0], cameraWorld.m[1][1], cameraWorld.m[1][2] });
+    }
+
+    for (uint32_t index = 0; index < count; ++index) {
+        Particle newParticle{};
+        const float offsetRight = rightOffsetDistribution(randomEngine_);
+        const float offsetUp = upOffsetDistribution(randomEngine_);
+        const float sideSpeed = sideSpeedDistribution(randomEngine_);
+        const float upSpeed = upSpeedDistribution(randomEngine_);
+        const float startScale = scaleDistribution(randomEngine_) * scaleMultiplier;
+
+        newParticle.transform.translate = {
+            position.x + cameraRight.x * offsetRight + cameraUp.x * offsetUp,
+            position.y + cameraRight.y * offsetRight + cameraUp.y * offsetUp,
+            position.z + cameraRight.z * offsetRight + cameraUp.z * offsetUp
+        };
+        newParticle.velocity = {
+            cameraRight.x * sideSpeed + cameraUp.x * upSpeed,
+            cameraRight.y * sideSpeed + cameraUp.y * upSpeed,
+            cameraRight.z * sideSpeed + cameraUp.z * upSpeed
+        };
+        newParticle.transform.rotate.z = rotateDistribution(randomEngine_);
+
+        newParticle.useColorAndScaleOverLife = true;
+        newParticle.startScale = { startScale, startScale, startScale };
+        newParticle.endScale = { startScale * 0.2f, startScale * 0.2f, startScale * 0.2f };
+        newParticle.startColor = { 1.0f, 1.0f, 0.92f, 1.0f };
+        newParticle.endColor = { 1.0f, 0.62f, 0.08f, 0.0f };
+        newParticle.transform.scale = newParticle.startScale;
+        newParticle.color = newParticle.startColor;
+        newParticle.lifeTime = lifeTimeDistribution(randomEngine_);
+        newParticle.currentTime = 0.0f;
+        newParticle.receivesWind = false;
+        group.particles.push_back(newParticle);
+    }
+}
+
+void ParticleManager::EmitLightCore(const std::string name, uint32_t count, const Vector3& position, float scaleMultiplier)
+{
+    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
+
+    ParticleGroup& group = particleGroups_[name];
+    std::uniform_real_distribution<float> offsetDistribution(-0.08f, 0.08f);
+    Vector3 cameraRight = { 1.0f, 0.0f, 0.0f };
+    Vector3 cameraUp = { 0.0f, 1.0f, 0.0f };
+    if (cameraManager_ && cameraManager_->GetActiveCamera()) {
+        const Matrix4x4& cameraWorld = cameraManager_->GetActiveCamera()->GetWorldMatrix();
+        cameraRight = Normalize({ cameraWorld.m[0][0], cameraWorld.m[0][1], cameraWorld.m[0][2] });
+        cameraUp = Normalize({ cameraWorld.m[1][0], cameraWorld.m[1][1], cameraWorld.m[1][2] });
+    }
+
+    for (uint32_t index = 0; index < count; ++index) {
+        Particle newParticle{};
+        const float offsetRight = offsetDistribution(randomEngine_);
+        const float offsetUp = offsetDistribution(randomEngine_);
+        newParticle.transform.translate = {
+            position.x + cameraRight.x * offsetRight + cameraUp.x * offsetUp,
+            position.y + cameraRight.y * offsetRight + cameraUp.y * offsetUp,
+            position.z + cameraRight.z * offsetRight + cameraUp.z * offsetUp
+        };
+        newParticle.velocity = { 0.0f, 0.0f, 0.0f };
+        newParticle.useColorAndScaleOverLife = true;
+        newParticle.startScale = { 0.08f * scaleMultiplier, 0.08f * scaleMultiplier, 0.08f * scaleMultiplier };
+        newParticle.endScale = { 0.9f * scaleMultiplier, 0.9f * scaleMultiplier, 0.9f * scaleMultiplier };
+        newParticle.startColor = { 1.0f, 1.0f, 0.92f, 1.0f };
+        newParticle.endColor = { 1.0f, 0.65f, 0.12f, 0.0f };
+        newParticle.transform.scale = newParticle.startScale;
+        newParticle.color = newParticle.startColor;
+        newParticle.lifeTime = 1.2f;
+        newParticle.currentTime = 0.0f;
+        newParticle.receivesWind = false;
+        group.particles.push_back(newParticle);
+    }
+}
+
+void ParticleManager::EmitLightRain(const std::string name, uint32_t count, const Vector3& position, float scaleMultiplier)
+{
+    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
+
+    ParticleGroup& group = particleGroups_[name];
+    std::uniform_real_distribution<float> positionXDistribution(-1.7f, 1.7f);
+    std::uniform_real_distribution<float> positionYDistribution(1.8f, 3.5f);
+    std::uniform_real_distribution<float> speedDistribution(-4.0f, -2.5f);
+    std::uniform_real_distribution<float> lifeTimeDistribution(1.2f, 2.2f);
+
+    Vector3 cameraRight = { 1.0f, 0.0f, 0.0f };
+    Vector3 cameraUp = { 0.0f, 1.0f, 0.0f };
+    if (cameraManager_ && cameraManager_->GetActiveCamera()) {
+        const Matrix4x4& cameraWorld = cameraManager_->GetActiveCamera()->GetWorldMatrix();
+        cameraRight = Normalize({ cameraWorld.m[0][0], cameraWorld.m[0][1], cameraWorld.m[0][2] });
+        cameraUp = Normalize({ cameraWorld.m[1][0], cameraWorld.m[1][1], cameraWorld.m[1][2] });
+    }
+
+    for (uint32_t index = 0; index < count; ++index) {
+        Particle newParticle{};
+        const float offsetRight = positionXDistribution(randomEngine_);
+        const float offsetUp = positionYDistribution(randomEngine_);
+        const float fallSpeed = speedDistribution(randomEngine_);
+        newParticle.transform.translate = {
+            position.x + cameraRight.x * offsetRight + cameraUp.x * offsetUp,
+            position.y + cameraRight.y * offsetRight + cameraUp.y * offsetUp,
+            position.z + cameraRight.z * offsetRight + cameraUp.z * offsetUp
+        };
+        newParticle.velocity = {
+            cameraUp.x * fallSpeed,
+            cameraUp.y * fallSpeed,
+            cameraUp.z * fallSpeed
+        };
+        newParticle.useColorAndScaleOverLife = true;
+        newParticle.startScale = { 0.035f * scaleMultiplier, 0.45f * scaleMultiplier, 0.035f * scaleMultiplier };
+        newParticle.endScale = { 0.01f * scaleMultiplier, 0.15f * scaleMultiplier, 0.01f * scaleMultiplier };
+        newParticle.startColor = { 1.0f, 0.98f, 0.72f, 0.9f };
+        newParticle.endColor = { 1.0f, 0.55f, 0.05f, 0.0f };
+        newParticle.transform.scale = newParticle.startScale;
+        newParticle.color = newParticle.startColor;
+        newParticle.lifeTime = lifeTimeDistribution(randomEngine_);
+        newParticle.currentTime = 0.0f;
+        newParticle.receivesWind = false;
+        group.particles.push_back(newParticle);
+    }
+}
+
+void ParticleManager::EmitLightSpiral(const std::string name, uint32_t count, const Vector3& translate, float scaleMultiplier)
+{
+    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
+
+    ParticleGroup& group = particleGroups_[name];
+    const uint32_t particlesPerArm = (std::max)(count / 2, 1u);
+    const float minimumRadius = 0.2f * scaleMultiplier;
+    const float maximumRadius = 1.4f * scaleMultiplier;
+    const float twoRotations = std::numbers::pi_v<float> * 4.0f;
+
+    Vector3 cameraRight = { 1.0f, 0.0f, 0.0f };
+    Vector3 cameraUp = { 0.0f, 1.0f, 0.0f };
+    if (cameraManager_ && cameraManager_->GetActiveCamera()) {
+        const Matrix4x4& cameraWorld = cameraManager_->GetActiveCamera()->GetWorldMatrix();
+        cameraRight = Normalize({ cameraWorld.m[0][0], cameraWorld.m[0][1], cameraWorld.m[0][2] });
+        cameraUp = Normalize({ cameraWorld.m[1][0], cameraWorld.m[1][1], cameraWorld.m[1][2] });
+    }
+
+    for (uint32_t index = 0; index < count; ++index) {
+        Particle newParticle{};
+        const uint32_t armIndex = index / particlesPerArm;
+        const uint32_t indexInArm = index % particlesPerArm;
+        const float progress = static_cast<float>(indexInArm) / static_cast<float>(particlesPerArm);
+        const float armOffset = (armIndex % 2) * std::numbers::pi_v<float>;
+
+        newParticle.isSpiral = true;
+        newParticle.spiralCenter = translate;
+        newParticle.spiralRight = cameraRight;
+        newParticle.spiralUp = cameraUp;
+        newParticle.spiralAngle = twoRotations * progress + armOffset;
+        newParticle.spiralRadius = minimumRadius + (maximumRadius - minimumRadius) * progress;
+        newParticle.spiralAngularVelocity = 1.8f;
+        newParticle.spiralRadialVelocity = -0.08f * scaleMultiplier;
+
+        const float spiralX = std::cos(newParticle.spiralAngle) * newParticle.spiralRadius;
+        const float spiralY = std::sin(newParticle.spiralAngle) * newParticle.spiralRadius;
+        newParticle.transform.translate = {
+            translate.x + cameraRight.x * spiralX + cameraUp.x * spiralY,
+            translate.y + cameraRight.y * spiralX + cameraUp.y * spiralY,
+            translate.z + cameraRight.z * spiralX + cameraUp.z * spiralY
+        };
+        newParticle.transform.scale = { 0.08f * scaleMultiplier, 0.08f * scaleMultiplier, 0.08f * scaleMultiplier };
+        newParticle.velocity = { 0.0f, 0.0f, 0.0f };
+        newParticle.color = (armIndex % 2 == 0)
+            ? Vector4{ 1.0f, 0.96f, 0.72f, 0.9f }
+            : Vector4{ 1.0f, 0.62f, 0.08f, 0.9f };
+        newParticle.lifeTime = 4.0f;
+        newParticle.currentTime = 0.0f;
+        newParticle.receivesWind = false;
+        group.particles.push_back(newParticle);
+    }
+}
+
 void ParticleManager::Update() {
 
     if (!cameraManager_)return;
@@ -453,24 +668,23 @@ void ParticleManager::Update() {
     //万が一カメラがない場合は安全のために抜ける
     if (!activeCamera)return;
 
-    Matrix4x4 backToFrontMatrix = MakeRotateYMatrix(std::numbers::pi_v<float>);
-
-    const float kDeltaTime_ = 1.0f / 60.0f;
+    const float kDeltaTime_ = dxCommon_->GetDeltaTime();
 
     //風タイマー
-    windTimer_ += kDeltaTime_;
-    if (windTimer_ >= 5.0f)
+    if (autoWindSwitch_) {
+        windTimer_ += kDeltaTime_;
+    }
+    if (autoWindSwitch_ && windTimer_ >= 5.0f)
     {//5秒経過したら
         isField_ = !isField_;//trueとfalse切り替え
         windTimer_ = 0.0f;
     }
 
     //取得したactiveカメラからビュー作成もらう
+    const Matrix4x4 viewProjectionMatrix = Multiply(activeCamera->GetViewMatrix(), activeCamera->GetProjectionMatrix());
     Matrix4x4 view = activeCamera->GetViewMatrix();
     view.m[3][0] = 0.0f; view.m[3][1] = 0.0f; view.m[3][2] = 0.0f;
     Matrix4x4 billboardMatrix = Inverse(view);
-
-    Matrix4x4 viewProjectionMatrix = Multiply(activeCamera->GetViewMatrix(), activeCamera->GetProjectionMatrix());
 
     // 全てのパーティクルグループについて処理する
     for (auto& pair : particleGroups_) {
@@ -501,6 +715,19 @@ void ParticleManager::Update() {
                 }
             }
 
+            if (particle.isSpiral) {
+                particle.spiralAngle += particle.spiralAngularVelocity * kDeltaTime_;
+                particle.spiralRadius = (std::max)(0.05f, particle.spiralRadius + particle.spiralRadialVelocity * kDeltaTime_);
+
+                const float spiralX = std::cos(particle.spiralAngle) * particle.spiralRadius;
+                const float spiralY = std::sin(particle.spiralAngle) * particle.spiralRadius;
+                particle.transform.translate = {
+                    particle.spiralCenter.x + particle.spiralRight.x * spiralX + particle.spiralUp.x * spiralY,
+                    particle.spiralCenter.y + particle.spiralRight.y * spiralX + particle.spiralUp.y * spiralY,
+                    particle.spiralCenter.z + particle.spiralRight.z * spiralX + particle.spiralUp.z * spiralY
+                };
+            }
+
             if (isField_ && particle.receivesWind)
             {
                 if (IsCollision(accelerationField_.area, particle.transform.translate))
@@ -518,7 +745,23 @@ void ParticleManager::Update() {
             float alpha = particle.color.w;
             if (!particle.isEndless) {
                 particle.currentTime += kDeltaTime_;
-                alpha = particle.color.w * (1.0f - (particle.currentTime / particle.lifeTime));
+                const float progress = std::clamp(particle.currentTime / particle.lifeTime, 0.0f, 1.0f);
+                if (particle.useColorAndScaleOverLife) {
+                    particle.transform.scale = {
+                        particle.startScale.x + (particle.endScale.x - particle.startScale.x) * progress,
+                        particle.startScale.y + (particle.endScale.y - particle.startScale.y) * progress,
+                        particle.startScale.z + (particle.endScale.z - particle.startScale.z) * progress
+                    };
+                    particle.color = {
+                        particle.startColor.x + (particle.endColor.x - particle.startColor.x) * progress,
+                        particle.startColor.y + (particle.endColor.y - particle.startColor.y) * progress,
+                        particle.startColor.z + (particle.endColor.z - particle.startColor.z) * progress,
+                        particle.startColor.w + (particle.endColor.w - particle.startColor.w) * progress
+                    };
+                    alpha = particle.color.w;
+                } else {
+                    alpha = particle.color.w * (1.0f - progress);
+                }
             }
 
             Matrix4x4 scale = MakeScaleMatrix(particle.transform.scale);
@@ -532,10 +775,8 @@ void ParticleManager::Update() {
             Matrix4x4 worldMatrix = Multiply(Multiply(scale, rotateOrBillboard), translate);
 
             // 取得したactiveCameraからビュープロジェクション行列をもらう(カメラの向きを向く)
-            Matrix4x4 worldViewProjectionMatrix = Multiply(activeCamera->GetViewMatrix(),activeCamera->GetProjectionMatrix());
-
             if (group.instanceCount < kNumMaxInstance) {
-                group.mappedData[group.instanceCount].WVP = worldViewProjectionMatrix;
+                group.mappedData[group.instanceCount].WVP = viewProjectionMatrix;
                 group.mappedData[group.instanceCount].World = worldMatrix;
                 group.mappedData[group.instanceCount].color = particle.color;
                 group.mappedData[group.instanceCount].color.w = alpha;

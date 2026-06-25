@@ -7,6 +7,37 @@
 
 using namespace MyMath;
 
+namespace {
+	Vector3 InterpolateKeyframeValue(const Vector3& start, const Vector3& end, float t)
+	{
+		return Lerp(start, end, t);
+	}
+
+	Quaternion InterpolateKeyframeValue(const Quaternion& start, const Quaternion& end, float t)
+	{
+		return Slerp(start, end, t);
+	}
+
+	template<typename tValue>
+	tValue CalculateKeyframeValue(const std::vector<Model::Keyframe<tValue>>& keyframes, float time)
+	{
+		assert(!keyframes.empty());
+		if (keyframes.size() == 1 || time <= keyframes.front().time) {
+			return keyframes.front().value;
+		}
+
+		for (size_t index = 0; index < keyframes.size() - 1; ++index) {
+			const size_t nextIndex = index + 1;
+			if (keyframes[index].time <= time && time <= keyframes[nextIndex].time) {
+				const float t = (time - keyframes[index].time) / (keyframes[nextIndex].time - keyframes[index].time);
+				return InterpolateKeyframeValue(keyframes[index].value, keyframes[nextIndex].value, t);
+			}
+		}
+
+		return keyframes.back().value;
+	}
+}
+
 Model::SkinCluster Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device, const Skeleton& skeleton, const ModelData& modelData, const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap, uint32_t descriptorSize)
 {
 	SkinCluster skinCluster;
@@ -175,40 +206,12 @@ Model::Animation Model::LoadAnimationFile(const std::string& directoryPath, cons
 
 Vector3 Model::CalculateValue(const std::vector<KeyframeVector3>& keyframes, float time)
 {
-	assert(!keyframes.empty());//キーがないものは返す値がわからないので駄目
-	if (keyframes.size() == 1 || time <= keyframes[0].time)//キーが1つか時刻がキーフレーム前なら最初の値とする
-	{
-		return keyframes[0].value;
-	}
-	for (size_t index = 0; index < keyframes.size() - 1; ++index)
-	{
-		size_t nextIndex = index + 1;
-		//indexとnextIndexの2つのkeyframeを取得して範囲内に時刻があるかを判定
-		if (keyframes[index].time <= time && time <= keyframes[nextIndex].time)
-		{
-			//範囲内を補間する
-			float t = (time - keyframes[index].time) / (keyframes[nextIndex].time - keyframes[index].time);
-			return Lerp(keyframes[index].value, keyframes[nextIndex].value, t);
-		}
-	}
-	//ここまできた場合は一番後の時刻よりも後ろなので最後の値を返すことにする
-	return (*keyframes.rbegin()).value;
+	return CalculateKeyframeValue(keyframes, time);
 }
 
 Quaternion Model::CalculateValue(const std::vector<KeyframeQuaternion>& keyframes, float time)
 {
-	assert(!keyframes.empty());
-	if (keyframes.size() == 1 || time <= keyframes[0].time) {
-		return keyframes[0].value;
-	}
-	for (size_t index = 0; index < keyframes.size() - 1; ++index) {
-		size_t nextIndex = index + 1;
-		if (keyframes[index].time <= time && time <= keyframes[nextIndex].time) {
-			float t = (time - keyframes[index].time) / (keyframes[nextIndex].time - keyframes[index].time);
-			return Slerp(keyframes[index].value, keyframes[nextIndex].value, t); // ここは Slerp！
-		}
-	}
-	return (*keyframes.rbegin()).value;
+	return CalculateKeyframeValue(keyframes, time);
 }
 
 Model::Node Model::ReadNode(aiNode* node)
@@ -351,23 +354,42 @@ void Model::SetTexture(const std::string& filePath)
 }
 
 //アニメーション適用
+void Model::BuildAnimationMapping(Skeleton& skeleton, const Animation& animation)
+{
+	skeleton.animationNodeMap.clear();
+	skeleton.animationNodeMap.resize(skeleton.joints.size(), nullptr);
+
+	for (const Joint& joint : skeleton.joints) {
+		if (auto it = animation.nodeAnimations.find(joint.name); it != animation.nodeAnimations.end()) {
+			skeleton.animationNodeMap[joint.index] = &it->second;
+		}
+	}
+
+	skeleton.cachedAnimation = &animation;
+}
+
 void Model::ApplyAnimation(Skeleton& skeleton, const Animation& animation, float animationTime)
 {
+	if (skeleton.cachedAnimation != &animation || skeleton.animationNodeMap.size() != skeleton.joints.size()) {
+		BuildAnimationMapping(skeleton, animation);
+	}
+
 	for (Joint& joint : skeleton.joints)
 	{
 		//対象のJointのAnimationがあれば値の適用を行う。初期化付きif文
-		if (auto it = animation.nodeAnimations.find(joint.name); it != animation.nodeAnimations.end())
+		const NodeAnimation* rootNodeAnimation = skeleton.animationNodeMap[joint.index];
+		if (rootNodeAnimation)
 		{
-			const NodeAnimation& rootNodeAnimation = (*it).second;
-			joint.transform.translate = CalculateValue(rootNodeAnimation.translate.keyframes, animationTime);
-			joint.transform.rotate = CalculateValue(rootNodeAnimation.rotate.keyframes, animationTime);
-			joint.transform.scale = CalculateValue(rootNodeAnimation.scale.keyframes, animationTime);
+			joint.transform.translate = CalculateValue(rootNodeAnimation->translate.keyframes, animationTime);
+			joint.transform.rotate = CalculateValue(rootNodeAnimation->rotate.keyframes, animationTime);
+			joint.transform.scale = CalculateValue(rootNodeAnimation->scale.keyframes, animationTime);
 		}
 	}
 }
 
 void Model::CreateIndexData()
 {
+	assert(!modelData.indices.empty());
 	// --- インデックスバッファの作成 ---
 	indexResource = modelCommon_->GetDxCommon()->CreateBufferResource(sizeof(uint32_t) * modelData.indices.size());
 
@@ -449,6 +471,7 @@ void Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 		assert(mesh->HasTextureCoords(0));//TexcoordがないMeshは今回は非対応
 
 		//現在の頂点数を保存しておく(複数メッシュ対応のため)
+		assert(mesh->HasFaces());
 		uint32_t vertexOffset = static_cast<uint32_t>(modelData.vertices.size());
 
 		//まず頂点をすべて解析して配列に突っ込む

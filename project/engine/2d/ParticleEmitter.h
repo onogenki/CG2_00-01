@@ -18,6 +18,14 @@ public:
 
     // エミッタの位置などを後から変えたいとき
     void SetTranslate(const Vector3& translate) { transform_.translate = translate; }
+    void SetScale(const Vector3& scale) { transform_.scale = scale; }
+    void SetCount(uint32_t count) { count_ = count; }
+    void SetFrequency(float frequency) { frequency_ = frequency; }
+    void SetReceivesWind(bool receivesWind) { receivesWind_ = receivesWind; }
+    const Transform& GetTransform() const { return transform_; }
+    uint32_t GetCount() const { return count_; }
+    float GetFrequency() const { return frequency_; }
+    bool GetReceivesWind() const { return receivesWind_; }
 
 private:
 

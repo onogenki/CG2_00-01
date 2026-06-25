@@ -148,6 +148,8 @@
     <FxCompile Include="resources\shaders\Fullscreen.VS.hlsl" />
     <FxCompile Include="resources\shaders\Grayscale.PS.hlsl" />
     <FxCompile Include="resources\shaders\Sepia.PS.hlsl" />
+    <FxCompile Include="resources\shaders\Sprite.PS.hlsl" />
+    <FxCompile Include="resources\shaders\Sprite.VS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="externals\imgui\imconfig.h">
@@ -302,6 +304,7 @@
     <None Include="resources\shaders\Object3d.hlsli" />
     <None Include="resources\shaders\Skybox.hlsli" />
     <None Include="resources\shaders\Fullscreen.hlsli" />
+    <None Include="resources\shaders\Sprite.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="CG2_00-01.rc">

@@ -41,16 +41,19 @@ public:
 	// 共通デバッグウィンドウ
 	void DemoWindow();
 	void FPSWindow();
-	void SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprites);
+	void SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprites, bool embedded = false);
 	void ModelWindow(
 		const std::vector<std::unique_ptr<Object3d>>& normalObjects,
 		const std::vector<std::unique_ptr<Object3d>>& animationObjects,
 		Object3d::DirectionalLight& light,
 		Object3d::PointLight& pointLight,
-		Object3d::SpotLight& spotLight);
-	void CameraWindow(CameraManager* cameraManager);
-	std::string ParticleWindow(Transform& emitterTransform);
+		Object3d::SpotLight& spotLight,
+		bool embedded = false);
+	void CameraWindow(CameraManager* cameraManager, bool embedded = false);
+	std::string ParticleWindow(Transform& emitterTransform, bool embedded = false);
 	void PostEffectWindow();
+	bool IsSkeletonDebugDrawEnabled() const;
+	bool IsMouseOverGameView(float mouseScreenX, float mouseScreenY) const;
 
 	// Game View上へスケルトンを重ねて描画する
 	void SkeletonDebugDraw(
@@ -78,6 +81,7 @@ private:
 	bool showCameraWindow_ = true;
 	bool showPostEffectWindow_ = true;
 	bool showDemoWindow_ = false;
+	bool showSkeletonDebugDraw_ = false;
 	bool resetDockLayout_ = false;
 	std::string layoutSceneName_;
 	int layoutResetFrames_ = 0;

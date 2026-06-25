@@ -86,7 +86,7 @@ public:
 	//今何秒か教える関数
 	float GetAnimationTime() const { return animationTime_; }
 	//シーンからアニメーションの時間をいじる関数
-	void SetAnimationTime(float time) { this->animationTime_ = true; }
+	void SetAnimationTime(float time) { this->animationTime_ = time; }
 
 	//スケルトン(アニメーションするか)を取得
 	Model::Skeleton& GetSkeleton() { return skeleton_; }
