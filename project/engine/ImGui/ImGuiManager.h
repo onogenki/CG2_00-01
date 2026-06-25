@@ -50,6 +50,7 @@ public:
 		Object3d::SpotLight& spotLight);
 	void CameraWindow(CameraManager* cameraManager);
 	std::string ParticleWindow(Transform& emitterTransform);
+	void PostEffectWindow(bool& isGrayscale, bool& isSepia);
 
 	// Game View上へスケルトンを重ねて描画する
 	void SkeletonDebugDraw(
@@ -75,6 +76,7 @@ private:
 	bool showModelWindow_ = true;
 	bool showParticleWindow_ = true;
 	bool showCameraWindow_ = true;
+	bool showPostEffectWindow_ = true;
 	bool showDemoWindow_ = false;
 	bool resetDockLayout_ = false;
 	std::string layoutSceneName_;

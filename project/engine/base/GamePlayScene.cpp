@@ -12,6 +12,8 @@ using namespace MyMath;
 void GamePlayScene::Initialize()
 {
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+	PostEffect::GetInstance()->SetGrayscale(false);
+	PostEffect::GetInstance()->SetSepia(false);
 
 	//3Dオブジェクト共通部の初期化
 	object3dCommon = Object3dCommon::GetInstance();
@@ -255,7 +257,6 @@ void GamePlayScene::Update()
 	}
 
 	ImGuiManager::GetInstance()->CameraWindow(cameraManager.get());
-
 	// スケルトンをGame Viewの映像座標へ合わせ、モデルの上へ重ねて表示する。
 	if (!animationObjects.empty())
 	{
@@ -346,6 +347,8 @@ void GamePlayScene::Draw()
 	}
 
 	// SceneはRenderTextureへ描画済みなので、ImGuiの直前にSwapChainへ切り替える
+	DirectXCommon::GetInstance()->PreDrawForPostEffectTexture();
+	PostEffect::GetInstance()->Draw();
 	DirectXCommon::GetInstance()->PreDrawForSwapChain();
 	// RenderTextureのSceneを全画面三角形でSwapChainへコピーする
 	PostEffect::GetInstance()->Draw();

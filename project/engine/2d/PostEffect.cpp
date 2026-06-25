@@ -22,7 +22,10 @@ void PostEffect::Draw()
 
 	// CopyImage用の描画設定をCommandListへ積む
 	commandList->SetGraphicsRootSignature(rootSignature_.Get());
-	commandList->SetPipelineState(graphicsPipelineState_.Get());
+	const PipelineType pipelineType = isSepia_
+		? PipelineType::Sepia
+		: (isGrayscale_ ? PipelineType::Grayscale : PipelineType::Fullscreen);
+	commandList->SetPipelineState(graphicsPipelineStates_[static_cast<int>(pipelineType)].Get());
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	// PixelShaderのt0へRenderTextureのSRVを設定する
@@ -86,6 +89,13 @@ void PostEffect::CreateRootSignature()
 
 void PostEffect::CreateGraphicsPipeline()
 {
+	CreateGraphicsPipelineState(PipelineType::Fullscreen, L"resources/shaders/Fullscreen.PS.hlsl");
+	CreateGraphicsPipelineState(PipelineType::Grayscale, L"resources/shaders/Grayscale.PS.hlsl");
+	CreateGraphicsPipelineState(PipelineType::Sepia, L"resources/shaders/Sepia.PS.hlsl");
+}
+
+void PostEffect::CreateGraphicsPipelineState(PipelineType type, const wchar_t* pixelShaderPath)
+{
 	// SV_VertexIDから頂点を作るため、InputLayoutには何も設定しない
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc{};
 	inputLayoutDesc.pInputElementDescs = nullptr;
@@ -104,11 +114,11 @@ void PostEffect::CreateGraphicsPipeline()
 	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob =
-		dxCommon_->CompileShader(L"resources/shaders/CopyImage.VS.hlsl", L"vs_6_0");
+		dxCommon_->CompileShader(L"resources/shaders/Fullscreen.VS.hlsl", L"vs_6_0");
 	assert(vertexShaderBlob);
 
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob =
-		dxCommon_->CompileShader(L"resources/shaders/CopyImage.PS.hlsl", L"ps_6_0");
+		dxCommon_->CompileShader(pixelShaderPath, L"ps_6_0");
 	assert(pixelShaderBlob);
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineDesc{};
@@ -133,6 +143,6 @@ void PostEffect::CreateGraphicsPipeline()
 
 	HRESULT hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(
 		&pipelineDesc,
-		IID_PPV_ARGS(&graphicsPipelineState_));
+		IID_PPV_ARGS(&graphicsPipelineStates_[static_cast<int>(type)]));
 	assert(SUCCEEDED(hr));
 }

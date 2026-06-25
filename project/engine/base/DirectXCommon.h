@@ -43,6 +43,7 @@ public:
 	//描画前処理
 	void PreDraw();
 	// Scene描画後、ImGuiを描画するSwapChainへ描画先を切り替える
+	void PreDrawForPostEffectTexture();
 	void PreDrawForSwapChain();
 	//描画後処理
 	void PostDraw();
@@ -97,6 +98,7 @@ public:
 	ID3D12CommandQueue* GetCommandQueue() const { return commandQueue.Get(); }
 	ID3D12CommandAllocator* GetCommandAllocator() const { return commandAllocator.Get(); }
 	uint32_t GetRenderTextureSrvIndex() const { return renderTextureSrvIndex_; }
+	uint32_t GetPostEffectTextureSrvIndex() const { return postEffectTextureSrvIndex_; }
 	uint32_t GetClientWidth() const { return width; }
 	uint32_t GetClientHeight() const { return height; }
 
@@ -169,6 +171,10 @@ private:
 	D3D12_CPU_DESCRIPTOR_HANDLE renderTextureRtvHandle_{};
 	uint32_t renderTextureSrvIndex_ = UINT32_MAX;
 	bool isRenderTextureShaderResource_ = false;
+	Microsoft::WRL::ComPtr<ID3D12Resource> postEffectTextureResource_;
+	D3D12_CPU_DESCRIPTOR_HANDLE postEffectTextureRtvHandle_{};
+	uint32_t postEffectTextureSrvIndex_ = UINT32_MAX;
+	bool isPostEffectTextureShaderResource_ = false;
 	const Vector4 renderTextureClearColor_{ 1.0f, 0.0f, 0.0f, 1.0f };
 
 	//ビューポート
