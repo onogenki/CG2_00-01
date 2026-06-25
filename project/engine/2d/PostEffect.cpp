@@ -15,6 +15,11 @@ void PostEffect::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 
 void PostEffect::Draw()
 {
+	Draw(dxCommon_->GetRenderTextureSrvIndex(), true);
+}
+
+void PostEffect::Draw(uint32_t sourceSrvIndex, bool useEffect)
+{
 	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
 
 	// RenderTextureのSRVが入ったDescriptorHeapを使用する
@@ -22,7 +27,9 @@ void PostEffect::Draw()
 
 	// CopyImage用の描画設定をCommandListへ積む
 	commandList->SetGraphicsRootSignature(rootSignature_.Get());
-	const PipelineType pipelineType = isSepia_
+	const PipelineType pipelineType = !useEffect
+		? PipelineType::Fullscreen
+		: isSepia_
 		? PipelineType::Sepia
 		: (isGrayscale_ ? PipelineType::Grayscale : PipelineType::Fullscreen);
 	commandList->SetPipelineState(graphicsPipelineStates_[static_cast<int>(pipelineType)].Get());
@@ -31,7 +38,7 @@ void PostEffect::Draw()
 	// PixelShaderのt0へRenderTextureのSRVを設定する
 	srvManager_->SetGraphicsRootDescriptorTable(
 		0,
-		dxCommon_->GetRenderTextureSrvIndex());
+		sourceSrvIndex);
 
 	// VertexShaderのSV_VertexIDで3頂点を作るため、頂点バッファは不要
 	commandList->DrawInstanced(3, 1, 0, 0);

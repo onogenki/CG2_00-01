@@ -347,11 +347,17 @@ void GamePlayScene::Draw()
 	}
 
 	// SceneはRenderTextureへ描画済みなので、ImGuiの直前にSwapChainへ切り替える
-	DirectXCommon::GetInstance()->PreDrawForPostEffectTexture();
-	PostEffect::GetInstance()->Draw();
-	DirectXCommon::GetInstance()->PreDrawForSwapChain();
+	if (PostEffect::GetInstance()->IsEnabled()) {
+		DirectXCommon::GetInstance()->PreDrawForPostEffectTexture();
+		PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), true);
+	}
+	DirectXCommon::GetInstance()->PreDrawForSwapChain(PostEffect::GetInstance()->IsEnabled());
 	// RenderTextureのSceneを全画面三角形でSwapChainへコピーする
-	PostEffect::GetInstance()->Draw();
+	if (PostEffect::GetInstance()->IsEnabled()) {
+		PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetPostEffectTextureSrvIndex(), false);
+	} else {
+		PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), false);
+	}
 	ImGuiManager::GetInstance()->Draw(DirectXCommon::GetInstance());
 
 	DirectXCommon::GetInstance()->PostDraw();

@@ -145,6 +145,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 			ImGui::MenuItem("Game View", nullptr, &showGameView_);
 			ImGui::MenuItem("Scene", nullptr, &showSceneWindow_);
 			ImGui::MenuItem("Performance", nullptr, &showFpsWindow_);
+			ImGui::MenuItem("Post Effect", nullptr, &showPostEffectWindow_);
 			ImGui::Separator();
 			ImGui::MenuItem("Sprite Editor", nullptr, &showSpriteWindow_);
 			ImGui::MenuItem("Model Editor", nullptr, &showModelWindow_);
@@ -180,6 +181,9 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 	if (showFpsWindow_) {
 		FPSWindow();
 	}
+	if (showPostEffectWindow_) {
+		PostEffectWindow();
+	}
 	if (showDemoWindow_) {
 		ImGui::ShowDemoWindow(&showDemoWindow_);
 	}
@@ -213,6 +217,7 @@ void ImGuiManager::BuildDefaultDockLayout(ImGuiID dockspaceId)
 	ImGui::DockBuilderDockWindow("Game View", centerId);
 	ImGui::DockBuilderDockWindow("Scene", leftId);
 	ImGui::DockBuilderDockWindow("FPS", leftId);
+	ImGui::DockBuilderDockWindow("Post Effect", leftId);
 	ImGui::DockBuilderDockWindow("Editing Object", rightId);
 	ImGui::DockBuilderDockWindow("Camera Control", rightId);
 	ImGui::DockBuilderDockWindow("Editing UVTranslate ( Sprite )", bottomId);
@@ -296,20 +301,6 @@ void ImGuiManager::SceneWindow(const char* sceneName)
 	if (sceneManager->HasPendingScene()) {
 		ImGui::TextDisabled("Loading: %s", sceneManager->GetPendingSceneName().c_str());
 	}
-
-	ImGui::Spacing();
-	ImGui::Separator();
-	ImGui::Text("Post Effect");
-	bool isGrayscale = PostEffect::GetInstance()->IsGrayscale();
-	bool isSepia = PostEffect::GetInstance()->IsSepia();
-	if (ImGui::Checkbox("Grayscale", &isGrayscale) && isGrayscale) {
-		isSepia = false;
-	}
-	if (ImGui::Checkbox("Sepia", &isSepia) && isSepia) {
-		isGrayscale = false;
-	}
-	PostEffect::GetInstance()->SetGrayscale(isGrayscale);
-	PostEffect::GetInstance()->SetSepia(isSepia);
 
 	ImGui::Spacing();
 	ImGui::TextDisabled("Drag any debug window by its tab to rearrange it.");
@@ -602,23 +593,25 @@ void ImGuiManager::CameraWindow(CameraManager* cameraManager)
 #endif
 }
 
-void ImGuiManager::PostEffectWindow(bool& isGrayscale, bool& isSepia)
+void ImGuiManager::PostEffectWindow()
 {
 #ifdef USE_IMGUI
 	if (!showPostEffectWindow_) {
 		return;
 	}
 	ImGui::Begin("Post Effect", &showPostEffectWindow_);
+	bool isGrayscale = PostEffect::GetInstance()->IsGrayscale();
+	bool isSepia = PostEffect::GetInstance()->IsSepia();
 	if (ImGui::Checkbox("Grayscale", &isGrayscale) && isGrayscale) {
 		isSepia = false;
 	}
 	if (ImGui::Checkbox("Sepia", &isSepia) && isSepia) {
 		isGrayscale = false;
 	}
+	PostEffect::GetInstance()->SetGrayscale(isGrayscale);
+	PostEffect::GetInstance()->SetSepia(isSepia);
 	ImGui::End();
 #else
-	(void)isGrayscale;
-	(void)isSepia;
 #endif
 }
 

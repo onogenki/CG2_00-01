@@ -512,7 +512,7 @@ void DirectXCommon::PreDrawForPostEffectTexture()
 	commandList_->RSSetScissorRects(1, &scissorRect_);
 }
 
-void DirectXCommon::PreDrawForSwapChain()
+void DirectXCommon::PreDrawForSwapChain(bool usePostEffectTexture)
 {
 	// Sceneの描画結果を後でSRVから読めるよう、RenderTextureを書き込み状態から読み取り状態へ変更する
 	if (!isRenderTextureShaderResource_)
@@ -528,7 +528,7 @@ void DirectXCommon::PreDrawForSwapChain()
 		isRenderTextureShaderResource_ = true;
 	}
 
-	if (!isPostEffectTextureShaderResource_)
+	if (usePostEffectTexture && !isPostEffectTextureShaderResource_)
 	{
 		D3D12_RESOURCE_BARRIER postEffectTextureBarrier{};
 		postEffectTextureBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
