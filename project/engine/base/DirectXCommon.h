@@ -44,7 +44,7 @@ public:
 	void PreDraw();
 	// Scene描画後、ImGuiを描画するSwapChainへ描画先を切り替える
 	void PreDrawForPostEffectTexture();
-	void PreDrawForSwapChain();
+	void PreDrawForSwapChain(bool usePostEffectTexture = false);
 	//描画後処理
 	void PostDraw();
 

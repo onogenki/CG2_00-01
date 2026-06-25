@@ -18,6 +18,7 @@ public:
 
 	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
 	void Draw();
+	void Draw(uint32_t sourceSrvIndex, bool useEffect);
 	void SetGrayscale(bool isGrayscale) { isGrayscale_ = isGrayscale; }
 	void SetSepia(bool isSepia) { isSepia_ = isSepia; }
 	bool IsGrayscale() const { return isGrayscale_; }
