@@ -41,20 +41,20 @@ struct Skinned
 Skinned Skinning(VertexShaderInput input)
 {
     Skinned skinned;
-    //Skinningの処理をする
+    //Skinningの処琁E��する
     //位置の変換
     skinned.position = mul(input.position, gMatrixPalette[input.index.x].skeletonSpaceMatrix) * input.weight.x;
     skinned.position += mul(input.position, gMatrixPalette[input.index.y].skeletonSpaceMatrix) * input.weight.y;
     skinned.position += mul(input.position, gMatrixPalette[input.index.z].skeletonSpaceMatrix) * input.weight.z;
     skinned.position += mul(input.position, gMatrixPalette[input.index.w].skeletonSpaceMatrix) * input.weight.w;
-    skinned.position.w = 1.0f; //確実に1を入れる
+    skinned.position.w = 1.0f; //確実に1を�Eれる
 
-//法線の変換
+//法線�E変換
     skinned.normal = mul(input.normal, (float32_t3x3) gMatrixPalette[input.index.x].skeletonSpaceInverseTransposeMatrix) * input.weight.x;
     skinned.normal += mul(input.normal, (float32_t3x3) gMatrixPalette[input.index.y].skeletonSpaceInverseTransposeMatrix) * input.weight.y;
     skinned.normal += mul(input.normal, (float32_t3x3) gMatrixPalette[input.index.z].skeletonSpaceInverseTransposeMatrix) * input.weight.z;
     skinned.normal += mul(input.normal, (float32_t3x3) gMatrixPalette[input.index.w].skeletonSpaceInverseTransposeMatrix) * input.weight.w;
-    skinned.normal = normalize(skinned.normal); //正規化して戻してあげる
+    skinned.normal = normalize(skinned.normal); //正規化して戻してあげめE
     
     return skinned;
 }
@@ -62,7 +62,7 @@ Skinned Skinning(VertexShaderInput input)
 VertexShaderOutput main(VertexShaderInput input)
 {
     VertexShaderOutput output;
-    Skinned skinned = Skinning(input); //まずSkinning計算を行って、Skinning後の頂点情報を手に入れる。ここでの頂点もSkeletonSpace
+    Skinned skinned = Skinning(input); //まずSkinning計算を行って、Skinning後�E頂点惁E��を手に入れる。ここでの頂点もSkeletonSpace
     
     //Skinning結果を使って変換
     output.position = mul(skinned.position, gTransformationMatrix.WVP);

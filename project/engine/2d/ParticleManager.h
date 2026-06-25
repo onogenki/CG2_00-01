@@ -25,6 +25,21 @@ public:
     bool receivesWind;//風を受けるかどうか
     bool isEndless = false;
     float scaleVelocityY = 0.0f;
+
+    bool isSpiral = false;
+    Vector3 spiralCenter{};
+    Vector3 spiralRight{ 1.0f, 0.0f, 0.0f };
+    Vector3 spiralUp{ 0.0f, 1.0f, 0.0f };
+    float spiralAngle = 0.0f;
+    float spiralRadius = 0.0f;
+    float spiralAngularVelocity = 0.0f;
+    float spiralRadialVelocity = 0.0f;
+
+    bool useColorAndScaleOverLife = false;
+    Vector3 startScale{};
+    Vector3 endScale{};
+    Vector4 startColor{};
+    Vector4 endColor{};
 };
 
 struct AccelerationField
@@ -92,14 +107,24 @@ public:
     }
 
 	//パーティクルの発生
-	void Emit(const std::string name, const Vector3& position, uint32_t count,bool receivesWind);
-	void EmitHitEffect(const std::string name, uint32_t count, const Vector3& translate);
-    void EmitRingEffect(const std::string name, uint32_t count, const Vector3& translate);
-    void EmitCylinderEffect(const std::string name, uint32_t count, const Vector3& translate);
+	void Emit(const std::string name, const Vector3& position, uint32_t count,bool receivesWind, float scaleMultiplier = 1.0f);
+	void EmitHitEffect(const std::string name, uint32_t count, const Vector3& translate, float scaleMultiplier = 1.0f);
+    void EmitRingEffect(const std::string name, uint32_t count, const Vector3& translate, float scaleMultiplier = 1.0f);
+    void EmitCylinderEffect(const std::string name, uint32_t count, const Vector3& translate, float scaleMultiplier = 1.0f);
+    void EmitPillarSparkle(const std::string name, uint32_t count, const Vector3& position, float scaleMultiplier = 1.0f);
+    void EmitLightCore(const std::string name, uint32_t count, const Vector3& position, float scaleMultiplier = 1.0f);
+    void EmitLightRain(const std::string name, uint32_t count, const Vector3& position, float scaleMultiplier = 1.0f);
+    void EmitLightSpiral(const std::string name, uint32_t count, const Vector3& translate, float scaleMultiplier = 1.0f);
 
 	void CreateParticleGroup(const std::string name, const std::string textureFilePath);
     void CreateRingParticleGroup(const std::string name, const std::string textureFilePath);
-    void CreateCylinderParticleGroup(const std::string name, const std::string textureFilePath);
+    void CreateCylinderParticleGroup(
+        const std::string name,
+        const std::string textureFilePath,
+        uint32_t divide = 32,
+        float topRadius = 1.0f,
+        float bottomRadius = 1.0f,
+        float height = 3.0f);
 
     // 全てのパーティクル（粒子）を削除する
     void ClearAllParticles();
@@ -109,6 +134,16 @@ public:
     void ClearAllGroups();
 
     void SetCameraManager(CameraManager* cameraManager) { cameraManager_ = cameraManager; }
+    bool IsWindEnabled() const { return isField_; }
+    void SetWindEnabled(bool isEnabled) { isField_ = isEnabled; windTimer_ = 0.0f; }
+    void ToggleWind() { SetWindEnabled(!isField_); }
+    bool IsAutoWindSwitchEnabled() const { return autoWindSwitch_; }
+    void SetAutoWindSwitchEnabled(bool isEnabled) { autoWindSwitch_ = isEnabled; windTimer_ = 0.0f; }
+    Vector3 GetWindAcceleration() const { return accelerationField_.acceleration; }
+    void SetWindAcceleration(const Vector3& acceleration) { accelerationField_.acceleration = acceleration; }
+
+    bool GetBillboardEnabled(const std::string& name) const;
+    void SetBillboardEnabled(const std::string& name, bool isEnabled);
 
     bool IsCollision(const AABB aabb, const Vector3& point);
 private:
@@ -139,6 +174,7 @@ private:
 
     //場
     AccelerationField accelerationField_;
+    bool autoWindSwitch_ = true;
     float windTimer_ = 0.0f;//吹く時間
     bool isField_ = false;//風が吹いてるかどうか
 };

@@ -20,7 +20,7 @@ VertexShaderOutput main(VertexShaderInput input, uint32_t instanceId : SV_Instan
 {
     VertexShaderOutput output;
     
-    float4 worldPos = mul(input.position, gParticle[instanceId].World);
+    float32_t4 worldPos = mul(input.position, gParticle[instanceId].World);
     output.worldPosition = worldPos.xyz;
 
     output.position = mul(worldPos, gParticle[instanceId].WVP);

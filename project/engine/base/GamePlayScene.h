@@ -24,6 +24,19 @@ public:
 	void Draw()override;
 
 private:
+    void UpdateGameViewCameraControl();
+    void DrawInspectorImGui();
+    void DrawParticleEffectImGui(bool embedded = false);
+    void UpdateParticleEffectEmission();
+    Vector3 GetParticleEffectPosition() const;
+
+    struct ParticleEffectControl {
+        bool enabled = false;
+        int emitCount = 1;
+        float scale = 1.0f;
+        bool billboard = true;
+    };
+
     //ゲームプレイシーン固有のデータ
 
     std::unique_ptr<Camera> upCamera;
@@ -54,6 +67,20 @@ private:
 
     int selectedUI = 0;
     bool isCylinderEffectVisible_ = false;
+    ParticleEffectControl hitEffect_{ false, 8, 1.0f, true };
+    ParticleEffectControl ringEffect_{ false, 3, 1.0f, true };
+    ParticleEffectControl cylinderEffect_{ false, 1, 1.0f, false };
+    ParticleEffectControl pillarSparkleEffect_{ false, 10, 1.0f, true };
+    ParticleEffectControl lightCoreEffect_{ false, 1, 1.0f, true };
+    ParticleEffectControl lightRainEffect_{ false, 8, 1.0f, true };
+    ParticleEffectControl lightSpiralEffect_{ false, 24, 1.0f, true };
+    float particleEffectEmitTimer_ = 0.0f;
+    bool lastCylinderEffectEnabled_ = false;
+    int lastCylinderEffectEmitCount_ = 1;
+    float lastCylinderEffectScale_ = 1.0f;
+    bool lastCylinderEffectBillboard_ = false;
+    bool refreshCylinderEffect_ = false;
+    bool isGameViewCameraDragging_ = false;
   
     //アニメーション
     Model::Animation walkAnimation_;

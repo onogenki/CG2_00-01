@@ -103,6 +103,13 @@ bool WinApp::ProcessMessage()
 	return false;
 }
 
+void WinApp::RequestClose()
+{
+	if (hwnd) {
+		PostMessage(hwnd, WM_CLOSE, 0, 0);
+	}
+}
+
 void WinApp::SetWindowMode(WindowMode mode)
 {
 	if (!hwnd || mode == GetWindowMode()) {

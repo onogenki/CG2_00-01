@@ -36,6 +36,7 @@ public:
 	// マウス
 	LONG GetMouseX() const { return mouseState.lX; }
 	LONG GetMouseY() const { return mouseState.lY; }
+	LONG GetMouseWheel() const { return mouseState.lZ; }
 	Vector2 GetMouseScreen() const {
 		return Vector2{
 static_cast<float>(mouseScreenX),
@@ -43,6 +44,7 @@ static_cast<float>(mouseScreenY)
 		};
 	}
 	bool IsMouseButtonPressed(int button);
+	bool TriggerMouseButton(int button);
 
 	// ゲームパッド
 	bool IsPadButtonPressed(int padIndex, int button);//プッシュ
@@ -71,6 +73,7 @@ private:
 
 	// マウス
 	ComPtr<IDirectInputDevice8> mouse = nullptr;
+	DIMOUSESTATE mouseStatePre{};
 	DIMOUSESTATE mouseState{}; // マウスの状態
 	int mouseScreenX; // マウスのスクリーン座標X
 	int mouseScreenY; // マウスのスクリーン座標Y

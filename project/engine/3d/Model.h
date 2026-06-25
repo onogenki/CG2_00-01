@@ -143,6 +143,8 @@ public:
 
 	struct Skeleton
 	{
+		std::vector<const NodeAnimation*> animationNodeMap;
+		const Animation* cachedAnimation = nullptr;
 		int32_t root;//RootJointのIndex
 		std::map<std::string, int32_t>jointMap;//Joint名とIndexとの辞書
 		std::vector<Joint>joints;//所属しているジョイント
@@ -190,6 +192,7 @@ public:
 	}
 
 	//アニメーション適用
+	void BuildAnimationMapping(Skeleton& skeleton, const Animation& animation);
 	void ApplyAnimation(Skeleton& skeleton, const Animation& animation, float animationTime);
 
 	ModelData& GetModelData() { return modelData; }

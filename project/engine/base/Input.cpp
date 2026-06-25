@@ -59,6 +59,7 @@ void Input::Update()
 {
 	//前回のキー入力を保存
 	memcpy(keyPre, key, sizeof(key));
+	mouseStatePre = mouseState;
 	//キーボード情報の取得開始
 	keyboard->Acquire();
 	//全キーの入力情報を取得する
@@ -231,6 +232,11 @@ bool Input::IsMouseButtonPressed(int button) {
 		return true;
 	}
 	return false;
+}
+
+bool Input::TriggerMouseButton(int button) {
+	if (button < 0 || button >= 4) return false;
+	return (mouseState.rgbButtons[button] & 0x80) && !(mouseStatePre.rgbButtons[button] & 0x80);
 }
 
 // ゲームパッドのボタンが押されたかどうか
