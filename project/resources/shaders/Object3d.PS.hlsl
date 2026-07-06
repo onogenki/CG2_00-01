@@ -12,9 +12,9 @@ struct Material
 
 struct DirectionalLight
 {
-    float32_t4 color; //繝ｩ繧､繝医・濶ｲ
-    float32_t3 direction; //繝ｩ繧､繝医・蜷代″
-    float intensity; //霈晏ｺｦ
+    float32_t4 color; //ライトの色
+    float32_t3 direction; //ライトの向き
+    float intensity; //輝度
     
     float specularPower;
     float specularStrength;
@@ -23,23 +23,23 @@ struct DirectionalLight
 
 struct PointLight
 {
-    float32_t4 color;//繝ｩ繧､繝医・濶ｲ
-    float32_t3 position;//繝ｩ繧､繝医・菴咲ｽｮ
-    float intensity;//霈晏ｺｦ
-    float radius;//繝ｩ繧､繝医・螻翫￥譛螟ｧ霍晞屬
-    float decay;//貂幄｡ｰ邇・
+    float32_t4 color; //ライトの色
+    float32_t3 position; //ライトの位置
+    float intensity; //輝度
+    float radius; //ライトの届く最大距離
+    float decay; //減衰率
 };
 
 struct SpotLight
 {
-    float32_t4 color;//繝ｩ繧､繝医・濶ｲ
-    float32_t3 position;//繝ｩ繧､繝医・菴咲ｽｮ
-    float intensity;//霈晏ｺｦ
-    float32_t3 direction;//繧ｹ繝昴ャ繝医Λ繧､繝医・譁ｹ蜷・
-    float distance;//繝ｩ繧､繝医・螻翫￥譛螟ｧ霍晞屬
-    float decay;//貂幄｡ｰ邇・
-    float cosAngle;//繧ｹ繝昴ャ繝医Λ繧､繝医・菴咎渊
-    float cosFalloffStart;//Falloff髢句ｧ九・隗貞ｺｦ
+    float32_t4 color; //ライトの色
+    float32_t3 position; //ライトの位置
+    float intensity; //輝度
+    float32_t3 direction; //スポットライトの方向
+    float distance; //ライトの届く最大距離
+    float decay; //減衰率
+    float cosAngle; //スポットライトの余韻
+    float cosFalloffStart; //Falloff開始の角度
 };
 
 struct PixelShaderOutput
@@ -69,19 +69,20 @@ PixelShaderOutput main(VertexShaderOutput input)
     float32_t4 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
     float32_t4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
     
-    // 豕慕ｷ・
+    // 法線
     float32_t3 N = normalize(input.normal);
-    //隕也ｷ壹・繧ｯ繝医Ν
+    //視線ベクトル
     float32_t3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
     
     ///
-    ///蟷ｳ陦悟・貅・
+    ///平行光源
     ///
-    // 繝ｩ繧､繝域婿蜷・
+    // ライト方向
+    
     float32_t3 L = gDirectionalLight.direction;
     float cosDirectional = saturate(dot(N, L));
     
-    //諡｡謨｣蜿榊ｰ・
+    //拡散反射
     float32_t3 diffuseDirectionalLight =
         gMaterial.color.rgb *
         textureColor.rgb *
@@ -89,7 +90,7 @@ PixelShaderOutput main(VertexShaderOutput input)
         cosDirectional *
         gDirectionalLight.intensity;
 
-    // 髀｡髱｢蜿榊ｰ・
+    // 鏡面反射
     float32_t3 halfVectorDirectional = normalize(-L + toEye);
     float NDotHDirectional = dot(N, halfVectorDirectional);
     float specularPowDirectional =
@@ -99,24 +100,24 @@ PixelShaderOutput main(VertexShaderOutput input)
         gDirectionalLight.intensity *
         specularPowDirectional *
         float32_t3(1.0f, 1.0f, 1.0f);
-
+    
     ///
-    ///轤ｹ蜈画ｺ舌・險育ｮ・
+    ///点光源の計算
     ///
     
-    //蜈･蟆・・縺ｮ譁ｹ蜷・
-    float32_t3 pointLightDirection = normalize(input.worldPosition - gPointLight.position);//繝ｩ繧､繝医°繧蛾らせ縺ｮ譁ｹ蜷代↓
+    //入射光の方向
     
-    //貂幄｡ｰ菫よ焚縺ｮ險育ｮ・
-    float pointDistance = length(gPointLight.position - input.worldPosition); // 繝昴う繝ｳ繝医Λ繧､繝医∈縺ｮ霍晞屬
-    float pointFactor = pow(saturate(-pointDistance / gPointLight.radius + 1.0f), gPointLight.decay); //謖・焚縺ｫ繧医ｋ繧ｳ繝ｳ繝医Ο繝ｼ繝ｫ
+    float32_t3 pointLightDirection = normalize(input.worldPosition - gPointLight.position);
     
-    //諡｡謨｣蜿榊ｰ・
-    float cosPoint = saturate(dot(N, -pointLightDirection));//鬆らせ縺九ｉ繝ｩ繧､繝医∈縺ｮ譁ｹ蜷代↓
+    //減衰係数の計算
+    float pointDistance = length(gPointLight.position - input.worldPosition);
+    float pointFactor = pow(saturate(-pointDistance / gPointLight.radius + 1.0f), gPointLight.decay); 
+    
+    //拡散反射
+    float cosPoint = saturate(dot(N, -pointLightDirection));
     float32_t3 diffusePointLight =
     gMaterial.color.rgb * textureColor.rgb * gPointLight.color.rgb * cosPoint * gPointLight.intensity * pointFactor;
-    
-    //髀｡髱｢蜿榊ｰ・
+    //鏡面反射
     float32_t3 halfVectorPoint = normalize(-pointLightDirection + toEye);
     float NDotHPoint = dot(N, halfVectorPoint);
     float specularPowPoint = pow(saturate(NDotHPoint), gMaterial.shininess);
@@ -124,36 +125,35 @@ PixelShaderOutput main(VertexShaderOutput input)
     gPointLight.color.rgb * gPointLight.intensity * pointFactor * specularPowPoint * float32_t3(1.0f, 1.0f, 1.0f);
     
     ///
-    ///繧ｹ繝昴ャ繝医Λ繧､繝・
+    ///スポットライト
     ///
     
-    //繝ｩ繧､繝医°繧蛾らせ縺ｸ縺ｮ譁ｹ蜷・
+    //ライトから頂点への方向
     float32_t3 spotLightDirectionOnSurface = normalize(input.worldPosition - gSpotLight.position);
     
-    //霍晞屬縺ｫ繧医ｋ貂幄｡ｰ
+    //距離による減衰
     float distanceSpot = length(gSpotLight.position - input.worldPosition);
     float attenuationFactor = pow(saturate(-distanceSpot / gSpotLight.distance + 1.0f), gSpotLight.decay);
     
-    //隗貞ｺｦ縺ｫ繧医ｋ貂幄｡ｰ
+    //角度による減衰
     float cosAngle = dot(spotLightDirectionOnSurface, gSpotLight.direction);
-     //cosFalloffStart縺ｨcosAngle縺悟酔縺伜､縺ｫ縺ｪ縺｣縺ｦ繧・.00001f 縺梧ｮ九ｋ縺溘ａ縲∫悄縺｣鮟偵・逵溘▲逋ｽ繧帝亟縺・
     float falloffFactor = saturate((cosAngle - gSpotLight.cosAngle) / max(gSpotLight.cosFalloffStart - gSpotLight.cosAngle, 0.00001f));
 
-    //諡｡謨｣蜿榊ｰ・
+    //拡散反射
     float cosSpot = saturate(dot(N, -spotLightDirectionOnSurface));
     float32_t3 diffuseSpotLight = gMaterial.color.rgb * textureColor.rgb * gSpotLight.color.rgb * cosSpot * gSpotLight.intensity * attenuationFactor * falloffFactor;
-    
-    //髀｡髱｢蜿榊ｰ・
+ 
+    //鏡面反射
     float32_t3 halfVectorSpot = normalize(-spotLightDirectionOnSurface + toEye);
     float NDotHSpot = dot(N, halfVectorSpot);
     float specularPowSpot = pow(saturate(NDotHSpot), gMaterial.shininess);
     float32_t3 specularSpotLight =
         gSpotLight.color.rgb * gSpotLight.intensity * attenuationFactor * falloffFactor * specularPowSpot * float32_t3(1.0f, 1.0f, 1.0f);
     
-    //蜈ｨ縺ｦ縺ｮ蜈峨ｒ蜷域・
+    //全ての光を合成
     output.color.rgb = diffuseDirectionalLight + specularDirectionalLight + diffusePointLight + specularPointLight + diffuseSpotLight + specularSpotLight;
     
-    // Sample the environment map only when this material needs reflection.
+    
     if (gMaterial.environmentCoefficient > 0.0f)
     {
         float32_t3 cameraToPosition = normalize(input.worldPosition - gCamera.worldPosition);
@@ -161,8 +161,8 @@ PixelShaderOutput main(VertexShaderOutput input)
         float32_t4 enviromentColor = gEnvironmentTexture.Sample(gSampler, reflectedVector);
     
         output.color.rgb += enviromentColor.rgb * gMaterial.environmentCoefficient;
-    }
-    // 繧｢繝ｫ繝輔ぃ
+    } 
+    // アルファ
     output.color.a =
         gMaterial.color.a * textureColor.a;
     

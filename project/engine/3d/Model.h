@@ -92,6 +92,11 @@ public:
 
 	struct SkinCluster
 	{
+		struct SkinningInformation
+		{
+			uint32_t numVertices;
+		};
+
 		std::vector<Matrix4x4>inverseBindPoseMatrices;
 		Microsoft::WRL::ComPtr<ID3D12Resource>influenceResource;
 		D3D12_VERTEX_BUFFER_VIEW influenceBufferView;
@@ -99,7 +104,14 @@ public:
 		Microsoft::WRL::ComPtr<ID3D12Resource>paletteResource;
 		std::span<WellForGPU>mappedPalette;
 		std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>paletteSrvHandle;
-
+		std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>inputVertexSrvHandle;
+		std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>influenceSrvHandle;
+		Microsoft::WRL::ComPtr<ID3D12Resource>outputVertexResource;
+		D3D12_VERTEX_BUFFER_VIEW outputVertexBufferView;
+		std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>outputVertexUavHandle;
+		D3D12_RESOURCE_STATES outputVertexResourceState = D3D12_RESOURCE_STATE_COMMON;
+		Microsoft::WRL::ComPtr<ID3D12Resource>skinningInformationResource;
+		SkinningInformation* mappedSkinningInformation = nullptr;
 	};
 
 	struct ModelData {
@@ -176,6 +188,8 @@ public:
 
 	// スキニングモデル描画用（骨あり）
 	void Draw(const SkinCluster& skinCluster);
+	void DispatchSkinning(SkinCluster& skinCluster);
+	void DrawSkinned(const SkinCluster& skinCluster);
 
 	void SetTexture(const std::string& filePath);
 

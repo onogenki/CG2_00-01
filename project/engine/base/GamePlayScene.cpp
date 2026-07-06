@@ -591,7 +591,7 @@ void GamePlayScene::Draw()
 	}
 
 	// アニメーションモデル用の描画
-	object3dCommon->SetSkinningCommonDrawSetting();
+	object3dCommon->SetCommonDrawSetting();
 	for (const auto& object3d : animationObjects) {
 		if (object3d->IsSkeletal()) {
 			object3d->Draw();

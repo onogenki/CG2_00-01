@@ -29,6 +29,7 @@ public:
 
 	//共通描画設定
 	void SetCommonDrawSetting();
+	void SetSkinningComputeSetting();
 
 	//setter
 	void SetDefaultCamera(Camera* camera) { this->defaultCamera_ = camera; }
@@ -67,6 +68,8 @@ private:
 	// スキニング用のルートシグネチャとパイプライン
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> skinningRootSignature_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> skinningGraphicsPipelineState_;
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> skinningComputeRootSignature_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> skinningComputePipelineState_;
 
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> skyboxRootSignature_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> skyboxGraphicsPipelineState_;
@@ -74,6 +77,8 @@ private:
 	// スキニング用の生成関数
 	void CreateSkinningRootSignature();
 	void CreateSkinningGraphicsPipeline();
+	void CreateSkinningComputeRootSignature();
+	void CreateSkinningComputePipeline();
 
 	//Skybox用生成関数
 	void CreateSkyboxRootSignature();

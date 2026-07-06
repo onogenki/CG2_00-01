@@ -13,8 +13,8 @@ void Object3dCommon::Initialize(DirectXCommon* dxCommon)
 	CreateGraphicsPipeline();
 
 	//スキニング用の生成
-	CreateSkinningRootSignature();
-	CreateSkinningGraphicsPipeline();
+	CreateSkinningComputeRootSignature();
+	CreateSkinningComputePipeline();
 
 	CreateSkyboxRootSignature();
 	CreateSkyboxPipeline();
@@ -40,6 +40,14 @@ void Object3dCommon::SetSkinningCommonDrawSetting()
 	commandList->SetGraphicsRootSignature(skinningRootSignature_.Get());
 	commandList->SetPipelineState(skinningGraphicsPipelineState_.Get());
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+}
+
+void Object3dCommon::SetSkinningComputeSetting()
+{
+	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
+
+	commandList->SetComputeRootSignature(skinningComputeRootSignature_.Get());
+	commandList->SetPipelineState(skinningComputePipelineState_.Get());
 }
 
 void Object3dCommon::CreateRootSignature()
@@ -440,6 +448,68 @@ void Object3dCommon::CreateSkinningGraphicsPipeline()
 	// 実際に生成
 	hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(&graphicsPipelineStateDesc,
 		IID_PPV_ARGS(&skinningGraphicsPipelineState_)); // メンバ変数 graphicsPipelineState_ に保存
+	assert(SUCCEEDED(hr));
+}
+
+void Object3dCommon::CreateSkinningComputeRootSignature()
+{
+	D3D12_DESCRIPTOR_RANGE descriptorRanges[4] = {};
+	for (uint32_t index = 0; index < 3; ++index)
+	{
+		descriptorRanges[index].BaseShaderRegister = index;
+		descriptorRanges[index].NumDescriptors = 1;
+		descriptorRanges[index].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		descriptorRanges[index].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	}
+	descriptorRanges[3].BaseShaderRegister = 0;
+	descriptorRanges[3].NumDescriptors = 1;
+	descriptorRanges[3].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+	descriptorRanges[3].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+	D3D12_ROOT_PARAMETER rootParameters[5] = {};
+	for (uint32_t index = 0; index < 4; ++index)
+	{
+		rootParameters[index].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParameters[index].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+		rootParameters[index].DescriptorTable.pDescriptorRanges = &descriptorRanges[index];
+		rootParameters[index].DescriptorTable.NumDescriptorRanges = 1;
+	}
+	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[4].Descriptor.ShaderRegister = 0;
+
+	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
+	descriptionRootSignature.NumParameters = _countof(rootParameters);
+	descriptionRootSignature.pParameters = rootParameters;
+	descriptionRootSignature.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+
+	Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob = nullptr;
+	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
+	HRESULT hr = D3D12SerializeRootSignature(&descriptionRootSignature,
+		D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
+	assert(SUCCEEDED(hr));
+
+	hr = dxCommon_->GetDevice()->CreateRootSignature(0,
+		signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(),
+		IID_PPV_ARGS(&skinningComputeRootSignature_));
+	assert(SUCCEEDED(hr));
+}
+
+void Object3dCommon::CreateSkinningComputePipeline()
+{
+	Microsoft::WRL::ComPtr<IDxcBlob> computeShaderBlob = dxCommon_->CompileShader(
+		L"resources/shaders/Skinning.CS.hlsl", L"cs_6_0");
+	assert(computeShaderBlob != nullptr);
+
+	D3D12_COMPUTE_PIPELINE_STATE_DESC computePipelineStateDesc{};
+	computePipelineStateDesc.CS = {
+		computeShaderBlob->GetBufferPointer(),
+		computeShaderBlob->GetBufferSize()
+	};
+	computePipelineStateDesc.pRootSignature = skinningComputeRootSignature_.Get();
+
+	HRESULT hr = dxCommon_->GetDevice()->CreateComputePipelineState(
+		&computePipelineStateDesc, IID_PPV_ARGS(&skinningComputePipelineState_));
 	assert(SUCCEEDED(hr));
 }
 

@@ -103,7 +103,6 @@ private:
 	Vector2 size = { 640.0f,360.0f };
 
 	Transform transform{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
-	//D3D12_GPU_DESCRIPTOR_HANDLE textureHandle_;
 
 	Transform uvTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 

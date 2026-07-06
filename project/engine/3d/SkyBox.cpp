@@ -19,14 +19,14 @@ void SkyBox::Initialize(DirectXCommon* dxCommon, Camera* camera) {
     ID3D12Device* device = dxCommon_->GetDevice();
 
     const uint32_t vertexCount = 24;
-    // 【修正】頂点バッファの生成が抜けていたのを追加
+    // 頂点バッファの生成が抜けていたのを追加
     vertexBuffer_ = dxCommon_->CreateBufferResource(sizeof(VertexData) * vertexCount);
 
     vertexBufferView_.BufferLocation = vertexBuffer_->GetGPUVirtualAddress();
     vertexBufferView_.SizeInBytes = sizeof(VertexData) * vertexCount;
     vertexBufferView_.StrideInBytes = sizeof(VertexData);
 
-    // 【修正】適切な構造体ポインタ(VertexData*)としてMapする
+    // 適切な構造体ポインタ(VertexData*)としてMapする
     VertexData* vertexData = nullptr;
     vertexBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 

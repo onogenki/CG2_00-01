@@ -10,7 +10,7 @@ struct PixelShaderOutput
     float32_t4 color : SV_TARGET0;
 };
 
-//Cubemapを利用するのに使ぁE
+//Cubemapを利用するのに使う
 TextureCube<float32_t4> gTexture : register(t0);
 
 ConstantBuffer<Material> gMaterial : register(b0);
