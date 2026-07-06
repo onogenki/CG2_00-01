@@ -81,6 +81,27 @@ void Object3d::Draw()
 {
 	// コマンドリストを取得
 	ID3D12GraphicsCommandList* commandList = object3dCommon->GetDxCommon()->GetCommandList();
+	if (model_ && isSkeletal_)
+	{
+		object3dCommon->SetSkinningComputeSetting();
+		model_->DispatchSkinning(skinCluster_);
+
+		object3dCommon->SetCommonDrawSetting();
+		commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
+		commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
+		commandList->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
+		commandList->SetGraphicsRootConstantBufferView(5, pointLightResource->GetGPUVirtualAddress());
+		commandList->SetGraphicsRootConstantBufferView(6, spotLightResource->GetGPUVirtualAddress());
+		const std::string& environmentTexturePath = object3dCommon->GetEnvironmentTexturePath();
+		if (!environmentTexturePath.empty() && GetEnvironmentCoefficient() > 0.0f)
+		{
+			D3D12_GPU_DESCRIPTOR_HANDLE environmentTextureSrvHandle =
+				TextureManager::GetInstance()->GetSrvHandleGPU(environmentTexturePath);
+			commandList->SetGraphicsRootDescriptorTable(7, environmentTextureSrvHandle);
+		}
+		model_->DrawSkinned(skinCluster_);
+		return;
+	}
 	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());

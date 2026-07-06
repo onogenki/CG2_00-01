@@ -4,8 +4,37 @@ struct Well
     float32_t4x4 skeletonSpaceInverseTransposeMatrix;
 };
 
+//SkinningObject3d.VS.hlslで作ったものと同じPalette
 StructuredBuffer<Well> gMatrixPalette : register(t0);
-    
+//VertexBufferViewのstream0として利用していた入力頂点
+StructuredBuffer<Vertex> gInputVertices : register(t1);
+//VertexBufferViewのStream1として利用していた入力インフルエンス
+StructuredBuffer<VertexInfluence> gInfluences : register(t2);
+//Skinning計算後の頂点データ。SkinnedVertex
+RWStructuredBuffer<vertex> gOutputVertices : register(u0);
+//Skinningに関するちょっとした情報
+ConstantBuffer<SkinningInformation> gSkinningInformation : register(b0);
+
+RWStructuredBuffer<Vertex> gOutputVertices : register(u0);
+
+resourceDesc.Flags=D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+struct vertex
+{
+    float32_t4 position;
+    float32_t2 texcoord;
+    float32_t3 normal;
+};
+struct VertexInfluence
+{
+    float32_t4 weight;
+    int32_t4 index;
+};
+struct SkinningInformation
+{
+    uint32_t numVertices;
+};
+
 struct TransformationMatrix
 {
     float32_t4x4 WVP;
@@ -41,30 +70,31 @@ struct Skinned
 Skinned Skinning(VertexShaderInput input)
 {
     Skinned skinned;
-    //Skinning縺ｮ蜃ｦ逅・ｒ縺吶ｋ
-    //菴咲ｽｮ縺ｮ螟画鋤
+    //Skinningの処理をする
+    //位置の変換
     skinned.position = mul(input.position, gMatrixPalette[input.index.x].skeletonSpaceMatrix) * input.weight.x;
     skinned.position += mul(input.position, gMatrixPalette[input.index.y].skeletonSpaceMatrix) * input.weight.y;
     skinned.position += mul(input.position, gMatrixPalette[input.index.z].skeletonSpaceMatrix) * input.weight.z;
     skinned.position += mul(input.position, gMatrixPalette[input.index.w].skeletonSpaceMatrix) * input.weight.w;
-    skinned.position.w = 1.0f; //遒ｺ螳溘↓1繧貞・繧後ｋ
-
-//豕慕ｷ壹・螟画鋤
+    skinned.position.w = 1.0f; //確実に1を入れる
+    //法線の変換
     skinned.normal = mul(input.normal, (float32_t3x3) gMatrixPalette[input.index.x].skeletonSpaceInverseTransposeMatrix) * input.weight.x;
     skinned.normal += mul(input.normal, (float32_t3x3) gMatrixPalette[input.index.y].skeletonSpaceInverseTransposeMatrix) * input.weight.y;
     skinned.normal += mul(input.normal, (float32_t3x3) gMatrixPalette[input.index.z].skeletonSpaceInverseTransposeMatrix) * input.weight.z;
     skinned.normal += mul(input.normal, (float32_t3x3) gMatrixPalette[input.index.w].skeletonSpaceInverseTransposeMatrix) * input.weight.w;
-    skinned.normal = normalize(skinned.normal); //豁｣隕丞喧縺励※謌ｻ縺励※縺ゅ￡繧・
+    skinned.normal = normalize(skinned.normal); //正規化して戻してあげる
     
     return skinned;
 }
 
 VertexShaderOutput main(VertexShaderInput input)
 {
+    //まずSkinning計算を行って、Skinning後の頂点情報を手に入れる。
+    //ここでの頂点もSkeletonSpace
     VertexShaderOutput output;
-    Skinned skinned = Skinning(input); //縺ｾ縺售kinning險育ｮ励ｒ陦後▲縺ｦ縲ヾkinning蠕後・鬆らせ諠・ｱ繧呈焔縺ｫ蜈･繧後ｋ縲ゅ％縺薙〒縺ｮ鬆らせ繧４keletonSpace
+    Skinned skinned = Skinning(input);
     
-    //Skinning邨先棡繧剃ｽｿ縺｣縺ｦ螟画鋤
+    //Skinning結果を使って変換
     output.position = mul(skinned.position, gTransformationMatrix.WVP);
     output.worldPosition = mul(skinned.position, gTransformationMatrix.World).xyz;
     output.texcoord = input.texcoord;
