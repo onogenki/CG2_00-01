@@ -5,12 +5,14 @@
 #include "PostEffect.h"
 #include "ImGuiManager.h"
 #include "Input.h"
+#include "LevelLoader.h"
 #include"SceneManager.h"
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui.h"
 #endif
 #include <algorithm>
 #include <dinput.h>
+#include <fstream>
 using namespace MyMath;
 
 void GamePlayScene::Initialize()
@@ -128,6 +130,36 @@ void GamePlayScene::Initialize()
 	objectAxis = objAxis.get();//外部保存用に記録
 
 	animationObjects.push_back(std::move(objAxis));//アニメーションモデル専用に登録
+
+	// レベルデータからオブジェクトを生成、配置
+	std::unique_ptr<LevelLoader::LevelData> levelData(LevelLoader::Load("scene"));
+	auto createLevelObjects = [&](auto&& self, const std::vector<LevelLoader::ObjectData>& objects) -> void
+	{
+		for (const LevelLoader::ObjectData& objectData : objects)
+		{
+			if (objectData.type == "MESH" && !objectData.fileName.empty())
+			{
+				const std::string modelPath = "resources/" + objectData.fileName;
+				std::ifstream modelFile(modelPath);
+				if (!modelFile.fail())
+				{
+					ModelManager::GetInstance()->LoadModel(objectData.fileName);
+
+					auto newObject = std::make_unique<Object3d>();
+					newObject->Initialize(object3dCommon);
+					newObject->SetModel(objectData.fileName);
+					newObject->SetTranslate(objectData.translation);
+					newObject->SetRotate(objectData.rotation);
+					newObject->SetScale(objectData.scaling);
+
+					normalObjects.push_back(std::move(newObject));
+				}
+			}
+
+			self(self, objectData.children);
+		}
+	};
+	createLevelObjects(createLevelObjects, levelData->objects);
 	
 	for (uint32_t i = 0; i < 1; ++i)
 	{
