@@ -1,9 +1,11 @@
 #include "Model.h"
 #include "DirectXCommon.h"
 #include "TextureManager.h"
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <cassert>
+#include <filesystem>
 
 using namespace MyMath;
 
@@ -43,6 +45,7 @@ Model::SkinCluster Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12D
 	SkinCluster skinCluster;
 	//マネージャから次使っていい番号をもらう
 	uint32_t srvIndex = SrvManager::GetInstance()->Allocate();
+	skinCluster.paletteSrvIndex = srvIndex;
 
 	//paletter用のResourceを確保
 	skinCluster.paletteResource = modelCommon_->GetDxCommon()->CreateBufferResource(sizeof(WellForGPU) * skeleton.joints.size());
@@ -64,6 +67,7 @@ Model::SkinCluster Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12D
 	device->CreateShaderResourceView(skinCluster.paletteResource.Get(), &paletterSrvDesc, skinCluster.paletteSrvHandle.first);
 
 	uint32_t inputVertexSrvIndex = SrvManager::GetInstance()->Allocate();
+	skinCluster.inputVertexSrvIndex = inputVertexSrvIndex;
 	skinCluster.inputVertexSrvHandle.first = SrvManager::GetInstance()->GetCPUDescriptorHandle(inputVertexSrvIndex);
 	skinCluster.inputVertexSrvHandle.second = SrvManager::GetInstance()->GetGPUDescriptorHandle(inputVertexSrvIndex);
 	SrvManager::GetInstance()->CreateSRVforStructuredBuffer(
@@ -82,6 +86,7 @@ Model::SkinCluster Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12D
 	skinCluster.influenceBufferView.StrideInBytes = sizeof(VertexInfluence);
 
 	uint32_t influenceSrvIndex = SrvManager::GetInstance()->Allocate();
+	skinCluster.influenceSrvIndex = influenceSrvIndex;
 	skinCluster.influenceSrvHandle.first = SrvManager::GetInstance()->GetCPUDescriptorHandle(influenceSrvIndex);
 	skinCluster.influenceSrvHandle.second = SrvManager::GetInstance()->GetGPUDescriptorHandle(influenceSrvIndex);
 	SrvManager::GetInstance()->CreateSRVforStructuredBuffer(
@@ -114,6 +119,7 @@ Model::SkinCluster Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12D
 	skinCluster.outputVertexBufferView.StrideInBytes = sizeof(VertexData);
 
 	uint32_t outputVertexUavIndex = SrvManager::GetInstance()->Allocate();
+	skinCluster.outputVertexUavIndex = outputVertexUavIndex;
 	skinCluster.outputVertexUavHandle.first = SrvManager::GetInstance()->GetCPUDescriptorHandle(outputVertexUavIndex);
 	skinCluster.outputVertexUavHandle.second = SrvManager::GetInstance()->GetGPUDescriptorHandle(outputVertexUavIndex);
 
@@ -213,10 +219,13 @@ Model::Animation Model::LoadAnimationFile(const std::string& directoryPath, cons
 	std::string filePath = directoryPath + "/" + filename;
 	const aiScene* scene = importer.ReadFile(filePath.c_str(), 0);
 
-	assert(scene->mNumAnimations != 0);//アニメーションがない
+	if (!scene || scene->mNumAnimations == 0) {
+		return animation;
+	}
 	aiAnimation* animationAssimp = scene->mAnimations[0];  //周波数における長さ/周波数
 
-	animation.duration = float(animationAssimp->mDuration / animationAssimp->mTicksPerSecond);//時間の単位を秒に変換
+	const double ticksPerSecond = animationAssimp->mTicksPerSecond != 0.0 ? animationAssimp->mTicksPerSecond : 1.0;
+	animation.duration = float(animationAssimp->mDuration / ticksPerSecond);//時間の単位を秒に変換
 
 	//NodeAnimation解析する
 	for (uint32_t channelIndex = 0; channelIndex < animationAssimp->mNumChannels; ++channelIndex)
@@ -228,7 +237,7 @@ Model::Animation Model::LoadAnimationFile(const std::string& directoryPath, cons
 		{
 			aiVectorKey& keyAssimp = nodeAnimationAssimp->mPositionKeys[keyIndex];
 			KeyframeVector3 keyframe;
-			keyframe.time = float(keyAssimp.mTime / animationAssimp->mTicksPerSecond);//秒に変換
+			keyframe.time = float(keyAssimp.mTime / ticksPerSecond);//秒に変換
 			keyframe.value = { -keyAssimp.mValue.x,keyAssimp.mValue.y,keyAssimp.mValue.z };//右手->左手
 			nodeAnimation.translate.keyframes.push_back(keyframe);
 		}
@@ -239,7 +248,7 @@ Model::Animation Model::LoadAnimationFile(const std::string& directoryPath, cons
 		{
 			aiQuatKey& keyAssimp = nodeAnimationAssimp->mRotationKeys[keyIndex];
 			KeyframeQuaternion keyframe;
-			keyframe.time = float(keyAssimp.mTime / animationAssimp->mTicksPerSecond); // 秒に変換
+			keyframe.time = float(keyAssimp.mTime / ticksPerSecond); // 秒に変換
 			// 右手->左手 (Quaternionの場合は y と z を反転)
 			//RotateはQuaternionで右手->左手に変換するために、yとzを反転させる必要がある。
 			keyframe.value = { keyAssimp.mValue.x, -keyAssimp.mValue.y, -keyAssimp.mValue.z, keyAssimp.mValue.w };
@@ -252,7 +261,7 @@ Model::Animation Model::LoadAnimationFile(const std::string& directoryPath, cons
 		{
 			aiVectorKey& keyAssimp = nodeAnimationAssimp->mScalingKeys[keyIndex];
 			KeyframeVector3 keyframe;
-			keyframe.time = float(keyAssimp.mTime / animationAssimp->mTicksPerSecond); // 秒に変換
+			keyframe.time = float(keyAssimp.mTime / ticksPerSecond); // 秒に変換
 			// Scale は変換不要　scaleはそのままでよい。
 			keyframe.value = { keyAssimp.mValue.x, keyAssimp.mValue.y, keyAssimp.mValue.z };
 
@@ -295,13 +304,15 @@ Model::Node Model::ReadNode(aiNode* node)
 	return result;
 }
 
-void Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPath, const std::string& filename)
+bool Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPath, const std::string& filename)
 {
 
 	//ModelCommonのポインタを引数からメンバ変数に記録する
 	modelCommon_ = modelCommon;
 	//モデル読み込み
-	LoadModelFile(directoryPath, filename);
+	if (!LoadModelFile(directoryPath, filename)) {
+		return false;
+	}
 
 	CreateIndexData();
 	//頂点データ作成
@@ -309,13 +320,17 @@ void Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPat
 	//マテリアルデータ作成
 	CreateMaterialData();
 	//pngが空ならuvChecker.pngに変える
+	const std::filesystem::path texturePath = modelData.material.textureFilePath;
 	if (modelData.material.textureFilePath.empty() ||
-		modelData.material.textureFilePath.find("None") != std::string::npos)
+		modelData.material.textureFilePath.find("None") != std::string::npos ||
+		modelData.material.textureFilePath.front() == '*' ||
+		!std::filesystem::exists(texturePath))
 	{
 		modelData.material.textureFilePath = "Resources/uvChecker.png";
 	}
 	//テクスチャ読み込み
 	TextureManager::GetInstance()->LoadTexture(modelData.material.textureFilePath);
+	return true;
 }
 
 void Model::Update(Skeleton& skeleton)
@@ -335,10 +350,13 @@ void Model::Update(Skeleton& skeleton)
 
 void Model::Update(SkinCluster& skinCluster, const Skeleton& skeleton)
 {
+	if (skinCluster.mappedPalette.data() == nullptr) {
+		return;
+	}
 
-	for (size_t jointIndex = 0; jointIndex < skeleton.joints.size(); ++jointIndex)
+	const size_t jointCount = (std::min)(skeleton.joints.size(), skinCluster.inverseBindPoseMatrices.size());
+	for (size_t jointIndex = 0; jointIndex < jointCount; ++jointIndex)
 	{
-		assert(jointIndex < skinCluster.inverseBindPoseMatrices.size());
 		skinCluster.mappedPalette[jointIndex].skeletonSpaceMatrix =
 			Multiply(skinCluster.inverseBindPoseMatrices[jointIndex], skeleton.joints[jointIndex].skeletonSpaceMatrix);
 		skinCluster.mappedPalette[jointIndex].skeletonSpaceInverseTransposeMatrix =
@@ -492,9 +510,15 @@ void Model::ApplyAnimation(Skeleton& skeleton, const Animation& animation, float
 		const NodeAnimation* rootNodeAnimation = skeleton.animationNodeMap[joint.index];
 		if (rootNodeAnimation)
 		{
-			joint.transform.translate = CalculateValue(rootNodeAnimation->translate.keyframes, animationTime);
-			joint.transform.rotate = CalculateValue(rootNodeAnimation->rotate.keyframes, animationTime);
-			joint.transform.scale = CalculateValue(rootNodeAnimation->scale.keyframes, animationTime);
+			if (!rootNodeAnimation->translate.keyframes.empty()) {
+				joint.transform.translate = CalculateValue(rootNodeAnimation->translate.keyframes, animationTime);
+			}
+			if (!rootNodeAnimation->rotate.keyframes.empty()) {
+				joint.transform.rotate = CalculateValue(rootNodeAnimation->rotate.keyframes, animationTime);
+			}
+			if (!rootNodeAnimation->scale.keyframes.empty()) {
+				joint.transform.scale = CalculateValue(rootNodeAnimation->scale.keyframes, animationTime);
+			}
 		}
 	}
 }
@@ -561,7 +585,7 @@ void Model::CreateMaterialData()
 	materialData->uvTransform = MakeIdentity4x4();
 }
 
-void Model::LoadModelFile(const std::string& directoryPath, const std::string& filename)
+bool Model::LoadModelFile(const std::string& directoryPath, const std::string& filename)
 {
 	// メンバ変数をクリアしておく
 	modelData.vertices.clear();
@@ -571,27 +595,36 @@ void Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 	Assimp::Importer importer;
 	std::string filePath = directoryPath + "/" + filename;
 
-	const aiScene* scene = importer.ReadFile(filePath.c_str(), aiProcess_FlipWindingOrder | aiProcess_FlipUVs | aiProcess_Triangulate);
-	assert(scene->HasMeshes());//メッシュがないのは対応しない
+	const aiScene* scene = importer.ReadFile(
+		filePath.c_str(),
+		aiProcess_FlipWindingOrder |
+		aiProcess_FlipUVs |
+		aiProcess_Triangulate |
+		aiProcess_GenNormals);
+	if (!scene || !scene->HasMeshes()) {
+		return false;
+	}
+	if (!scene->mRootNode) {
+		return false;
+	}
 
 	modelData.rootNode = ReadNode(scene->mRootNode);
 
 	for (uint32_t meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex)//mesh解析
 	{
 		aiMesh* mesh = scene->mMeshes[meshIndex];
-		assert(mesh->HasNormals());//法線がないMeshは今回は非対応
-		assert(mesh->HasTextureCoords(0));//TexcoordがないMeshは今回は非対応
-
 		//現在の頂点数を保存しておく(複数メッシュ対応のため)
-		assert(mesh->HasFaces());
+		if (!mesh->HasPositions() || !mesh->HasFaces()) {
+			continue;
+		}
 		uint32_t vertexOffset = static_cast<uint32_t>(modelData.vertices.size());
 
 		//まず頂点をすべて解析して配列に突っ込む
 		for (uint32_t v = 0; v < mesh->mNumVertices; ++v)
 		{
 			aiVector3D& position = mesh->mVertices[v];
-			aiVector3D& normal = mesh->mNormals[v];
-			aiVector3D& texcoord = mesh->mTextureCoords[0][v];
+			const aiVector3D normal = mesh->HasNormals() ? mesh->mNormals[v] : aiVector3D(0.0f, 1.0f, 0.0f);
+			const aiVector3D texcoord = mesh->HasTextureCoords(0) ? mesh->mTextureCoords[0][v] : aiVector3D(0.0f, 0.0f, 0.0f);
 
 			VertexData vertex;
 			vertex.position = { position.x,position.y,position.z,1.0f };
@@ -607,7 +640,9 @@ void Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 		for (uint32_t faceIndex = 0; faceIndex < mesh->mNumFaces; ++faceIndex)//face解析
 		{
 			aiFace& face = mesh->mFaces[faceIndex];
-			assert(face.mNumIndices == 3);//三角形のみサポート
+			if (face.mNumIndices != 3) {
+				continue;
+			}
 			for (uint32_t element = 0; element < face.mNumIndices; ++element)//vertex解析
 			{
 				uint32_t vertexIndex = face.mIndices[element];
@@ -651,7 +686,14 @@ void Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 		{
 			aiString textureFilePath;
 			material->GetTexture(aiTextureType_DIFFUSE, 0, &textureFilePath);
-			modelData.material.textureFilePath = directoryPath + "/" + textureFilePath.C_Str();
+			const std::filesystem::path modelPath = std::filesystem::path(directoryPath) / filename;
+			const std::filesystem::path texturePath = std::filesystem::path(textureFilePath.C_Str());
+			if (texturePath.is_absolute()) {
+				modelData.material.textureFilePath = texturePath.generic_string();
+			} else {
+				modelData.material.textureFilePath = (modelPath.parent_path() / texturePath).generic_string();
+			}
 		}
 	}
+	return !modelData.vertices.empty() && !modelData.indices.empty();
 }

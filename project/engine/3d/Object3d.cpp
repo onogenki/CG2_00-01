@@ -2,10 +2,16 @@
 #include "DirectXCommon.h"
 #include "Object3dCommon.h"
 #include "ModelManager.h"
+#include "SrvManager.h"
 #include "TextureManager.h"
 #include <cassert>
 #include "MyMath.h"
 using namespace MyMath;
+
+Object3d::~Object3d()
+{
+	ReleaseSkinClusterDescriptors();
+}
 
 void Object3d::Initialize(Object3dCommon* object3dCommon)
 {//引数で受け取ってメンバ変数に記録する
@@ -32,7 +38,7 @@ void Object3d::Initialize(Object3dCommon* object3dCommon)
 void Object3d::Update()
 {
 
-	if (model_ && isAnimating_)
+	if (model_ && isAnimating_ && currentAnimation_.duration > 0.0f)
 	{// 実時間を 1/60 秒ずつ進める
 		animationTime_ += DirectXCommon::GetInstance()->GetDeltaTime();
 
@@ -132,12 +138,21 @@ void Object3d::SetModel(const std::string& filePath)
 {
 	// モデルマネージャからモデルを検索してセットする
 	model_ = ModelManager::GetInstance()->FindModel(filePath);
+	modelName_ = filePath;
 }
 // この関数を初期化時に1回だけ呼ぶ
 void Object3d::InitializeAnimation()
 {
 	//既に同じモデルがセットされている場合は、再生成を防ぐために何もせず抜ける
 	if (!model_)return;
+	ReleaseSkinClusterDescriptors();
+	if (model_->GetModelData().skinClusterData.empty()) {
+		skeleton_ = {};
+		skinCluster_ = {};
+		isSkeletal_ = false;
+		isAnimating_ = false;
+		return;
+	}
 
 	//モデルの階層構造からスケルトンを生成
 	skeleton_ = model_->CreateSkeleton(model_->GetModelData().rootNode);
@@ -145,6 +160,14 @@ void Object3d::InitializeAnimation()
 	isSkeletal_ = !skeleton_.joints.empty();
 
 	if (isSkeletal_) {
+		constexpr uint32_t kSkinClusterDescriptorCount = 4;
+		if (!SrvManager::GetInstance()->CanAllocate(kSkinClusterDescriptorCount)) {
+			skeleton_ = {};
+			skinCluster_ = {};
+			isSkeletal_ = false;
+			isAnimating_ = false;
+			return;
+		}
 		//スケルトンがあるならSkinClusterも作成する
 		// （引数の descriptorHeap や device は DxCommon 等から引っ張ってくる）
 		auto device = object3dCommon->GetDxCommon()->GetDevice();
@@ -152,11 +175,29 @@ void Object3d::InitializeAnimation()
 		uint32_t descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 		skinCluster_ = model_->CreateSkinCluster(device, skeleton_, model_->GetModelData(), srvHeap, descriptorSize);
+		model_->Update(skeleton_);
+		model_->Update(skinCluster_, skeleton_);
 	}
 	else
 	{
 		isSkeletal_ = false;//アニメーションしないモデルはfalse
 	}
+}
+
+void Object3d::ReleaseSkinClusterDescriptors()
+{
+	auto freeIndex = [](uint32_t& index) {
+		if (index != UINT32_MAX) {
+			SrvManager::GetInstance()->Free(index);
+			index = UINT32_MAX;
+		}
+	};
+
+	freeIndex(skinCluster_.paletteSrvIndex);
+	freeIndex(skinCluster_.inputVertexSrvIndex);
+	freeIndex(skinCluster_.influenceSrvIndex);
+	freeIndex(skinCluster_.outputVertexUavIndex);
+	skinCluster_ = {};
 }
 
 void Object3d::PlayAnimation(const Model::Animation& animation)

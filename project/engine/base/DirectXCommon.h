@@ -7,6 +7,7 @@
 #include <array>
 #include "externals/DirectXTex/DirectXTex.h"
 #include<string>
+#include <vector>
 #include <dxcapi.h>
 #include<chrono>
 #include "Vector4.h"
@@ -111,6 +112,7 @@ public:
 
 	//GPU待ち関数
 	void WaitForGPU();
+	bool CaptureGameTexturePixels(std::vector<unsigned char>& pixels, int& outWidth, int& outHeight, bool usePostEffectTexture);
 
 	// テクスチャの転送コマンドを実行して完了を待つ関数
 	void ExecuteTextureTransfer(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages);

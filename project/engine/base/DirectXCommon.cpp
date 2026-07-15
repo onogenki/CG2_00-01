@@ -685,6 +685,137 @@ void DirectXCommon::WaitForGPU() {
 }
 
 
+bool DirectXCommon::CaptureGameTexturePixels(std::vector<unsigned char>& pixels, int& outWidth, int& outHeight, bool usePostEffectTexture)
+{
+	ID3D12Resource* sourceResource = usePostEffectTexture
+		? postEffectTextureResource_.Get()
+		: renderTextureResource_.Get();
+	if (!sourceResource || !device_ || !commandList_ || !commandQueue) {
+		return false;
+	}
+
+	const D3D12_RESOURCE_DESC sourceDesc = sourceResource->GetDesc();
+	if (sourceDesc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE2D ||
+		sourceDesc.Width == 0 || sourceDesc.Height == 0 ||
+		sourceDesc.DepthOrArraySize != 1 || sourceDesc.MipLevels == 0) {
+		return false;
+	}
+
+	D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
+	UINT numRows = 0;
+	UINT64 rowSizeInBytes = 0;
+	UINT64 totalBytes = 0;
+	device_->GetCopyableFootprints(&sourceDesc, 0, 1, 0, &footprint, &numRows, &rowSizeInBytes, &totalBytes);
+	if (totalBytes == 0 || numRows == 0 || rowSizeInBytes == 0) {
+		return false;
+	}
+
+	D3D12_HEAP_PROPERTIES heapProperties{};
+	heapProperties.Type = D3D12_HEAP_TYPE_READBACK;
+
+	D3D12_RESOURCE_DESC readbackDesc{};
+	readbackDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	readbackDesc.Width = totalBytes;
+	readbackDesc.Height = 1;
+	readbackDesc.DepthOrArraySize = 1;
+	readbackDesc.MipLevels = 1;
+	readbackDesc.SampleDesc.Count = 1;
+	readbackDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> readbackResource;
+	HRESULT result = device_->CreateCommittedResource(
+		&heapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&readbackDesc,
+		D3D12_RESOURCE_STATE_COPY_DEST,
+		nullptr,
+		IID_PPV_ARGS(&readbackResource));
+	if (FAILED(result)) {
+		return false;
+	}
+
+	const bool sourceWasShaderResource = usePostEffectTexture
+		? isPostEffectTextureShaderResource_
+		: isRenderTextureShaderResource_;
+	const D3D12_RESOURCE_STATES sourceStateBefore = sourceWasShaderResource
+		? D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+		: D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+	D3D12_RESOURCE_BARRIER toCopySource{};
+	toCopySource.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	toCopySource.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	toCopySource.Transition.pResource = sourceResource;
+	toCopySource.Transition.StateBefore = sourceStateBefore;
+	toCopySource.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+	toCopySource.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	commandList_->ResourceBarrier(1, &toCopySource);
+
+	D3D12_TEXTURE_COPY_LOCATION copySource{};
+	copySource.pResource = sourceResource;
+	copySource.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+	copySource.SubresourceIndex = 0;
+
+	D3D12_TEXTURE_COPY_LOCATION copyDestination{};
+	copyDestination.pResource = readbackResource.Get();
+	copyDestination.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+	copyDestination.PlacedFootprint = footprint;
+
+	commandList_->CopyTextureRegion(&copyDestination, 0, 0, 0, &copySource, nullptr);
+
+	D3D12_RESOURCE_BARRIER restoreState = toCopySource;
+	restoreState.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+	restoreState.Transition.StateAfter = sourceStateBefore;
+	commandList_->ResourceBarrier(1, &restoreState);
+
+	result = commandList_->Close();
+	if (FAILED(result)) {
+		return false;
+	}
+
+	ID3D12CommandList* commandLists[] = { commandList_.Get() };
+	commandQueue->ExecuteCommandLists(1, commandLists);
+	WaitForGPU();
+
+	outWidth = static_cast<int>(sourceDesc.Width);
+	outHeight = static_cast<int>(sourceDesc.Height);
+	const size_t tightImageSize = static_cast<size_t>(outWidth) * static_cast<size_t>(outHeight) * 4;
+	pixels.resize(tightImageSize);
+
+	unsigned char* mappedData = nullptr;
+	D3D12_RANGE readRange{ 0, totalBytes };
+	result = readbackResource->Map(0, &readRange, reinterpret_cast<void**>(&mappedData));
+	if (FAILED(result) || !mappedData) {
+		commandAllocators_[frameIndex_]->Reset();
+		commandList_->Reset(commandAllocators_[frameIndex_].Get(), nullptr);
+		return false;
+	}
+
+	const size_t sourceRowPitch = static_cast<size_t>(footprint.Footprint.RowPitch);
+	const size_t tightRowPitch = static_cast<size_t>(outWidth) * 4;
+	for (int y = 0; y < outHeight; ++y) {
+		const unsigned char* sourceRow = mappedData + footprint.Offset + static_cast<size_t>(y) * sourceRowPitch;
+		unsigned char* destinationRow = pixels.data() + static_cast<size_t>(y) * tightRowPitch;
+		for (int x = 0; x < outWidth; ++x) {
+			const unsigned char* sourcePixel = sourceRow + static_cast<size_t>(x) * 4;
+			unsigned char* destinationPixel = destinationRow + static_cast<size_t>(x) * 4;
+			destinationPixel[0] = sourcePixel[2];
+			destinationPixel[1] = sourcePixel[1];
+			destinationPixel[2] = sourcePixel[0];
+			destinationPixel[3] = sourcePixel[3];
+		}
+	}
+
+	D3D12_RANGE writtenRange{ 0, 0 };
+	readbackResource->Unmap(0, &writtenRange);
+
+	result = commandAllocators_[frameIndex_]->Reset();
+	if (FAILED(result)) {
+		return false;
+	}
+	result = commandList_->Reset(commandAllocators_[frameIndex_].Get(), nullptr);
+	return SUCCEEDED(result);
+}
+
 Microsoft::WRL::ComPtr < IDxcBlob> DirectXCommon::CompileShader(
 	//CompilerするShaderファイルへのパス
 	const std::wstring& filePath,

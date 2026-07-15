@@ -1,6 +1,7 @@
 #pragma once
 #include "DirectXCommon.h"
 #include <cassert>
+#include <array>
 #include<queue>
 
 class SrvManager
@@ -19,6 +20,8 @@ public:
 	uint32_t Allocate();
 	void Free(uint32_t index);//解放用の関数
 	bool CanAllocate() const;//空きがあるか確認する関数
+
+	bool CanAllocate(uint32_t count) const;
 
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle(uint32_t index);
 	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(uint32_t index);
@@ -52,7 +55,7 @@ private:
 	DirectXCommon* directXCommon = nullptr;
 
 	//最大SRV数(最大テクスチャ枚数)
-	static const uint32_t kMaxSRVCount;
+	static constexpr uint32_t kMaxSRVCount = 512;
 
 	//SRV用のデスクリプタサイズ
 	uint32_t descriptorSize;
@@ -62,6 +65,7 @@ private:
 
 	//空き番号を管理するキュー
 	std::queue<uint32_t> freeList_;
+	std::array<bool, kMaxSRVCount> allocated_{};
 
 };
 

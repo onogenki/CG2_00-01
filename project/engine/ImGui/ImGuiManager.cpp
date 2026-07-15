@@ -9,6 +9,7 @@
 #include "ParticleManager.h"
 #include "SceneManager.h"
 #include "PostEffect.h"
+#include <cmath>
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui_internal.h"
 #endif
@@ -26,6 +27,7 @@ void ImGuiManager::Initialize([[maybe_unused]] WinApp* winApp, [[maybe_unused]]D
 	ImGuiIO& io = ImGui::GetIO();
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+	io.IniFilename = "imgui_docking.ini";
 	//ImGuiのスタイルを設定
 	ImGui::StyleColorsDark();
 	ImGuiStyle& style = ImGui::GetStyle();
@@ -100,7 +102,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 	gameViewImageSize_ = {};
 	if (layoutSceneName_ != sceneName) {
 		layoutSceneName_ = sceneName;
-		layoutResetFrames_ = 2;
+		layoutResetFrames_ = 120;
 	}
 	if (layoutResetFrames_ > 0) {
 		resetDockLayout_ = true;
@@ -144,8 +146,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 		if (ImGui::BeginMenu("Windows")) {
 			ImGui::MenuItem("Game View", nullptr, &showGameView_);
 			ImGui::MenuItem("Scene", nullptr, &showSceneWindow_);
-			ImGui::MenuItem("Performance", nullptr, &showFpsWindow_);
-			ImGui::MenuItem("Post Effect", nullptr, &showPostEffectWindow_);
+			ImGui::TextDisabled("Top Tools contains FPS / Capture / Post Effect");
 			ImGui::Separator();
 			ImGui::MenuItem("Inspector", nullptr, &showModelWindow_);
 			ImGui::Separator();
@@ -157,19 +158,34 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				ResetLayoutToDefault();
 			}
 			ImGui::EndMenu();
-		}
-		ImGui::TextDisabled("Scene: %s", sceneName);
-		ImGui::SameLine();
-		ImGui::TextDisabled("FPS: %.1f", ImGui::GetIO().Framerate);
-		ImGui::EndMenuBar();
+	}
+	ImGui::TextDisabled("Scene: %s", sceneName);
+	ImGui::SameLine();
+	ImGui::TextDisabled("FPS: %.1f", ImGui::GetIO().Framerate);
+	ImGui::EndMenuBar();
 	}
 
-	const ImGuiID dockspaceId = ImGui::GetID("MainDockspaceV3");
-	if (resetDockLayout_ || ImGui::DockBuilderGetNode(dockspaceId) == nullptr) {
+	const ImGuiID dockspaceId = ImGui::GetID("MainDockspaceV10");
+	ImGuiDockNode* dockNode = ImGui::DockBuilderGetNode(dockspaceId);
+	const bool hasUsableViewport = viewport->WorkSize.x >= 640.0f && viewport->WorkSize.y >= 360.0f;
+	const bool hasTinySavedLayout =
+		dockNode != nullptr && (dockNode->Size.x < 128.0f || dockNode->Size.y < 128.0f);
+	if (hasUsableViewport && (resetDockLayout_ || dockNode == nullptr || hasTinySavedLayout)) {
 		BuildDefaultDockLayout(dockspaceId);
 		resetDockLayout_ = false;
 	}
 	ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+
+	const std::string currentSceneName = sceneName ? sceneName : "";
+	if (showModelWindow_ && currentSceneName != "GamePlay") {
+		if (inspectorDockId_ != 0) {
+			ImGui::SetNextWindowDockID(inspectorDockId_, ImGuiCond_Always);
+		}
+		ImGui::Begin("Inspector", &showModelWindow_);
+		ImGui::TextDisabled("Scene-specific controls are shown below when available.");
+		ImGui::Separator();
+		ImGui::End();
+	}
 
 	if (showGameView_) {
 		GameViewWindow();
@@ -177,11 +193,56 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 	if (showSceneWindow_) {
 		SceneWindow(sceneName);
 	}
-	if (showFpsWindow_) {
-		FPSWindow();
-	}
-	if (showPostEffectWindow_) {
-		PostEffectWindow();
+	if (currentSceneName != "GamePlay") {
+		if (ImGui::Begin("Top Tools")) {
+			ImGui::TextUnformatted("FPS");
+			static float sharedFpsValues[90] = {};
+			static int sharedFpsValueOffset = 0;
+			sharedFpsValues[sharedFpsValueOffset] = ImGui::GetIO().Framerate;
+			sharedFpsValueOffset = (sharedFpsValueOffset + 1) % 90;
+			char overlay[32];
+			snprintf(overlay, sizeof(overlay), "%.1f FPS", ImGui::GetIO().Framerate);
+			ImGui::PlotLines("##SharedTopToolsFPS", sharedFpsValues, 90, sharedFpsValueOffset, overlay, 0.0f, 120.0f, ImVec2(220.0f, 58.0f));
+			ImGui::SameLine();
+			ImGui::BeginGroup();
+			ImGui::TextUnformatted("Capture");
+			ImGui::TextDisabled("Photo / video capture is available in GamePlay.");
+			ImGui::EndGroup();
+			ImGui::SameLine();
+			ImGui::BeginGroup();
+			ImGui::TextUnformatted("Post Effect");
+			bool isGrayscale = PostEffect::GetInstance()->IsGrayscale();
+			bool isSepia = PostEffect::GetInstance()->IsSepia();
+			if (ImGui::Checkbox("Gray", &isGrayscale) && isGrayscale) {
+				isSepia = false;
+			}
+			ImGui::SameLine();
+			if (ImGui::Checkbox("Sepia", &isSepia) && isSepia) {
+				isGrayscale = false;
+			}
+			PostEffect::GetInstance()->SetGrayscale(isGrayscale);
+			PostEffect::GetInstance()->SetSepia(isSepia);
+			ImGui::EndGroup();
+		}
+		ImGui::End();
+
+		if (ImGui::Begin("Model Shelf")) {
+			ImGui::TextUnformatted("Common Dock Model Shelf");
+			ImGui::Separator();
+			ImGui::TextWrapped("This bottom area is reserved in every scene so the layout stays consistent.");
+			ImGui::BulletText("GamePlay: model / 2D Texture cards, preview, drag placement.");
+			ImGui::BulletText("Title: shared dock placeholder and scene navigation.");
+			if (SceneManager::GetInstance()->GetCurrentSceneName() != "GAMEPLAY") {
+				if (ImGui::Button("Go to GamePlay")) {
+					SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
+				}
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Reset Dock Layout")) {
+				ResetLayoutToDefault();
+			}
+		}
+		ImGui::End();
 	}
 	if (showDemoWindow_) {
 		ImGui::ShowDemoWindow(&showDemoWindow_);
@@ -197,6 +258,7 @@ void ImGuiManager::ResetLayoutToDefault()
 	showModelWindow_ = true;
 	showParticleWindow_ = true;
 	showCameraWindow_ = true;
+	showPostEffectWindow_ = true;
 	showDemoWindow_ = false;
 	resetDockLayout_ = true;
 }
@@ -209,14 +271,17 @@ void ImGuiManager::BuildDefaultDockLayout(ImGuiID dockspaceId)
 	ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->WorkSize);
 
 	ImGuiID centerId = dockspaceId;
-	const ImGuiID leftId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Left, 0.18f, nullptr, &centerId);
-	const ImGuiID rightId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Right, 0.24f, nullptr, &centerId);
+	const ImGuiID leftId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Left, 0.20f, nullptr, &centerId);
+	const ImGuiID bottomId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Down, 0.39f, nullptr, &centerId);
+	const ImGuiID topId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Up, 0.18f, nullptr, &centerId);
+	const ImGuiID rightId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Right, 0.40f, nullptr, &centerId);
+	inspectorDockId_ = rightId;
 
 	ImGui::DockBuilderDockWindow("Game View", centerId);
 	ImGui::DockBuilderDockWindow("Scene", leftId);
-	ImGui::DockBuilderDockWindow("FPS", leftId);
-	ImGui::DockBuilderDockWindow("Post Effect", leftId);
+	ImGui::DockBuilderDockWindow("Top Tools", topId);
 	ImGui::DockBuilderDockWindow("Inspector", rightId);
+	ImGui::DockBuilderDockWindow("Model Shelf", bottomId);
 	ImGui::DockBuilderFinish(dockspaceId);
 }
 
@@ -292,7 +357,12 @@ void ImGuiManager::SceneWindow(const char* sceneName)
 	ImGui::EndDisabled();
 
 	if (sceneManager->HasPendingScene()) {
-		ImGui::TextDisabled("Loading: %s", sceneManager->GetPendingSceneName().c_str());
+		const std::string& pendingSceneName = sceneManager->GetPendingSceneName();
+		if (!pendingSceneName.empty()) {
+			ImGui::TextDisabled("Loading: %s", pendingSceneName.c_str());
+		} else {
+			ImGui::TextDisabled("Scene reset is settling...");
+		}
 	}
 
 	ImGui::Separator();
@@ -331,6 +401,60 @@ bool ImGuiManager::IsMouseOverGameView(float mouseScreenX, float mouseScreenY) c
 		mouseScreenY <= gameViewImageMin_.y + gameViewImageSize_.y;
 #else
 	return false;
+#endif
+}
+
+bool ImGuiManager::GetGameViewRect(float& x, float& y, float& width, float& height) const
+{
+#ifdef USE_IMGUI
+	if (gameViewImageSize_.x <= 0.0f || gameViewImageSize_.y <= 0.0f) {
+		return false;
+	}
+	x = gameViewImageMin_.x;
+	y = gameViewImageMin_.y;
+	width = gameViewImageSize_.x;
+	height = gameViewImageSize_.y;
+	return true;
+#else
+	(void)x;
+	(void)y;
+	(void)width;
+	(void)height;
+	return false;
+#endif
+}
+
+bool ImGuiManager::GetGameViewScreenRect(int& x, int& y, int& width, int& height) const
+{
+#ifdef USE_IMGUI
+	float localX = 0.0f;
+	float localY = 0.0f;
+	float localWidth = 0.0f;
+	float localHeight = 0.0f;
+	if (!GetGameViewRect(localX, localY, localWidth, localHeight)) {
+		return false;
+	}
+
+	x = static_cast<int>(std::round(localX));
+	y = static_cast<int>(std::round(localY));
+	width = static_cast<int>(std::round(localWidth));
+	height = static_cast<int>(std::round(localHeight));
+	return width > 0 && height > 0;
+#else
+	(void)x;
+	(void)y;
+	(void)width;
+	(void)height;
+	return false;
+#endif
+}
+
+unsigned int ImGuiManager::GetInspectorDockId() const
+{
+#ifdef USE_IMGUI
+	return inspectorDockId_;
+#else
+	return 0;
 #endif
 }
 
@@ -375,27 +499,97 @@ void ImGuiManager::FPSWindow()
 }
 
 //スプライトデバック
-void ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprites, bool embedded)
+int ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprites, bool embedded, int forcedSpriteIndex)
 {
 #ifdef USE_IMGUI
 
-	static float my_color[4] = { 1.0f, 1.0f, 1.0f, 1.0f }; // カラーピッカーの色
+	static float my_color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	static int selectedSpriteIndex = 0;
 
 	
 	if (!embedded && !showSpriteWindow_) {
-		return;
+		return -1;
 	}
 	if (!embedded && !ImGui::Begin("Editing UVTranslate ( Sprite )", &showSpriteWindow_)) {
 		ImGui::End();
-		return;
+		return -1;
 	}
 	ImGui::Separator();
 
 	// ここで色を変えたら、配列内の全スプライトに色を適用する
-	if (ImGui::ColorEdit4("Color", my_color)) {
-		for (auto& sprite : sprites) {
-			sprite->SetColor({ my_color[0], my_color[1], my_color[2], my_color[3] });
+	if (forcedSpriteIndex >= 0 && forcedSpriteIndex < static_cast<int>(sprites.size())) {
+		selectedSpriteIndex = forcedSpriteIndex;
+		Sprite* targetSprite = sprites[forcedSpriteIndex].get();
+		if (targetSprite) {
+			ImGui::Text("Selected 2D Texture / Sprite %d", forcedSpriteIndex);
+			if (ImGui::ColorEdit4("Color", my_color)) {
+				targetSprite->SetColor({ my_color[0], my_color[1], my_color[2], my_color[3] });
+			}
+			Vector2 pos = targetSprite->GetPosition();
+			if (ImGui::DragFloat2("Pos", &pos.x, 1.0f)) {
+				targetSprite->SetPosition(pos);
+			}
+			float rot = targetSprite->GetRotation();
+			if (ImGui::DragFloat("Rot", &rot, 0.01f)) {
+				targetSprite->SetRotation(rot);
+			}
+			Vector2 size = targetSprite->GetSize();
+			if (ImGui::DragFloat2("Size", &size.x, 1.0f)) {
+				targetSprite->SetSize(size);
+			}
+			Vector2 anchor = targetSprite->GetAnchorPoint();
+			if (ImGui::DragFloat2("Anchor", &anchor.x, 0.01f, 0.0f, 1.0f)) {
+				targetSprite->SetAnchorPoint(anchor);
+			}
+			bool isFlipX = targetSprite->GetIsFlipX();
+			if (ImGui::Checkbox("isFlipX", &isFlipX)) {
+				targetSprite->SetIsFlipX(isFlipX);
+			}
+			bool isFlipY = targetSprite->GetIsFlipY();
+			if (ImGui::Checkbox("isFlipY", &isFlipY)) {
+				targetSprite->SetIsFlipY(isFlipY);
+			}
+			Vector2 texBase = targetSprite->GetTextureLeftTop();
+			if (ImGui::DragFloat2("TexLeftTop", &texBase.x, 1.0f)) {
+				targetSprite->SetTextureLeftTop(texBase);
+			}
+			Vector2 texSize = targetSprite->GetTextureSize();
+			if (ImGui::DragFloat2("TexSize", &texSize.x, 1.0f)) {
+				targetSprite->SetTextureSize(texSize);
+			}
 		}
+		if (!embedded) {
+			ImGui::End();
+		}
+		return forcedSpriteIndex;
+	}
+
+	if (sprites.empty()) {
+		ImGui::TextDisabled("No Sprite / 2D Texture objects.");
+		if (!embedded) {
+			ImGui::End();
+		}
+		return -1;
+	}
+	if (selectedSpriteIndex < 0 || selectedSpriteIndex >= static_cast<int>(sprites.size())) {
+		selectedSpriteIndex = 0;
+	}
+	std::string spritePreview = "Sprite " + std::to_string(selectedSpriteIndex);
+	if (ImGui::BeginCombo("Target", spritePreview.c_str())) {
+		for (int i = 0; i < static_cast<int>(sprites.size()); ++i) {
+			std::string item = "Sprite " + std::to_string(i);
+			if (ImGui::Selectable(item.c_str(), selectedSpriteIndex == i)) {
+				selectedSpriteIndex = i;
+			}
+			if (selectedSpriteIndex == i) {
+				ImGui::SetItemDefaultFocus();
+			}
+		}
+		ImGui::EndCombo();
+	}
+
+	if (ImGui::ColorEdit4("Color", my_color) && sprites[selectedSpriteIndex]) {
+		sprites[selectedSpriteIndex]->SetColor({ my_color[0], my_color[1], my_color[2], my_color[3] });
 	}
 
 	ImGui::Separator();
@@ -403,6 +597,9 @@ void ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& spri
 	// std::vector の全要素に対して処理
 	for (int i = 0; i < sprites.size(); ++i)
 	{
+		if (i != selectedSpriteIndex) {
+			continue;
+		}
 		// IDをプッシュ（これが無いと全部のスプライトが同時に動いてしまう）
 		ImGui::PushID(i);
 		ImGui::Text("Sprite %d", i);
@@ -449,15 +646,34 @@ void ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& spri
 	if (!embedded) {
 		ImGui::End();
 	}
+	return selectedSpriteIndex;
+#else
+	(void)sprites;
+	(void)embedded;
+	(void)forcedSpriteIndex;
+	return -1;
 #endif
 }
 
-void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& normalObjects, const std::vector<std::unique_ptr<Object3d>>& animationObjects, Object3d::DirectionalLight& light,Object3d::PointLight& pointLight,Object3d::SpotLight& spotLight, bool embedded)
+void ImGuiManager::ModelWindow(
+	std::vector<std::unique_ptr<Object3d>>& normalObjects,
+	std::vector<std::unique_ptr<Object3d>>& animationObjects,
+	Object3d::DirectionalLight& light,
+	Object3d::PointLight& pointLight,
+	Object3d::SpotLight& spotLight,
+	bool embedded,
+	size_t protectedNormalObjectCount,
+	size_t protectedAnimationObjectCount,
+	int forcedNormalObjectIndex,
+	int forcedAnimationObjectIndex,
+	const std::function<void(bool animationObject, size_t index)>& onObjectRemoved)
 {
 #ifdef USE_IMGUI
 
 	static int selectedNormalIndex = 0;// 0:アニメーションなし 1:アニメーションあり
 	static int selectedAnimationIndex = 0;//選択されている番号
+	static int previousNormalCount = 0;
+	static int previousAnimationCount = 0;
 	static bool useMonsterBall = false;//png入れ替え
 	if (!embedded && !showModelWindow_) {
 		return;
@@ -467,19 +683,56 @@ void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& nor
 		return;
 	}
 
-	auto drawObjectEditor = [](const char* label, const std::vector<std::unique_ptr<Object3d>>& objects, int& selectedIndex) {
+	auto syncSelectionForChangedList = [](int objectCount, size_t protectedObjectCount, int& selectedIndex, int& previousCount) {
+		const int protectedCount = static_cast<int>(protectedObjectCount);
+		if (objectCount <= 0) {
+			selectedIndex = 0;
+			previousCount = 0;
+			return;
+		}
+		if (objectCount != previousCount) {
+			const bool hasAddedObjects = objectCount > protectedCount;
+			if (objectCount > previousCount || selectedIndex >= objectCount || (hasAddedObjects && selectedIndex < protectedCount)) {
+				selectedIndex = hasAddedObjects ? objectCount - 1 : 0;
+			}
+			previousCount = objectCount;
+		}
+	};
+
+	syncSelectionForChangedList(static_cast<int>(normalObjects.size()), protectedNormalObjectCount, selectedNormalIndex, previousNormalCount);
+	syncSelectionForChangedList(static_cast<int>(animationObjects.size()), protectedAnimationObjectCount, selectedAnimationIndex, previousAnimationCount);
+	const bool forceNormalSelection =
+		forcedNormalObjectIndex >= 0 && forcedNormalObjectIndex < static_cast<int>(normalObjects.size());
+	const bool forceAnimationSelection =
+		forcedAnimationObjectIndex >= 0 && forcedAnimationObjectIndex < static_cast<int>(animationObjects.size());
+	if (forceNormalSelection) {
+		selectedNormalIndex = forcedNormalObjectIndex;
+	}
+	if (forceAnimationSelection) {
+		selectedAnimationIndex = forcedAnimationObjectIndex;
+	}
+
+	auto drawObjectEditor = [this, &onObjectRemoved](const char* label, std::vector<std::unique_ptr<Object3d>>& objects, int& selectedIndex, size_t protectedObjectCount, bool animationObject) {
 		if (objects.empty()) {
 			ImGui::TextDisabled("No %s objects.", label);
 			return;
 		}
-		if (selectedIndex >= static_cast<int>(objects.size())) {
+		if (selectedIndex < 0 || selectedIndex >= static_cast<int>(objects.size())) {
 			selectedIndex = 0;
 		}
 
-		std::string preview = std::string(label) + " " + std::to_string(selectedIndex);
+		auto makeObjectLabel = [label](const Object3d* object, int index) {
+			const std::string modelName = object ? object->GetModelName() : std::string();
+			if (!modelName.empty()) {
+				return std::string(label) + " " + std::to_string(index) + " : " + modelName;
+			}
+			return std::string(label) + " " + std::to_string(index);
+		};
+
+		std::string preview = makeObjectLabel(objects[selectedIndex].get(), selectedIndex);
 		if (ImGui::BeginCombo("Target", preview.c_str())) {
 			for (int index = 0; index < static_cast<int>(objects.size()); ++index) {
-				std::string item = std::string(label) + " " + std::to_string(index);
+				std::string item = makeObjectLabel(objects[index].get(), index);
 				if (ImGui::Selectable(item.c_str(), selectedIndex == index)) {
 					selectedIndex = index;
 				}
@@ -489,27 +742,78 @@ void ImGuiManager::ModelWindow(const std::vector<std::unique_ptr<Object3d>>& nor
 
 		Object3d* targetObject = objects[selectedIndex].get();
 		ImGui::PushID(targetObject);
+		if (!targetObject->GetModelName().empty()) {
+			ImGui::Text("Model File: %s", targetObject->GetModelName().c_str());
+		}
 
 		Transform& transform = targetObject->GetTransform();
 		ImGui::DragFloat3("Translate", &transform.translate.x, 0.01f);
 		ImGui::DragFloat3("Rotate", &transform.rotate.x, 0.01f);
 		ImGui::DragFloat3("Scale", &transform.scale.x, 0.01f);
 
+		ImGui::Separator();
+		ImGui::TextDisabled("Quick Adjust");
+		if (ImGui::Button("Reset Transform")) {
+			transform.translate = { 0.0f, 0.0f, 0.0f };
+			transform.rotate = { 0.0f, 0.0f, 0.0f };
+			transform.scale = { 1.0f, 1.0f, 1.0f };
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Reset Rotation")) {
+			transform.rotate = { 0.0f, 0.0f, 0.0f };
+		}
+
+		float uniformScale = (transform.scale.x + transform.scale.y + transform.scale.z) / 3.0f;
+		if (ImGui::DragFloat("Uniform Scale", &uniformScale, 0.01f, 0.001f, 100.0f)) {
+			transform.scale = { uniformScale, uniformScale, uniformScale };
+		}
+
 		float environmentCoefficient = targetObject->GetEnvironmentCoefficient();
 		if (ImGui::SliderFloat("Environment Reflection", &environmentCoefficient, 0.0f, 1.0f)) {
 			targetObject->SetEnvironmentCoefficient(environmentCoefficient);
+		}
+
+		ImGui::Separator();
+		const bool canRemoveObject = static_cast<size_t>(selectedIndex) >= protectedObjectCount;
+		ImGui::BeginDisabled(!canRemoveObject);
+		const bool removeSelected = ImGui::Button("Remove Added Model") ||
+			(canRemoveObject && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+				!ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Delete, false));
+		ImGui::EndDisabled();
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+			ImGui::SetTooltip(canRemoveObject
+				? "Remove this model from the scene. Delete key also works while Inspector is focused."
+				: "Initial scene models are protected. Only models added from Model Shelf can be removed here.");
+		}
+		if (removeSelected && canRemoveObject) {
+			const size_t removedIndex = static_cast<size_t>(selectedIndex);
+			if (dxCommon_) {
+				dxCommon_->WaitForGPU();
+			}
+			objects.erase(objects.begin() + selectedIndex);
+			if (onObjectRemoved) {
+				onObjectRemoved(animationObject, removedIndex);
+			}
+			if (selectedIndex >= static_cast<int>(objects.size())) {
+				selectedIndex = static_cast<int>(objects.size()) - 1;
+			}
+			if (selectedIndex < 0) {
+				selectedIndex = 0;
+			}
 		}
 		ImGui::PopID();
 	};
 
 	if (ImGui::BeginTabBar("ModelInspectorTabs")) {
-		if (ImGui::BeginTabItem("Model")) {
-			drawObjectEditor("Model", normalObjects, selectedNormalIndex);
+		const ImGuiTabItemFlags modelTabFlags = forceNormalSelection ? ImGuiTabItemFlags_SetSelected : 0;
+		const ImGuiTabItemFlags animationTabFlags = forceAnimationSelection ? ImGuiTabItemFlags_SetSelected : 0;
+		if (ImGui::BeginTabItem("Model", nullptr, modelTabFlags)) {
+			drawObjectEditor("Model", normalObjects, selectedNormalIndex, protectedNormalObjectCount, false);
 			ImGui::EndTabItem();
 		}
-		if (ImGui::BeginTabItem("Animation Model")) {
+		if (ImGui::BeginTabItem("Animation Model", nullptr, animationTabFlags)) {
 			ImGui::Checkbox("Skeleton Debug", &showSkeletonDebugDraw_);
-			drawObjectEditor("Animation", animationObjects, selectedAnimationIndex);
+			drawObjectEditor("Animation", animationObjects, selectedAnimationIndex, protectedAnimationObjectCount, true);
 			ImGui::EndTabItem();
 		}
 		if (ImGui::BeginTabItem("Light")) {

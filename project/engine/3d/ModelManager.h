@@ -18,7 +18,7 @@ public:
 	void Finalize();
 
 	//モデルファイルの読み込み
-	void LoadModel(const std::string& filePath);
+	bool LoadModel(const std::string& filePath);
 
 	//モデルファイルパス
 	Model* FindModel(const std::string& filePath);

@@ -1,7 +1,5 @@
 #include "SrvManager.h"
 
-const uint32_t SrvManager::kMaxSRVCount = 512;
-
 void SrvManager::Initialize(DirectXCommon* dxCommon){
 	//引数で受け取ってメンバ変数に記録する
 	this->directXCommon = dxCommon;
@@ -10,6 +8,8 @@ void SrvManager::Initialize(DirectXCommon* dxCommon){
 	descriptorHeap = directXCommon->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSRVCount, true);
 	//デスクリプタ1個分のサイズを取得して記録
 	descriptorSize = directXCommon->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	freeList_ = {};
+	allocated_.fill(false);
 
 	//初期化時に番号すべて空きリストに入れておく
 	for (uint32_t i = 0; i < kMaxSRVCount; ++i)
@@ -24,6 +24,11 @@ bool SrvManager::CanAllocate() const
 	return !freeList_.empty();
 }
 
+bool SrvManager::CanAllocate(uint32_t count) const
+{
+	return freeList_.size() >= count;
+}
+
 uint32_t SrvManager::Allocate()
 {
 	//上限に達してないかチェック
@@ -32,6 +37,7 @@ uint32_t SrvManager::Allocate()
 	uint32_t index = freeList_.front();
 	//取り出した番号をキューから排除
 	freeList_.pop();
+	allocated_[index] = true;
 	//上で記録した番号をreturn
 	return index;
 }
@@ -39,6 +45,10 @@ uint32_t SrvManager::Allocate()
 void SrvManager::Free(uint32_t index)
 {
 	//使わなくなった番号を空きリストに戻す
+	if (index >= kMaxSRVCount || !allocated_[index]) {
+		return;
+	}
+	allocated_[index] = false;
 	freeList_.push(index);
 }
 

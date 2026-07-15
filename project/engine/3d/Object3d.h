@@ -60,6 +60,8 @@ public:
 		Vector3 worldPosition;
 	};
 
+	~Object3d();
+
 	void Initialize(Object3dCommon* object3dCommon);
 
 	void Update();
@@ -115,17 +117,23 @@ public:
 	const Vector3& GetTranslate()const { return transform.translate; }
 	const DirectionalLight& GetDirectionalLight()const { return *directionalLightData; }
 	float GetEnvironmentCoefficient() const;
+	Model* GetModel() const { return model_; }
+	const std::string& GetModelName() const { return modelName_; }
 
 	//外部からアニメーションモデルかどうか判定
 	bool IsSkeletal() const { return isSkeletal_; }
 
 	// モデル
 	Transform& GetTransform() { return transform; }
+	const Transform& GetTransform() const { return transform; }
 
 private:
+	void ReleaseSkinClusterDescriptors();
+
 	Object3dCommon* object3dCommon = nullptr;
 
 	Model* model_ = nullptr;
+	std::string modelName_;
 
 	Camera* camera = nullptr;
 

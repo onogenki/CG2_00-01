@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <vector>
 #include <string>
 #include <wrl.h>
@@ -103,11 +104,15 @@ public:
 		std::span<VertexInfluence>mappedInfluence;
 		Microsoft::WRL::ComPtr<ID3D12Resource>paletteResource;
 		std::span<WellForGPU>mappedPalette;
+		uint32_t paletteSrvIndex = UINT32_MAX;
 		std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>paletteSrvHandle;
+		uint32_t inputVertexSrvIndex = UINT32_MAX;
 		std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>inputVertexSrvHandle;
+		uint32_t influenceSrvIndex = UINT32_MAX;
 		std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>influenceSrvHandle;
 		Microsoft::WRL::ComPtr<ID3D12Resource>outputVertexResource;
 		D3D12_VERTEX_BUFFER_VIEW outputVertexBufferView;
+		uint32_t outputVertexUavIndex = UINT32_MAX;
 		std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>outputVertexUavHandle;
 		D3D12_RESOURCE_STATES outputVertexResourceState = D3D12_RESOURCE_STATE_COMMON;
 		Microsoft::WRL::ComPtr<ID3D12Resource>skinningInformationResource;
@@ -177,7 +182,8 @@ public:
 
 	Node ReadNode(aiNode* node);
 
-	void Initialize(ModelCommon* modelCommon, const std::string& directoryPath, const std::string& filename);
+	bool Initialize(ModelCommon* modelCommon, const std::string& directoryPath, const std::string& filename);
+	bool IsLoaded() const { return vertexResource != nullptr && indexResource != nullptr && materialResource != nullptr; }
 
 	//skeletonの更新
 	void Update(Skeleton& skeleton);
@@ -230,7 +236,7 @@ private:
 
 
 
-	void LoadModelFile(const std::string& directoryPath, const std::string& filename);
+	bool LoadModelFile(const std::string& directoryPath, const std::string& filename);
 	void CreateIndexData();
 	void CreateVertexData();
 	void CreateMaterialData();

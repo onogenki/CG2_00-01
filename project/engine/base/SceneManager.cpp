@@ -1,4 +1,5 @@
 #include "SceneManager.h"
+#include "DirectXCommon.h"
 
 SceneManager* SceneManager::GetInstance()
 {
@@ -12,12 +13,15 @@ void SceneManager::Update()
 	//次のシーンの予約があるなら
 	if (nextScene_)
 	{
+		isChangingScene_ = true;
+		DirectXCommon::GetInstance()->WaitForGPU();
 		//旧シーンの終了
 		if (scene_)
 		{
 			scene_->Finalize();
 			scene_.reset();
 		}
+		DirectXCommon::GetInstance()->WaitForGPU();
 		//シーン切り替え
 		scene_ = std::move(nextScene_);
 		nextScene_ = nullptr;
@@ -26,12 +30,17 @@ void SceneManager::Update()
 
 		//次シーンを初期化する
 		scene_->Initialize();
+		sceneChangeCooldownFrames_ = 6;
+		isChangingScene_ = false;
 	}
 
 	//実行中シーンを更新する
 	if (scene_)
 	{
 		scene_->Update();
+	}
+	if (sceneChangeCooldownFrames_ > 0) {
+		--sceneChangeCooldownFrames_;
 	}
 }
 
@@ -45,7 +54,7 @@ void SceneManager::Draw()
 
 bool SceneManager::ChangeScene(const std::string& sceneName)
 {
-	if (sceneFactory_ == nullptr || nextScene_ != nullptr) {
+	if (sceneFactory_ == nullptr || nextScene_ != nullptr || isChangingScene_ || sceneChangeCooldownFrames_ > 0) {
 		return false;
 	}
 
@@ -64,6 +73,23 @@ bool SceneManager::RestartCurrentScene()
 	return !currentSceneName_.empty() && ChangeScene(currentSceneName_);
 }
 
+void SceneManager::FinalizeCurrentScene()
+{
+	isChangingScene_ = true;
+	DirectXCommon::GetInstance()->WaitForGPU();
+	nextScene_.reset();
+	pendingSceneName_.clear();
+	if (scene_)
+	{
+		scene_->Finalize();
+		scene_.reset();
+	}
+	DirectXCommon::GetInstance()->WaitForGPU();
+	currentSceneName_.clear();
+	sceneChangeCooldownFrames_ = 0;
+	isChangingScene_ = false;
+}
+
 const std::vector<std::string>& SceneManager::GetAvailableSceneNames() const
 {
 	static const std::vector<std::string> empty;
@@ -73,8 +99,8 @@ const std::vector<std::string>& SceneManager::GetAvailableSceneNames() const
 SceneManager::~SceneManager()
 {
 	//最後のシーンの終了と開放
-	if (scene_)
+	if (scene_ || nextScene_)
 	{
-		scene_->Finalize();
+		FinalizeCurrentScene();
 	}
 }

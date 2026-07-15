@@ -7,33 +7,45 @@
 #include "Object3d.h"
 #include "Sprite.h"
 #include "ParticleEmitter.h"
-#include "Audio.h" // SoundDataを使うために必要
+#include "Audio.h"
 #include "BaseScene.h"
+#include "SceneEditor.h"
 #include "SkyBox.h"
-#include <vector>
 #include <memory>
+#include <string>
+#include <vector>
 
-//BaseSceneを継承する(publicをつけることで公認の親子関係)
 class TitleScene : public BaseScene
 {
 public:
-    //overrideをつけて、親の純粋仮想関数を実装
-    void Initialize()override;
-    void Finalize()override;
-    void Update()override;
-    void Draw()override;
+	void Initialize() override;
+	void Finalize() override;
+	void Update() override;
+	void Draw() override;
 
-    //タイトルシーン独自の関数
-    bool IsFinished() const { return isFinished_; }
+	bool IsFinished() const { return isFinished_; }
 
 private:
-    //タイトルシーン固有のデータ
+	void ScanResourceShelf();
+	void DrawTitleModelShelfImGui();
+	void DrawTitleInspectorImGui();
+	void HandleTitleShelfDropOnGameView();
+	bool AddModelToTitle(const std::string& fileName);
+	bool AddTextureToTitle(const std::string& textureFilePath);
 
-    std::unique_ptr<Sprite> sprite_;
-    std::unique_ptr<SkyBox> skyBox_;
+	std::unique_ptr<Sprite> sprite_;
+	std::unique_ptr<SkyBox> skyBox_;
 
-    std::vector<std::unique_ptr<Object3d>> normalObjects;//通常モデル  
-    Object3d* obj = nullptr;
-    bool isFinished_ = false;
-
+	std::vector<std::unique_ptr<Object3d>> normalObjects;
+	std::vector<std::unique_ptr<Object3d>> animationObjects_;
+	std::vector<std::unique_ptr<Sprite>> addedSprites_;
+	SceneEditor::ShelfState shelfState_;
+	Object3d::DirectionalLight directionalLight_{};
+	Object3d::PointLight pointLight_{};
+	Object3d::SpotLight spotLight_{};
+	size_t baseNormalObjectCount_ = 0;
+	size_t selectedTitleSpriteIndex_ = 0;
+	int inspectorAutoSelectSpriteFrames_ = 0;
+	Object3d* obj = nullptr;
+	bool isFinished_ = false;
 };

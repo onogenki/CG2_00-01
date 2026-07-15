@@ -19,11 +19,12 @@ public:
 	//次シーン予約
 	bool ChangeScene(const std::string& sceneName);
 	bool RestartCurrentScene();
+	void FinalizeCurrentScene();
 
 	const std::string& GetCurrentSceneName() const { return currentSceneName_; }
 	const std::string& GetPendingSceneName() const { return pendingSceneName_; }
 	const std::vector<std::string>& GetAvailableSceneNames() const;
-	bool HasPendingScene() const { return nextScene_ != nullptr; }
+	bool HasPendingScene() const { return nextScene_ != nullptr || isChangingScene_ || sceneChangeCooldownFrames_ > 0; }
 
 private:
 	// シングルトン化：コンストラクタとデストラクタをprivateにする
@@ -39,6 +40,8 @@ private:
 	std::unique_ptr<BaseScene> nextScene_ = nullptr;
 	std::string currentSceneName_;
 	std::string pendingSceneName_;
+	bool isChangingScene_ = false;
+	int sceneChangeCooldownFrames_ = 0;
 
 	//シーンファクトリー(借りてくる)
 	AbstractSceneFactory* sceneFactory_ = nullptr;
