@@ -7,6 +7,7 @@
 #include "SrvManager.h"
 #include "WinApp.h"
 
+#include <functional>
 #include <vector>
 #include <string>
 
@@ -41,19 +42,27 @@ public:
 	// 共通デバッグウィンドウ
 	void DemoWindow();
 	void FPSWindow();
-	void SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprites, bool embedded = false);
+	int SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprites, bool embedded = false, int forcedSpriteIndex = -1);
 	void ModelWindow(
-		const std::vector<std::unique_ptr<Object3d>>& normalObjects,
-		const std::vector<std::unique_ptr<Object3d>>& animationObjects,
+		std::vector<std::unique_ptr<Object3d>>& normalObjects,
+		std::vector<std::unique_ptr<Object3d>>& animationObjects,
 		Object3d::DirectionalLight& light,
 		Object3d::PointLight& pointLight,
 		Object3d::SpotLight& spotLight,
-		bool embedded = false);
+		bool embedded = false,
+		size_t protectedNormalObjectCount = 0,
+		size_t protectedAnimationObjectCount = 0,
+		int forcedNormalObjectIndex = -1,
+		int forcedAnimationObjectIndex = -1,
+		const std::function<void(bool animationObject, size_t index)>& onObjectRemoved = {});
 	void CameraWindow(CameraManager* cameraManager, bool embedded = false);
 	std::string ParticleWindow(Transform& emitterTransform, bool embedded = false);
 	void PostEffectWindow();
 	bool IsSkeletonDebugDrawEnabled() const;
 	bool IsMouseOverGameView(float mouseScreenX, float mouseScreenY) const;
+	bool GetGameViewRect(float& x, float& y, float& width, float& height) const;
+	bool GetGameViewScreenRect(int& x, int& y, int& width, int& height) const;
+	unsigned int GetInspectorDockId() const;
 
 	// Game View上へスケルトンを重ねて描画する
 	void SkeletonDebugDraw(
@@ -92,5 +101,6 @@ private:
 	ImVec2 gameViewImageMin_{};
 	ImVec2 gameViewImageSize_{};
 	ImDrawList* gameViewDrawList_ = nullptr;
+	ImGuiID inspectorDockId_ = 0;
 #endif
 };

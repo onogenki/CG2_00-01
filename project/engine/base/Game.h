@@ -11,6 +11,7 @@
 #include "Framework.h"
 #include "TitleScene.h"
 #include "GamePlayScene.h"
+#include <string>
 
 class WinApp;
 class DirectXCommon;
@@ -38,8 +39,18 @@ public:
 
 private:
 
+	void InitializeSceneStressFromEnvironment();
+	void UpdateSceneStress();
+
 	SceneType currentScene_ = SceneType::TITLE;
 
 	int selectedUI = 0;
+
+	bool sceneStressEnabled_ = false;
+	std::string sceneStressTarget_ = "GAMEPLAY";
+	int sceneStressRequestedRestarts_ = 0;
+	int sceneStressCompletedRestarts_ = 0;
+	int sceneStressIntervalFrames_ = 8;
+	int sceneStressFrameCounter_ = 0;
 };
 

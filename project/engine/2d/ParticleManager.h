@@ -103,7 +103,7 @@ public:
     void Draw();
     void Finalize() {
         // インスタンス自体を消すのではなく、中身（グループリストなど）を掃除する
-        particleGroups_.clear();
+        ClearAllGroups();
     }
 
 	//パーティクルの発生

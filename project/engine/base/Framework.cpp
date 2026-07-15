@@ -9,6 +9,7 @@
 #include <cassert>
 #include <dbghelp.h>
 #include <strsafe.h>
+#include <system_error>
 
 #include "TextureManager.h"
 #include "ModelManager.h"
@@ -18,6 +19,39 @@
 #include "AbstractSceneFactory.h"
 
 #pragma comment(lib, "Dbghelp.lib")
+
+namespace {
+void AlignWorkingDirectoryToResources()
+{
+	std::error_code errorCode;
+	std::filesystem::path directory = std::filesystem::current_path(errorCode);
+	if (errorCode) {
+		return;
+	}
+
+	while (!directory.empty()) {
+		const std::filesystem::path directResources = directory / "resources" / "shaders";
+		if (std::filesystem::exists(directResources, errorCode) && !errorCode) {
+			std::filesystem::current_path(directory, errorCode);
+			return;
+		}
+		errorCode.clear();
+
+		const std::filesystem::path projectDirectory = directory / "project";
+		const std::filesystem::path projectResources = projectDirectory / "resources" / "shaders";
+		if (std::filesystem::exists(projectResources, errorCode) && !errorCode) {
+			std::filesystem::current_path(projectDirectory, errorCode);
+			return;
+		}
+		errorCode.clear();
+
+		if (directory == directory.root_path()) {
+			break;
+		}
+		directory = directory.parent_path();
+	}
+}
+}
 
 static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception)
 {
@@ -45,6 +79,8 @@ static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception)
 
 void Framework::Initialize()
 {
+	AlignWorkingDirectoryToResources();
+
 	//ログのディレクトリを用意
 	std::filesystem::create_directory("logs");
 
@@ -114,6 +150,9 @@ void Framework::Update()
 
 void Framework::Finalize()
 {
+
+	SceneManager::GetInstance()->FinalizeCurrentScene();
+	SceneManager::GetInstance()->SetSceneFactory(nullptr);
 
 	imGuiManager_->Finalize();
 	TextureManager::GetInstance()->Finalize();
