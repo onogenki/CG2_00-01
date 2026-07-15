@@ -8,10 +8,12 @@
 #include "Sprite.h"
 #include "ParticleEmitter.h"
 #include "Audio.h"
+#include "../ecs/EcsWorld.h"
 #include"BaseScene.h"
 #include "SceneEditor.h"
 #include "SkyBox.h"
 #include <array>
+#include <deque>
 #include <filesystem>
 #include <string>
 #include <utility>
@@ -40,6 +42,10 @@ private:
     void HandleGameViewSpriteSelection();
     void HandleGameViewObjectSelection();
     void DrawGameViewModelToolsOverlay();
+	void RegisterEcsModel(Object3d* object, const std::string& sourceFile, bool isAnimated);
+	void RegisterEcsSprite(Sprite* sprite, const std::string& sourceFile);
+	void UpdateEcsWorld();
+	void DrawEcsInspectorImGui();
     bool AddTextureToScene(const std::string& textureFilePath);
     bool AddTextureToScene(const std::string& textureFilePath, const Vector2& position);
     bool TryGetGameViewSpritePosition(float screenX, float screenY, Vector2& outPosition) const;
@@ -53,6 +59,8 @@ private:
     void DrawSelectedObjectGizmo();
     void DrawCollisionDebugOverlay();
     void UpdateRecordingCapture();
+	void UpdateReplayCapture();
+	bool SaveReplayClip();
     bool EnterModelPreview(const std::string& fileName);
     bool EnterTexturePreview(const std::string& textureFilePath);
     void ExitModelPreview();
@@ -70,10 +78,11 @@ private:
     void ClearSceneObjectSelection();
     bool CaptureGameViewPixels(std::vector<unsigned char>& pixels, int& width, int& height);
     bool SavePixelsAsBmp(const std::filesystem::path& filePath, const std::vector<unsigned char>& pixels, int width, int height);
-    bool BeginRecordingAvi(const std::filesystem::path& filePath, int width, int height);
+    bool BeginRecordingAvi(const std::filesystem::path& filePath, int width, int height, int frameRate = 10);
     bool AppendRecordingFrame(const std::vector<unsigned char>& pixels, int width, int height);
     void EndRecordingAvi();
-    std::filesystem::path GetUserMediaDirectory(const char* folderName, const char* projectFolderName) const;
+	std::filesystem::path GetCaptureDirectory(const char* folderName) const;
+	bool CreateCaptureDirectories() const;
     std::string MakeTimestampString() const;
     void DrawParticleEffectImGui(bool embedded = false);
     void UpdateParticleEffectEmission();
@@ -82,6 +91,9 @@ private:
     void UpdateUiSmoke();
     void UpdateUiSmokeAfterDraw();
     void FinishUiSmoke(bool success, const std::string& message);
+    void InitializeTimePlaybackSmokeFromEnvironment();
+    void UpdateTimePlaybackSmoke();
+    void FinishTimePlaybackSmoke(bool success, const std::string& message);
 
     struct ParticleEffectControl {
         bool enabled = false;
@@ -96,6 +108,12 @@ private:
         MyMath::AABB aabb{};
         bool overlaps = false;
     };
+
+	struct ReplayFrame {
+		std::vector<unsigned char> pixels;
+		int width = 0;
+		int height = 0;
+	};
 
     enum class GizmoAxis {
         None,
@@ -113,6 +131,8 @@ private:
     std::vector<std::unique_ptr<Object3d>> animationObjects;//アニメーションモデル 
 
     std::vector<std::unique_ptr<Sprite>> sprites;
+	Ecs::World ecsWorld_;
+	Ecs::Entity selectedEcsEntity_ = Ecs::kInvalidEntity;
     std::unique_ptr<SkyBox> skyBox_;
     std::vector<ResourceModelEntry> modelLibrary_;
     std::unique_ptr<Object3d> previewObject_;
@@ -143,6 +163,15 @@ private:
     std::filesystem::path recordingVideoPath_;
     std::filesystem::path lastScreenshotPath_;
     std::filesystem::path lastVideoPath_;
+	std::filesystem::path replayDirectory_;
+	std::filesystem::path lastReplayPath_;
+	std::deque<ReplayFrame> replayFrames_;
+	bool replayBufferEnabled_ = true;
+	float replayFrameTimer_ = 0.0f;
+	static constexpr int kReplaySeconds_ = 30;
+	static constexpr int kReplayFramesPerSecond_ = 5;
+	static constexpr int kReplayWidth_ = 480;
+	static constexpr int kReplayHeight_ = 270;
     void* recordingAviFile_ = nullptr;
     void* recordingAviStream_ = nullptr;
     int recordingVideoWidth_ = 0;
@@ -204,6 +233,19 @@ private:
     int uiSmokeStage_ = 0;
     std::string uiSmokeModelFile_;
     std::filesystem::path uiSmokeLogPath_;
+    bool timePlaybackSmokeEnabled_ = false;
+    bool timePlaybackSmokeFinished_ = false;
+    int timePlaybackSmokeStage_ = 0;
+    int timePlaybackSmokeStableFrames_ = 0;
+    int timePlaybackSmokeDeleteIterations_ = 0;
+    float timePlaybackSmokeStageTime_ = 0.0f;
+    float timePlaybackSmokePreviousAnimationTime_ = 0.0f;
+    float timePlaybackSmokeParticleRotation_ = 0.0f;
+    Transform timePlaybackSmokeOrigin_{};
+    Transform timePlaybackSmokeTarget_{};
+    Transform timePlaybackSmokePaused_{};
+    std::string timePlaybackSmokeModelFile_;
+    std::filesystem::path timePlaybackSmokeLogPath_;
     int inspectorForceDockFrames_ = 120;
   
     //アニメーション

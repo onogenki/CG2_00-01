@@ -9,6 +9,7 @@
 #include "ParticleManager.h"
 #include "SceneManager.h"
 #include "PostEffect.h"
+#include "CaptureManager.h"
 #include <cmath>
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui_internal.h"
@@ -56,6 +57,11 @@ void ImGuiManager::Initialize([[maybe_unused]] WinApp* winApp, [[maybe_unused]]D
 		{
 			SrvManager* srvManager = SrvManager::GetInstance();
 			uint32_t index = srvManager->Allocate();
+			if (index == SrvManager::kInvalidSrvIndex) {
+				*out_cpu_handle = {};
+				*out_gpu_handle = {};
+				return;
+			}
 			*out_cpu_handle = srvManager->GetCPUDescriptorHandle(index);
 			*out_gpu_handle = srvManager->GetGPUDescriptorHandle(index);
 		};
@@ -64,6 +70,7 @@ void ImGuiManager::Initialize([[maybe_unused]] WinApp* winApp, [[maybe_unused]]D
 	initInfo.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle,
 		D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
 		{
+			SrvManager::GetInstance()->Free(cpu_handle);
 			//SrvManagerに解放機能を作っていないためここでは何もしない
 		};
 
@@ -193,8 +200,16 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 	if (showSceneWindow_) {
 		SceneWindow(sceneName);
 	}
-	if (currentSceneName != "GamePlay") {
-		if (ImGui::Begin("Top Tools")) {
+	if (ImGui::Begin("Top Tools")) {
+		const ImGuiTableFlags tableFlags =
+			ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_BordersInnerV;
+		if (ImGui::BeginTable("SharedTopToolsTable", 3, tableFlags, ImVec2(-1.0f, 0.0f))) {
+			ImGui::TableSetupColumn("FPS", ImGuiTableColumnFlags_WidthFixed, 200.0f);
+			ImGui::TableSetupColumn("Capture", ImGuiTableColumnFlags_WidthFixed, 620.0f);
+			ImGui::TableSetupColumn("PostEffect", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+			ImGui::TableNextRow();
+
+			ImGui::TableSetColumnIndex(0);
 			ImGui::TextUnformatted("FPS");
 			static float sharedFpsValues[90] = {};
 			static int sharedFpsValueOffset = 0;
@@ -202,14 +217,21 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 			sharedFpsValueOffset = (sharedFpsValueOffset + 1) % 90;
 			char overlay[32];
 			snprintf(overlay, sizeof(overlay), "%.1f FPS", ImGui::GetIO().Framerate);
-			ImGui::PlotLines("##SharedTopToolsFPS", sharedFpsValues, 90, sharedFpsValueOffset, overlay, 0.0f, 120.0f, ImVec2(220.0f, 58.0f));
-			ImGui::SameLine();
-			ImGui::BeginGroup();
-			ImGui::TextUnformatted("Capture");
-			ImGui::TextDisabled("Photo / video capture is available in GamePlay.");
-			ImGui::EndGroup();
-			ImGui::SameLine();
-			ImGui::BeginGroup();
+			const float fpsGraphWidth = (std::max)(120.0f, ImGui::GetContentRegionAvail().x);
+			ImGui::PlotLines(
+				"##SharedTopToolsFPS",
+				sharedFpsValues,
+				90,
+				sharedFpsValueOffset,
+				overlay,
+				0.0f,
+				120.0f,
+				ImVec2(fpsGraphWidth, 58.0f));
+
+			ImGui::TableSetColumnIndex(1);
+			CaptureManager::GetInstance()->DrawImGui();
+
+			ImGui::TableSetColumnIndex(2);
 			ImGui::TextUnformatted("Post Effect");
 			bool isGrayscale = PostEffect::GetInstance()->IsGrayscale();
 			bool isSepia = PostEffect::GetInstance()->IsSepia();
@@ -222,10 +244,18 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 			}
 			PostEffect::GetInstance()->SetGrayscale(isGrayscale);
 			PostEffect::GetInstance()->SetSepia(isSepia);
-			ImGui::EndGroup();
+			ParticleManager* particleManager = ParticleManager::GetInstance();
+			bool particlesReturning = particleManager->IsReturning();
+			if (ImGui::Checkbox("Particle return##TopTools", &particlesReturning)) {
+				particleManager->SetReturning(particlesReturning);
+			}
+			ImGui::TextDisabled("Capture uses Game View in every scene.");
+			ImGui::EndTable();
 		}
-		ImGui::End();
+	}
+	ImGui::End();
 
+	if (currentSceneName != "GamePlay") {
 		if (ImGui::Begin("Model Shelf")) {
 			ImGui::TextUnformatted("Common Dock Model Shelf");
 			ImGui::Separator();
@@ -746,10 +776,56 @@ void ImGuiManager::ModelWindow(
 			ImGui::Text("Model File: %s", targetObject->GetModelName().c_str());
 		}
 
+		ImGui::Separator();
+		ImGui::TextUnformatted("Time Playback");
+		if (targetObject->IsAnimating()) {
+			bool animationReturning = targetObject->IsAnimationReturning();
+			if (ImGui::Checkbox("return##Animation", &animationReturning)) {
+				targetObject->SetAnimationReturning(animationReturning);
+			}
+			ImGui::SameLine();
+			ImGui::TextDisabled(
+				"Animation %.2f / %.2f sec",
+				targetObject->GetAnimationTime(),
+				targetObject->GetAnimationDuration());
+		}
+
+		bool transformReturning = targetObject->IsTransformReturning();
+		ImGui::BeginDisabled(!targetObject->HasTransformHistory());
+		if (ImGui::Checkbox("return##Transform", &transformReturning)) {
+			targetObject->SetTransformReturning(transformReturning);
+		}
+		ImGui::SameLine();
+		ImGui::BeginDisabled(!targetObject->CanMoveTransformForward());
+		if (ImGui::Button("Move")) {
+			targetObject->MoveTransformForward();
+		}
+		ImGui::EndDisabled();
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		if (targetObject->IsTransformReturning()) {
+			ImGui::TextDisabled("Transform returning %.0f%%", targetObject->GetTransformPlaybackProgress() * 100.0f);
+		} else if (targetObject->IsTransformMovingForward()) {
+			ImGui::TextDisabled("Transform moving %.0f%%", targetObject->GetTransformPlaybackProgress() * 100.0f);
+		} else if (!targetObject->HasTransformHistory()) {
+			ImGui::TextDisabled("Edit a transform first");
+		}
+		if (targetObject->HasTransformHistory()) {
+			ImGui::TextDisabled(
+				"Transform timeline %.2f / %.2f sec (1x)",
+				targetObject->GetTransformPlaybackTime(),
+				targetObject->GetTransformPlaybackDuration());
+		}
+
 		Transform& transform = targetObject->GetTransform();
-		ImGui::DragFloat3("Translate", &transform.translate.x, 0.01f);
-		ImGui::DragFloat3("Rotate", &transform.rotate.x, 0.01f);
-		ImGui::DragFloat3("Scale", &transform.scale.x, 0.01f);
+		const Transform transformBeforeEdit = transform;
+		bool transformEdited = false;
+		const bool transformPlaybackActive =
+			targetObject->IsTransformReturning() || targetObject->IsTransformMovingForward();
+		ImGui::BeginDisabled(transformPlaybackActive);
+		transformEdited |= ImGui::DragFloat3("Translate", &transform.translate.x, 0.01f);
+		transformEdited |= ImGui::DragFloat3("Rotate", &transform.rotate.x, 0.01f);
+		transformEdited |= ImGui::DragFloat3("Scale", &transform.scale.x, 0.01f);
 
 		ImGui::Separator();
 		ImGui::TextDisabled("Quick Adjust");
@@ -757,15 +833,22 @@ void ImGuiManager::ModelWindow(
 			transform.translate = { 0.0f, 0.0f, 0.0f };
 			transform.rotate = { 0.0f, 0.0f, 0.0f };
 			transform.scale = { 1.0f, 1.0f, 1.0f };
+			transformEdited = true;
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Reset Rotation")) {
 			transform.rotate = { 0.0f, 0.0f, 0.0f };
+			transformEdited = true;
 		}
 
 		float uniformScale = (transform.scale.x + transform.scale.y + transform.scale.z) / 3.0f;
 		if (ImGui::DragFloat("Uniform Scale", &uniformScale, 0.01f, 0.001f, 100.0f)) {
 			transform.scale = { uniformScale, uniformScale, uniformScale };
+			transformEdited = true;
+		}
+		ImGui::EndDisabled();
+		if (transformEdited) {
+			targetObject->RecordTransformEdit(transformBeforeEdit);
 		}
 
 		float environmentCoefficient = targetObject->GetEnvironmentCoefficient();
@@ -901,6 +984,13 @@ std::string ImGuiManager::ParticleWindow(Transform& emitterTransform, bool embed
 
 	ImGui::Separator();
 	ParticleManager* particleManager = ParticleManager::GetInstance();
+	bool particlesReturning = particleManager->IsReturning();
+	if (ImGui::Checkbox("return##Particles", &particlesReturning)) {
+		particleManager->SetReturning(particlesReturning);
+	}
+	ImGui::SameLine();
+	ImGui::TextDisabled(particlesReturning ? "Particles reverse continuously" : "Particles play forward");
+
 	bool autoWindSwitch = particleManager->IsAutoWindSwitchEnabled();
 	if (ImGui::Checkbox("Auto Wind Every 5s", &autoWindSwitch)) {
 		particleManager->SetAutoWindSwitchEnabled(autoWindSwitch);

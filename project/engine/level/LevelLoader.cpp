@@ -1,6 +1,7 @@
 #include "LevelLoader.h"
 #include <fstream>
 #include <cassert>
+#include <memory>
 #include "../../externals/nlohmann/json.hpp"
 
 LevelLoader::LevelData* LevelLoader::Load(const std::string& fileName)
@@ -11,16 +12,25 @@ LevelLoader::LevelData* LevelLoader::Load(const std::string& fileName)
 	std::ifstream file(fullpath);
 
 	//ファイルオープン失敗をチェック
-	if (file.fail())
-	{
-		assert(0);
+	if (file.fail()) {
+		return nullptr;
 	}
 
 	//JSON文字列から解凍したデータ
 	nlohmann::json deserialized;
 
 	//解凍
-	file >> deserialized;
+	try {
+		file >> deserialized;
+	} catch (const nlohmann::json::exception&) {
+		return nullptr;
+	}
+
+	if (!deserialized.is_object() || !deserialized.contains("name") ||
+		deserialized.value("name", "") != "scene" ||
+		!deserialized.contains("objects") || !deserialized["objects"].is_array()) {
+		return nullptr;
+	}
 
 	//正しいレベルエディタファイルかチェック
 	assert(deserialized.is_object());
@@ -31,7 +41,12 @@ LevelLoader::LevelData* LevelLoader::Load(const std::string& fileName)
 	//レベルエディタ格納インスタンスを生成
 	LevelData* levelData = new LevelData();
 
-	LoadObjects(deserialized["objects"], levelData->objects);
+	try {
+		LoadObjects(deserialized["objects"], levelData->objects);
+	} catch (const nlohmann::json::exception&) {
+		delete levelData;
+		return nullptr;
+	}
 
 	return levelData;
 }

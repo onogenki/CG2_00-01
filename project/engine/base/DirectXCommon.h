@@ -113,11 +113,27 @@ public:
 	//GPU待ち関数
 	void WaitForGPU();
 	bool CaptureGameTexturePixels(std::vector<unsigned char>& pixels, int& outWidth, int& outHeight, bool usePostEffectTexture);
+	bool QueueGameTextureCapture(bool usePostEffectTexture);
+	bool TryGetGameTextureCapturePixels(std::vector<unsigned char>& pixels, int& outWidth, int& outHeight);
 
 	// テクスチャの転送コマンドを実行して完了を待つ関数
 	void ExecuteTextureTransfer(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages);
 
 private:
+	struct CaptureReadbackSlot {
+		Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator;
+		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList;
+		Microsoft::WRL::ComPtr<ID3D12Resource> readbackResource;
+		D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
+		UINT64 totalBytes = 0;
+		UINT64 fenceValue = 0;
+		UINT64 sequence = 0;
+		int width = 0;
+		int height = 0;
+		bool pending = false;
+	};
+
+	static constexpr size_t kCaptureReadbackSlotCount_ = 4;
 
 	DirectXCommon() = default;
 	~DirectXCommon();
@@ -142,6 +158,8 @@ private:
 	UINT64 fenceVal = 0;
 	UINT64 frameFenceValues_[2] = {};
 	UINT frameIndex_ = 0;
+	std::array<CaptureReadbackSlot, kCaptureReadbackSlotCount_> captureReadbackSlots_{};
+	UINT64 captureSequence_ = 0;
 
 	//スワップチェーンを生成する
 	Microsoft::WRL::ComPtr < IDXGISwapChain4> swapChain;

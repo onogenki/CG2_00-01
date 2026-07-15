@@ -161,10 +161,14 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
     accelerationField_.area.max = { 1.0f,1.0f,1.0f };
 
     isField_ = true;
+	returnState_.Reset();
 }
 
 // パーティクルグループの生成
 void ParticleManager::CreateParticleGroup(const std::string name, const std::string textureFilePath) {
+	if (!srvManager_ || !srvManager_->CanAllocate()) {
+		return;
+	}
     if (auto it = particleGroups_.find(name); it != particleGroups_.end()) {
         if (srvManager_) {
             srvManager_->Free(it->second.instancingSrvIndex);
@@ -200,6 +204,9 @@ void ParticleManager::CreateParticleGroup(const std::string name, const std::str
 
 void ParticleManager::CreateRingParticleGroup(const std::string name, const std::string textureFilePath)
 {
+	if (!srvManager_ || !srvManager_->CanAllocate()) {
+		return;
+	}
     if (auto it = particleGroups_.find(name); it != particleGroups_.end()) {
         if (srvManager_) {
             srvManager_->Free(it->second.instancingSrvIndex);
@@ -266,6 +273,9 @@ void ParticleManager::CreateCylinderParticleGroup(
     float bottomRadius,
     float height)
 {
+	if (!srvManager_ || !srvManager_->CanAllocate()) {
+		return;
+	}
     if (auto it = particleGroups_.find(name); it != particleGroups_.end()) {
         if (srvManager_) {
             srvManager_->Free(it->second.instancingSrvIndex);
@@ -344,6 +354,7 @@ void ParticleManager::ClearAllGroups()
         }
     }
     particleGroups_.clear();
+	returnState_.Reset();
 }
 
 void ParticleManager::ClearParticles(const std::string name)
@@ -354,6 +365,38 @@ void ParticleManager::ClearParticles(const std::string name)
     }
     it->second.particles.clear();
     it->second.instanceCount = 0;
+}
+
+bool ParticleManager::GetPlaybackSnapshot(const std::string& name, ParticlePlaybackSnapshot& snapshot) const
+{
+    snapshot = {};
+    const auto groupIt = particleGroups_.find(name);
+    if (groupIt == particleGroups_.end()) {
+        return false;
+    }
+
+    snapshot.count = groupIt->second.particles.size();
+    if (groupIt->second.particles.empty()) {
+        return true;
+    }
+
+    const Particle& particle = groupIt->second.particles.front();
+    snapshot.transform = particle.transform;
+    snapshot.velocity = particle.velocity;
+    snapshot.currentTime = particle.currentTime;
+    snapshot.lifeTime = particle.lifeTime;
+    snapshot.isEndless = particle.isEndless;
+    return true;
+}
+
+size_t ParticleManager::GetTotalParticleCount() const
+{
+    size_t count = 0;
+    for (const auto& [name, group] : particleGroups_) {
+        (void)name;
+        count += group.particles.size();
+    }
+    return count;
 }
 
 bool ParticleManager::GetBillboardEnabled(const std::string& name) const
@@ -380,6 +423,7 @@ bool ParticleManager::IsCollision(const AABB aabb, const Vector3& point)
 
 // パーティクルの発生
 void ParticleManager::Emit(const std::string name, const Vector3& position, uint32_t count,bool receivesWind, float scaleMultiplier) {
+	if (returnState_.IsReturning()) return;
     auto groupIt = particleGroups_.find(name);
     if (groupIt == particleGroups_.end()) {
         return;
@@ -422,6 +466,7 @@ void ParticleManager::Emit(const std::string name, const Vector3& position, uint
 
 //ヒット(斬撃みたいな細長い円)エフェクト発生
 void ParticleManager::EmitHitEffect(const std::string name, uint32_t count, const Vector3& translate, float scaleMultiplier) {
+	if (returnState_.IsReturning()) return;
     auto groupIt = particleGroups_.find(name);
     if (groupIt == particleGroups_.end()) {
         return;
@@ -452,6 +497,7 @@ void ParticleManager::EmitHitEffect(const std::string name, uint32_t count, cons
 //インパクト(円)エフェクト発生
 void ParticleManager::EmitRingEffect(const std::string name, uint32_t count, const Vector3& translate, float scaleMultiplier)
 {
+	if (returnState_.IsReturning()) return;
     auto groupIt = particleGroups_.find(name);
     if (groupIt == particleGroups_.end()) {
         return;
@@ -482,6 +528,7 @@ void ParticleManager::EmitRingEffect(const std::string name, uint32_t count, con
 //ポータル(円柱)エフェクト発生
 void ParticleManager::EmitCylinderEffect(const std::string name, uint32_t count, const Vector3& translate, float scaleMultiplier)
 {
+	if (returnState_.IsReturning()) return;
     auto groupIt = particleGroups_.find(name);
     if (groupIt == particleGroups_.end()) {
         return;
@@ -511,6 +558,7 @@ void ParticleManager::EmitCylinderEffect(const std::string name, uint32_t count,
 
 void ParticleManager::EmitPillarSparkle(const std::string name, uint32_t count, const Vector3& position, float scaleMultiplier)
 {
+	if (returnState_.IsReturning()) return;
     auto groupIt = particleGroups_.find(name);
     if (groupIt == particleGroups_.end()) {
         return;
@@ -570,6 +618,7 @@ void ParticleManager::EmitPillarSparkle(const std::string name, uint32_t count, 
 
 void ParticleManager::EmitLightCore(const std::string name, uint32_t count, const Vector3& position, float scaleMultiplier)
 {
+	if (returnState_.IsReturning()) return;
     auto groupIt = particleGroups_.find(name);
     if (groupIt == particleGroups_.end()) {
         return;
@@ -612,6 +661,7 @@ void ParticleManager::EmitLightCore(const std::string name, uint32_t count, cons
 
 void ParticleManager::EmitLightRain(const std::string name, uint32_t count, const Vector3& position, float scaleMultiplier)
 {
+	if (returnState_.IsReturning()) return;
     auto groupIt = particleGroups_.find(name);
     if (groupIt == particleGroups_.end()) {
         return;
@@ -663,6 +713,7 @@ void ParticleManager::EmitLightRain(const std::string name, uint32_t count, cons
 
 void ParticleManager::EmitLightSpiral(const std::string name, uint32_t count, const Vector3& translate, float scaleMultiplier)
 {
+	if (returnState_.IsReturning()) return;
     auto groupIt = particleGroups_.find(name);
     if (groupIt == particleGroups_.end()) {
         return;
@@ -726,13 +777,18 @@ void ParticleManager::Update() {
     //万が一カメラがない場合は安全のために抜ける
     if (!activeCamera)return;
 
-    const float kDeltaTime_ = dxCommon_->GetDeltaTime();
+    const bool returning = returnState_.IsReturning();
+    const float signedDeltaTime = dxCommon_->GetDeltaTime() * (returning ? -1.0f : 1.0f);
 
     //風タイマー
     if (autoWindSwitch_) {
-        windTimer_ += kDeltaTime_;
+        windTimer_ += signedDeltaTime;
     }
-    if (autoWindSwitch_ && windTimer_ >= 5.0f)
+    if (autoWindSwitch_ && returning && windTimer_ < 0.0f) {
+        isField_ = !isField_;
+        windTimer_ += 5.0f;
+    }
+    else if (autoWindSwitch_ && windTimer_ >= 5.0f)
     {//5秒経過したら
         isField_ = !isField_;//trueとfalse切り替え
         windTimer_ = 0.0f;
@@ -754,15 +810,25 @@ void ParticleManager::Update() {
         for (auto it = group.particles.begin(); it != group.particles.end();) {
             Particle& particle = *it;
 
-            if (!particle.isEndless && particle.currentTime >= particle.lifeTime) {
+            if (!returning && !particle.isEndless && particle.currentTime >= particle.lifeTime) {
                 it = group.particles.erase(it);
                 continue;
             }
 
             //Fieldの範囲内のParticleには加速度を適用
             if (pair.first == "Cylinder") {
-                particle.transform.rotate.y += 1.5f * kDeltaTime_;
-                particle.transform.scale.y += particle.scaleVelocityY * kDeltaTime_;
+                particle.transform.rotate.y += 1.5f * signedDeltaTime;
+
+                // At a bounce, forward playback clamps the scale and flips the
+                // velocity. Reverse playback must undo that flip before moving.
+                if (returning) {
+                    if (particle.transform.scale.y >= 1.2f && particle.scaleVelocityY < 0.0f) {
+                        particle.scaleVelocityY *= -1.0f;
+                    } else if (particle.transform.scale.y <= 0.5f && particle.scaleVelocityY > 0.0f) {
+                        particle.scaleVelocityY *= -1.0f;
+                    }
+                }
+                particle.transform.scale.y += particle.scaleVelocityY * signedDeltaTime;
 
                 if (particle.transform.scale.y >= 1.2f) {
                     particle.transform.scale.y = 1.2f;
@@ -774,8 +840,8 @@ void ParticleManager::Update() {
             }
 
             if (particle.isSpiral) {
-                particle.spiralAngle += particle.spiralAngularVelocity * kDeltaTime_;
-                particle.spiralRadius = (std::max)(0.05f, particle.spiralRadius + particle.spiralRadialVelocity * kDeltaTime_);
+                particle.spiralAngle += particle.spiralAngularVelocity * signedDeltaTime;
+                particle.spiralRadius = (std::max)(0.05f, particle.spiralRadius + particle.spiralRadialVelocity * signedDeltaTime);
 
                 const float spiralX = std::cos(particle.spiralAngle) * particle.spiralRadius;
                 const float spiralY = std::sin(particle.spiralAngle) * particle.spiralRadius;
@@ -786,23 +852,37 @@ void ParticleManager::Update() {
                 };
             }
 
-            if (isField_ && particle.receivesWind)
-            {
-                if (IsCollision(accelerationField_.area, particle.transform.translate))
-                {
-                    particle.velocity.x += accelerationField_.acceleration.x * kDeltaTime_;
-                    particle.velocity.y += accelerationField_.acceleration.y * kDeltaTime_;
-                    particle.velocity.z += accelerationField_.acceleration.z * kDeltaTime_;
-                }
+            // Forward Euler first changes velocity and then position. Its inverse
+            // must restore position before restoring velocity to avoid drift.
+            if (returning) {
+                particle.transform.translate.x += particle.velocity.x * signedDeltaTime;
+                particle.transform.translate.y += particle.velocity.y * signedDeltaTime;
+                particle.transform.translate.z += particle.velocity.z * signedDeltaTime;
             }
 
-            particle.transform.translate.x += particle.velocity.x * kDeltaTime_;
-            particle.transform.translate.y += particle.velocity.y * kDeltaTime_;
-            particle.transform.translate.z += particle.velocity.z * kDeltaTime_;
+            const bool receivesActiveWind = isField_ && particle.receivesWind &&
+                IsCollision(accelerationField_.area, particle.transform.translate);
+            if (receivesActiveWind)
+            {
+                particle.velocity.x += accelerationField_.acceleration.x * signedDeltaTime;
+                particle.velocity.y += accelerationField_.acceleration.y * signedDeltaTime;
+                particle.velocity.z += accelerationField_.acceleration.z * signedDeltaTime;
+            }
+
+            if (!returning) {
+                particle.transform.translate.x += particle.velocity.x * signedDeltaTime;
+                particle.transform.translate.y += particle.velocity.y * signedDeltaTime;
+                particle.transform.translate.z += particle.velocity.z * signedDeltaTime;
+            }
 
             float alpha = particle.color.w;
             if (!particle.isEndless) {
-                particle.currentTime += kDeltaTime_;
+                particle.currentTime += signedDeltaTime;
+                if (returning && particle.lifeTime > 0.0f) {
+                    while (particle.currentTime < 0.0f) {
+                        particle.currentTime += particle.lifeTime;
+                    }
+                }
                 const float progress = std::clamp(particle.currentTime / particle.lifeTime, 0.0f, 1.0f);
                 if (particle.useColorAndScaleOverLife) {
                     particle.transform.scale = {

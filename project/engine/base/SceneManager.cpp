@@ -1,4 +1,5 @@
 #include "SceneManager.h"
+#include "CaptureManager.h"
 #include "DirectXCommon.h"
 
 SceneManager* SceneManager::GetInstance()
@@ -49,6 +50,7 @@ void SceneManager::Draw()
 	if (scene_)
 	{
 		scene_->Draw();
+		CaptureManager::GetInstance()->UpdateAfterDraw();
 	}
 }
 

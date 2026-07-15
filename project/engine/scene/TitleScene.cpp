@@ -30,10 +30,19 @@ bool TitleScene::AddModelToTitle(const std::string& fileName)
 	object->SetDirectionalLight(directionalLight_);
 	object->SetPointLight(pointLight_);
 	object->SetSpotLight(spotLight_);
-	const float offset = static_cast<float>(normalObjects.size()) * 1.4f;
+	const float offset = static_cast<float>(normalObjects.size() + animationObjects_.size()) * 1.4f;
 	object->SetTranslate({ -2.0f + offset, 0.0f, 6.0f });
 	object->SetScale({ 1.0f, 1.0f, 1.0f });
-	normalObjects.push_back(std::move(object));
+	if (object->IsSkeletal()) {
+		const Model::Animation animation = Model::LoadAnimationFile("./resources", fileName);
+		if (animation.duration > 0.0f) {
+			object->PlayAnimation(animation);
+			object->SetIsLoop(true);
+		}
+		animationObjects_.push_back(std::move(object));
+	} else {
+		normalObjects.push_back(std::move(object));
+	}
 	return true;
 }
 
@@ -61,7 +70,9 @@ void TitleScene::DrawTitleModelShelfImGui()
 {
 	SceneEditor::ShelfCallbacks callbacks{};
 	callbacks.sceneLabel = "Title";
-	callbacks.addedModelCount = normalObjects.size() > baseNormalObjectCount_ ? normalObjects.size() - baseNormalObjectCount_ : 0;
+	callbacks.addedModelCount =
+		(normalObjects.size() > baseNormalObjectCount_ ? normalObjects.size() - baseNormalObjectCount_ : 0) +
+		animationObjects_.size();
 	callbacks.addedTextureCount = addedSprites_.size();
 	callbacks.addModel = [this](const std::string& fileName) { return AddModelToTitle(fileName); };
 	callbacks.addTexture = [this](const std::string& textureFilePath) { return AddTextureToTitle(textureFilePath); };
@@ -70,6 +81,7 @@ void TitleScene::DrawTitleModelShelfImGui()
 			normalObjects.resize(baseNormalObjectCount_);
 			obj = normalObjects.empty() ? nullptr : normalObjects.front().get();
 		}
+		animationObjects_.clear();
 		addedSprites_.clear();
 		selectedTitleSpriteIndex_ = 0;
 		inspectorAutoSelectSpriteFrames_ = 0;
@@ -213,6 +225,13 @@ void TitleScene::Update()
 		object3d->SetSpotLight(spotLight_);
 		object3d->Update();
 	}
+	for (auto& object3d : animationObjects_) {
+		object3d->SetCamera(cameraManager->GetActiveCamera());
+		object3d->SetDirectionalLight(directionalLight_);
+		object3d->SetPointLight(pointLight_);
+		object3d->SetSpotLight(spotLight_);
+		object3d->Update();
+	}
 
 	//カメラのビュープロジェクション行列を渡して更新
 	Matrix4x4 viewMatrix = cameraManager->GetActiveCamera()->GetViewMatrix();
@@ -247,6 +266,11 @@ void TitleScene::Draw()
 
 	object3dCommon->SetCommonDrawSetting();
 	for (const auto& object : normalObjects) {
+		if (object) {
+			object->Draw();
+		}
+	}
+	for (const auto& object : animationObjects_) {
 		if (object) {
 			object->Draw();
 		}

@@ -17,6 +17,7 @@
 #include "PostEffect.h"
 #include "Audio.h"
 #include "AbstractSceneFactory.h"
+#include "CaptureManager.h"
 
 #pragma comment(lib, "Dbghelp.lib")
 
@@ -127,6 +128,7 @@ void Framework::Initialize()
 
 	imGuiManager_ = ImGuiManager::GetInstance();
 	imGuiManager_->Initialize(winApp_.get(), dxCommon_, srvManager_);
+	CaptureManager::GetInstance()->Initialize();
 
 	// クラッシュ時にExportDumpを呼ぶように登録
 	SetUnhandledExceptionFilter(ExportDump);
@@ -154,10 +156,12 @@ void Framework::Finalize()
 	SceneManager::GetInstance()->FinalizeCurrentScene();
 	SceneManager::GetInstance()->SetSceneFactory(nullptr);
 
+	CaptureManager::GetInstance()->Finalize();
 	imGuiManager_->Finalize();
 	TextureManager::GetInstance()->Finalize();
 	ModelManager::GetInstance()->Finalize();
 	ParticleManager::GetInstance()->Finalize();
+	Audio::GetInstance()->Unload();
 
 	xAudio2_.Reset();
 	MFShutdown();

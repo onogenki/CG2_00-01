@@ -2,11 +2,13 @@
 #include "DirectXCommon.h"
 #include <cassert>
 #include <array>
+#include <cstdint>
 #include<queue>
 
 class SrvManager
 {
 public:
+	static constexpr uint32_t kInvalidSrvIndex = UINT32_MAX;
 
 	// シングルトンインスタンスの取得
 	static SrvManager* GetInstance() {
@@ -19,6 +21,7 @@ public:
 
 	uint32_t Allocate();
 	void Free(uint32_t index);//解放用の関数
+	void Free(D3D12_CPU_DESCRIPTOR_HANDLE handle);
 	bool CanAllocate() const;//空きがあるか確認する関数
 
 	bool CanAllocate(uint32_t count) const;
