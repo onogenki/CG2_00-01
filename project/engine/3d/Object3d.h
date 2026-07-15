@@ -5,6 +5,7 @@
 #include "ModelManager.h"
 #include "SrvManager.h"
 #include "Camera.h"
+#include "TimePlayback.h"
 #include <vector>
 #include <string>
 #include <d3d12.h>
@@ -89,6 +90,22 @@ public:
 	float GetAnimationTime() const { return animationTime_; }
 	//シーンからアニメーションの時間をいじる関数
 	void SetAnimationTime(float time) { this->animationTime_ = time; }
+	bool IsAnimating() const { return isAnimating_; }
+	float GetAnimationDuration() const { return currentAnimation_.duration; }
+	bool IsAnimationReturning() const { return animationReturnState_.IsReturning(); }
+	void SetAnimationReturning(bool returning) { animationReturnState_.SetReturning(returning && isAnimating_); }
+
+	void RecordTransformEdit(const Transform& before);
+	void RecordTransformEdit(const Transform& before, float elapsedSeconds);
+	bool IsTransformReturning() const { return transformPlayback_.IsReturning(); }
+	void SetTransformReturning(bool returning) { transformPlayback_.SetReturning(returning); }
+	bool CanMoveTransformForward() const { return transformPlayback_.CanMoveForward(); }
+	bool MoveTransformForward() { return transformPlayback_.StartMoveForward(); }
+	bool IsTransformMovingForward() const { return transformPlayback_.IsMovingForward(); }
+	bool HasTransformHistory() const { return transformPlayback_.HasHistory(); }
+	float GetTransformPlaybackProgress() const { return transformPlayback_.GetProgress(); }
+	float GetTransformPlaybackTime() const { return transformPlayback_.GetPlaybackTime(); }
+	float GetTransformPlaybackDuration() const { return transformPlayback_.GetDuration(); }
 
 	//スケルトン(アニメーションするか)を取得
 	Model::Skeleton& GetSkeleton() { return skeleton_; }
@@ -171,6 +188,8 @@ private:
 	bool isAnimating_ = false;
 	bool isLoop_ = true;//デフォルトはループ
 	float maxPlayTime_ = 0.0f;
+	ReturnPlaybackState animationReturnState_;
+	TransformPlaybackController transformPlayback_;
 
 	Model::Skeleton skeleton_; // このオブジェクト専用の骨
 	bool isSkeletal_ = false;  // スケルトンを持っているかどうか

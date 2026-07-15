@@ -33,8 +33,8 @@ public:
 
 	void Initialize();
 
-	void LoadFile(const std::string& filename);
-	void PlayWave(const std::string& filename);
+	bool LoadFile(const std::string& filename);
+	bool PlayWave(const std::string& filename);
 	void Unload();
 
 private:
@@ -46,4 +46,7 @@ private:
 	IXAudio2MasteringVoice* masterVoice_ = nullptr;
 
 	std::unordered_map<std::string, SoundData> soundDatas_;
+	std::vector<IXAudio2SourceVoice*> sourceVoices_;
+
+	void ReleaseFinishedVoices();
 };

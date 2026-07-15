@@ -22,7 +22,7 @@ public:
 
 	void Finalize();
 
-	void LoadTexture(const std::string& filePath);
+	bool LoadTexture(const std::string& filePath);
 
 	//メタデータを取得
 	const DirectX::TexMetadata& GetMetaData(const std::string& filePath);

@@ -215,7 +215,7 @@ bool Input::TriggerKey(BYTE keyNumber){
 // ゲームパッドのボタンが押された瞬間かどうか
 bool Input::TriggerPadButton(int padIndex, int button) {
 	// 指定されたインデックスが範囲外なら拒否
-	if (padIndex >= padStates.size()) return false;
+	if (padIndex < 0 || padIndex >= static_cast<int>(padStates.size()) || button < 0 || button >= 32) return false;
 
 	// 「現在のフレームで押されていて」かつ「前のフレームでは押されていなかった」なら true
 	if (padStates[padIndex].rgbButtons[button] && !padStatesPre[padIndex].rgbButtons[button]) {
@@ -241,7 +241,7 @@ bool Input::TriggerMouseButton(int button) {
 
 // ゲームパッドのボタンが押されたかどうか
 bool Input::IsPadButtonPressed(int padIndex, int button) {
-	if (padIndex >= padStates.size()) return false;
+	if (padIndex < 0 || padIndex >= static_cast<int>(padStates.size()) || button < 0 || button >= 32) return false;
 
 	if (padStates[padIndex].rgbButtons[button]) {
 		return true;

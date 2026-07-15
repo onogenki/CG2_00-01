@@ -32,7 +32,9 @@ bool SrvManager::CanAllocate(uint32_t count) const
 uint32_t SrvManager::Allocate()
 {
 	//上限に達してないかチェック
-	assert(CanAllocate());
+	if (!CanAllocate()) {
+		return kInvalidSrvIndex;
+	}
 	//キューの先頭から空いてる番号を1つ取り出す
 	uint32_t index = freeList_.front();
 	//取り出した番号をキューから排除
@@ -50,6 +52,22 @@ void SrvManager::Free(uint32_t index)
 	}
 	allocated_[index] = false;
 	freeList_.push(index);
+}
+
+void SrvManager::Free(D3D12_CPU_DESCRIPTOR_HANDLE handle)
+{
+	if (!descriptorHeap || descriptorSize == 0) {
+		return;
+	}
+	const SIZE_T start = descriptorHeap->GetCPUDescriptorHandleForHeapStart().ptr;
+	if (handle.ptr < start) {
+		return;
+	}
+	const SIZE_T offset = handle.ptr - start;
+	if (offset % descriptorSize != 0) {
+		return;
+	}
+	Free(static_cast<uint32_t>(offset / descriptorSize));
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE SrvManager::GetCPUDescriptorHandle(uint32_t index)

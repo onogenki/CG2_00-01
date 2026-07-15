@@ -11,6 +11,7 @@
 #include "Object3d.h"
 #include "DirectXCommon.h"
 #include "SrvManager.h"
+#include "TimePlayback.h"
 using namespace MyMath;
 
 class CameraManager;
@@ -88,6 +89,16 @@ struct ParticleGroup
     bool useBillboard = true;
 };
 
+struct ParticlePlaybackSnapshot
+{
+    size_t count = 0;
+    Transform transform{};
+    Vector3 velocity{};
+    float currentTime = 0.0f;
+    float lifeTime = 0.0f;
+    bool isEndless = false;
+};
+
 class ParticleManager
 {
 public:
@@ -141,6 +152,10 @@ public:
     void SetAutoWindSwitchEnabled(bool isEnabled) { autoWindSwitch_ = isEnabled; windTimer_ = 0.0f; }
     Vector3 GetWindAcceleration() const { return accelerationField_.acceleration; }
     void SetWindAcceleration(const Vector3& acceleration) { accelerationField_.acceleration = acceleration; }
+	bool IsReturning() const { return returnState_.IsReturning(); }
+	void SetReturning(bool returning) { returnState_.SetReturning(returning); }
+	bool GetPlaybackSnapshot(const std::string& name, ParticlePlaybackSnapshot& snapshot) const;
+	size_t GetTotalParticleCount() const;
 
     bool GetBillboardEnabled(const std::string& name) const;
     void SetBillboardEnabled(const std::string& name, bool isEnabled);
@@ -174,6 +189,7 @@ private:
 
     //場
     AccelerationField accelerationField_;
+	ReturnPlaybackState returnState_;
     bool autoWindSwitch_ = true;
     float windTimer_ = 0.0f;//吹く時間
     bool isField_ = false;//風が吹いてるかどうか

@@ -9,6 +9,9 @@ ParticleEmitter::ParticleEmitter(const std::string& name, const Transform& trans
 
 void ParticleEmitter::Update()
 {
+	if (ParticleManager::GetInstance()->IsReturning()) {
+		return;
+	}
     //1フレームの進む時間
     const float kDeltaTime = 1.0f / 60.0f;
     // 時刻を進める

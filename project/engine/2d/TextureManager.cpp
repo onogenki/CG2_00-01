@@ -26,21 +26,29 @@ void TextureManager::Initialize(DirectXCommon* dxCommon,SrvManager* srvManager)
 
 void TextureManager::Finalize()
 {
+	if (srvManager_) {
+		for (const auto& [filePath, textureData] : textureDatas) {
+			srvManager_->Free(textureData.srvIndex);
+		}
+	}
+	textureDatas.clear();
 	delete instance;
 	instance = nullptr;
 }
 
-void TextureManager::LoadTexture(const std::string& filePath)
+bool TextureManager::LoadTexture(const std::string& filePath)
 {
 	//読み込みテクスチャを検索
 	if (textureDatas.contains(filePath))
 	{
 		//読み込み済みなら早朝return 
-		return;
+		return true;
 	}
 
 	//テクスチャ枚数上限チェック
-	assert(srvManager_->CanAllocate());
+	if (!dxCommon_ || !srvManager_ || !srvManager_->CanAllocate()) {
+		return false;
+	}
 
 	//テクスチャを読んでプログラムで扱えるようにする
 	DirectX::ScratchImage image{};
@@ -55,7 +63,9 @@ void TextureManager::LoadTexture(const std::string& filePath)
 	{
 		hr = DirectX::LoadFromWICFile(wFilePath.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, nullptr, image);
 	}
-	assert(SUCCEEDED(hr));//読み込みが成功したか
+	if (FAILED(hr)) {
+		return false;
+	}
 
 	//ミップマップ生成の分岐
 	DirectX::ScratchImage mipImages{};
@@ -72,7 +82,9 @@ void TextureManager::LoadTexture(const std::string& filePath)
 			0, // 0を指定すると、1x1まで全てのミップマップを自動計算してくれます
 			mipImages
 		); 
-		assert(SUCCEEDED(hr));
+		if (FAILED(hr)) {
+			return false;
+		}
 	}
 
 	//追加したテクスチャデータの参照を取得する
@@ -84,6 +96,10 @@ void TextureManager::LoadTexture(const std::string& filePath)
 
 	//srvManagerからデスクリプタの割り当てを受ける
 	textureData.srvIndex = srvManager_->Allocate();
+	if (textureData.srvIndex == SrvManager::kInvalidSrvIndex) {
+		textureDatas.erase(filePath);
+		return false;
+	}
 	textureData.srvHandleCPU = srvManager_->GetCPUDescriptorHandle(textureData.srvIndex);
 	textureData.srvHandleGPU = srvManager_->GetGPUDescriptorHandle(textureData.srvIndex);
 
@@ -108,6 +124,7 @@ void TextureManager::LoadTexture(const std::string& filePath)
 
 	//テクスチャデータの転送(GPUへのキックから完了待ち、リセットまでをDirectXCommonに全て任せる)
 	dxCommon_->ExecuteTextureTransfer(textureData.resource, mipImages);
+	return true;
 
 }
 

@@ -128,6 +128,26 @@ std::string GetEnvironmentString(const char* name)
 	std::free(value);
 	return result;
 }
+
+bool NearlyEqual(float lhs, float rhs, float tolerance = 0.001f)
+{
+	return std::abs(lhs - rhs) <= tolerance;
+}
+
+bool NearlyEqual(const Vector3& lhs, const Vector3& rhs, float tolerance = 0.001f)
+{
+	return NearlyEqual(lhs.x, rhs.x, tolerance) &&
+		NearlyEqual(lhs.y, rhs.y, tolerance) &&
+		NearlyEqual(lhs.z, rhs.z, tolerance);
+}
+
+bool NearlyEqual(const Transform& lhs, const Transform& rhs, float tolerance = 0.001f)
+{
+	return NearlyEqual(lhs.scale, rhs.scale, tolerance) &&
+		NearlyEqual(lhs.rotate, rhs.rotate, tolerance) &&
+		NearlyEqual(lhs.translate, rhs.translate, tolerance);
+}
+
 }
 
 void GamePlayScene::Initialize()
@@ -339,8 +359,26 @@ void GamePlayScene::Initialize()
 	baseNormalObjectCount_ = normalObjects.size();
 	baseAnimationObjectCount_ = animationObjects.size();
 	baseSpriteCount_ = sprites.size();
+	for (const auto& object : normalObjects) {
+		if (object) {
+			ecsWorld_.CreateModelEntity(object.get(), object->GetModelName(), false);
+		}
+	}
+	for (const auto& object : animationObjects) {
+		if (object) {
+			ecsWorld_.CreateModelEntity(object.get(), object->GetModelName(), true);
+		}
+	}
+	for (const auto& sprite : sprites) {
+		if (sprite) {
+			ecsWorld_.CreateSpriteEntity(sprite.get(), "Initial Sprite");
+		}
+	}
+	selectedEcsEntity_ = Ecs::kInvalidEntity;
 	ScanResourceModels();
+	CreateCaptureDirectories();
 	InitializeUiSmokeFromEnvironment();
+	InitializeTimePlaybackSmokeFromEnvironment();
 
 }
 
@@ -417,11 +455,15 @@ bool GamePlayScene::AddModelToScene(const std::string& fileName, const Vector3& 
 	object->SetTranslate(spawnPosition);
 
 	if (object->IsSkeletal()) {
+		Object3d* addedObject = object.get();
 		animationObjects.push_back(std::move(object));
 		SelectSceneObject(true, animationObjects.size() - 1);
+		RegisterEcsModel(addedObject, fileName, true);
 	} else {
+		Object3d* addedObject = object.get();
 		normalObjects.push_back(std::move(object));
 		SelectSceneObject(false, normalObjects.size() - 1);
+		RegisterEcsModel(addedObject, fileName, false);
 	}
 	return true;
 }
@@ -449,8 +491,10 @@ bool GamePlayScene::AddTextureToScene(const std::string& textureFilePath, const 
 		sprite->SetSize({ originalSize.x * scale, originalSize.y * scale });
 	}
 	sprite->SetPosition(position);
+	Sprite* addedSprite = sprite.get();
 	sprites.push_back(std::move(sprite));
 	SelectSceneSprite(sprites.size() - 1);
+	RegisterEcsSprite(addedSprite, textureFilePath);
 	return true;
 }
 
@@ -466,8 +510,49 @@ void GamePlayScene::ClearAddedSceneModels()
 	if (sprites.size() > baseSpriteCount_) {
 		sprites.resize(baseSpriteCount_);
 	}
+	UpdateEcsWorld();
 	ClearSceneObjectSelection();
 	ClearSceneSpriteSelection();
+}
+
+void GamePlayScene::RegisterEcsModel(Object3d* object, const std::string& sourceFile, bool isAnimated)
+{
+	selectedEcsEntity_ = ecsWorld_.CreateModelEntity(object, sourceFile, isAnimated);
+}
+
+void GamePlayScene::RegisterEcsSprite(Sprite* sprite, const std::string& sourceFile)
+{
+	selectedEcsEntity_ = ecsWorld_.CreateSpriteEntity(sprite, sourceFile);
+}
+
+void GamePlayScene::UpdateEcsWorld()
+{
+	std::vector<Object3d*> currentObjects;
+	currentObjects.reserve(normalObjects.size() + animationObjects.size());
+	for (const auto& object : normalObjects) {
+		if (object) {
+			currentObjects.push_back(object.get());
+		}
+	}
+	for (const auto& object : animationObjects) {
+		if (object) {
+			currentObjects.push_back(object.get());
+		}
+	}
+
+	std::vector<Sprite*> currentSprites;
+	currentSprites.reserve(sprites.size());
+	for (const auto& sprite : sprites) {
+		if (sprite) {
+			currentSprites.push_back(sprite.get());
+		}
+	}
+
+	ecsWorld_.PruneMissingBindings(currentObjects, currentSprites);
+	ecsWorld_.UpdateSystems();
+	if (!ecsWorld_.IsAlive(selectedEcsEntity_)) {
+		selectedEcsEntity_ = Ecs::kInvalidEntity;
+	}
 }
 
 Object3d* GamePlayScene::GetSelectedSceneObject()
@@ -506,6 +591,8 @@ void GamePlayScene::SelectSceneObject(bool animationObject, size_t index)
 	selectedSceneObjectIsAnimation_ = animationObject;
 	selectedSceneObjectIndex_ = index;
 	hasSelectedSceneObject_ = true;
+	Object3d* selectedObject = animationObject ? animationObjects[index].get() : normalObjects[index].get();
+	selectedEcsEntity_ = ecsWorld_.FindEntity(selectedObject);
 	inspectorAutoSelectModelFrames_ = 2;
 	inspectorAutoSelectSpriteFrames_ = 0;
 	ClearSceneSpriteSelection();
@@ -548,6 +635,7 @@ void GamePlayScene::SelectSceneSprite(size_t index)
 	}
 	selectedSceneSpriteIndex_ = index;
 	hasSelectedSceneSprite_ = true;
+	selectedEcsEntity_ = ecsWorld_.FindEntity(sprites[index].get());
 	inspectorAutoSelectSpriteFrames_ = 2;
 	inspectorAutoSelectModelFrames_ = 0;
 	ClearSceneObjectSelection();
@@ -1000,36 +1088,23 @@ void GamePlayScene::DrawParticleEffectImGui(bool embedded)
 #endif
 }
 
-std::filesystem::path GamePlayScene::GetUserMediaDirectory(const char* folderName, const char* projectFolderName) const
+std::filesystem::path GamePlayScene::GetCaptureDirectory(const char* folderName) const
 {
-	std::filesystem::path basePath = ".";
-	const KNOWNFOLDERID* knownFolderId = nullptr;
-	if (std::strcmp(folderName, "Pictures") == 0) {
-		knownFolderId = &FOLDERID_Pictures;
-	} else if (std::strcmp(folderName, "Videos") == 0) {
-		knownFolderId = &FOLDERID_Videos;
-	}
+	std::error_code errorCode;
+	const std::filesystem::path resourceDirectory = std::filesystem::absolute("resources", errorCode);
+	return (errorCode ? std::filesystem::path("resources") : resourceDirectory) / "Captures" / folderName;
+}
 
-	if (knownFolderId) {
-		PWSTR knownFolderPath = nullptr;
-		if (SUCCEEDED(SHGetKnownFolderPath(*knownFolderId, KF_FLAG_DEFAULT, nullptr, &knownFolderPath)) && knownFolderPath) {
-			basePath = knownFolderPath;
-			CoTaskMemFree(knownFolderPath);
-			return basePath / projectFolderName;
-		}
-		if (knownFolderPath) {
-			CoTaskMemFree(knownFolderPath);
+bool GamePlayScene::CreateCaptureDirectories() const
+{
+	std::error_code errorCode;
+	for (const char* folderName : { "Screenshots", "Videos", "Replays" }) {
+		std::filesystem::create_directories(GetCaptureDirectory(folderName), errorCode);
+		if (errorCode) {
+			return false;
 		}
 	}
-
-	char* userProfile = nullptr;
-	size_t userProfileLength = 0;
-	if (_dupenv_s(&userProfile, &userProfileLength, "USERPROFILE") == 0 && userProfile) {
-		basePath = userProfile;
-		free(userProfile);
-	}
-
-	return basePath / folderName / projectFolderName;
+	return true;
 }
 
 std::string GamePlayScene::MakeTimestampString() const
@@ -1092,19 +1167,17 @@ bool GamePlayScene::SavePixelsAsBmp(const std::filesystem::path& filePath, const
 	if (!file) {
 		return false;
 	}
-
 	file.write(reinterpret_cast<const char*>(&fileHeader), sizeof(fileHeader));
 	file.write(reinterpret_cast<const char*>(&bitmapHeader), sizeof(bitmapHeader));
 	file.write(reinterpret_cast<const char*>(pixels.data()), imageSize);
 	return file.good();
 }
 
-bool GamePlayScene::BeginRecordingAvi(const std::filesystem::path& filePath, int width, int height)
+bool GamePlayScene::BeginRecordingAvi(const std::filesystem::path& filePath, int width, int height, int frameRate)
 {
-	if (width <= 0 || height <= 0) {
+	if (width <= 0 || height <= 0 || frameRate <= 0) {
 		return false;
 	}
-
 	EndRecordingAvi();
 
 	std::error_code errorCode;
@@ -1114,7 +1187,6 @@ bool GamePlayScene::BeginRecordingAvi(const std::filesystem::path& filePath, int
 	}
 
 	AVIFileInit();
-
 	PAVIFILE aviFile = nullptr;
 	HRESULT result = AVIFileOpenW(&aviFile, filePath.wstring().c_str(), OF_WRITE | OF_CREATE, nullptr);
 	if (FAILED(result)) {
@@ -1125,7 +1197,7 @@ bool GamePlayScene::BeginRecordingAvi(const std::filesystem::path& filePath, int
 	AVISTREAMINFOW streamInfo{};
 	streamInfo.fccType = streamtypeVIDEO;
 	streamInfo.dwScale = 1;
-	streamInfo.dwRate = 10;
+	streamInfo.dwRate = static_cast<DWORD>(frameRate);
 	streamInfo.dwSuggestedBufferSize = static_cast<DWORD>(width * height * 4);
 	SetRect(&streamInfo.rcFrame, 0, 0, width, height);
 
@@ -1145,7 +1217,6 @@ bool GamePlayScene::BeginRecordingAvi(const std::filesystem::path& filePath, int
 	bitmapHeader.biBitCount = 32;
 	bitmapHeader.biCompression = BI_RGB;
 	bitmapHeader.biSizeImage = static_cast<DWORD>(width * height * 4);
-
 	result = AVIStreamSetFormat(aviStream, 0, &bitmapHeader, sizeof(bitmapHeader));
 	if (FAILED(result)) {
 		AVIStreamRelease(aviStream);
@@ -1210,8 +1281,12 @@ void GamePlayScene::EndRecordingAvi()
 void GamePlayScene::DrawCaptureImGui()
 {
 #ifdef USE_IMGUI
-	const std::filesystem::path screenshotDirectory = GetUserMediaDirectory("Pictures", "CG2Captures");
-	const std::filesystem::path videoDirectory = GetUserMediaDirectory("Videos", "CG2Recordings");
+	const std::filesystem::path screenshotDirectory = GetCaptureDirectory("Screenshots");
+	const std::filesystem::path videoDirectory = GetCaptureDirectory("Videos");
+	const std::filesystem::path replayDirectory = GetCaptureDirectory("Replays");
+	if (!CreateCaptureDirectories()) {
+		lastCaptureMessage_ = "Could not create capture folders under resources/Captures.";
+	}
 
 	ImGui::TextUnformatted("Capture");
 	ImGui::SameLine();
@@ -1277,6 +1352,37 @@ void GamePlayScene::DrawCaptureImGui()
 			? "Opened video folder: " + videoDirectory.string()
 			: "Could not open video folder: " + videoDirectory.string();
 	}
+
+	if (ImGui::Checkbox("Keep 30s Replay", &replayBufferEnabled_) && !replayBufferEnabled_) {
+		replayFrames_.clear();
+		replayFrameTimer_ = 0.0f;
+	}
+	ImGui::SameLine();
+	ImGui::BeginDisabled(isRecordingGameView_ || !replayBufferEnabled_ || replayFrames_.empty());
+	if (ImGui::Button("Save Last 30s")) {
+		if (SaveReplayClip()) {
+			lastCaptureMessage_ = "Saved replay: " + lastReplayPath_.string();
+		} else {
+			lastCaptureMessage_ = "Replay save failed.";
+		}
+	}
+	ImGui::EndDisabled();
+	ImGui::SameLine();
+	if (ImGui::SmallButton("open Replays File")) {
+		lastCaptureMessage_ = OpenFolderInExplorer(replayDirectory)
+			? "Opened replay folder: " + replayDirectory.string()
+			: "Could not open replay folder: " + replayDirectory.string();
+	}
+	const float replaySeconds = static_cast<float>(replayFrames_.size()) / static_cast<float>(kReplayFramesPerSecond_);
+	size_t replayBytes = 0;
+	for (const ReplayFrame& frame : replayFrames_) {
+		replayBytes += frame.pixels.size();
+	}
+	ImGui::TextDisabled(
+		"Replay buffer: %.1f / %d sec (480x270, 5 FPS, %.1f MB)",
+		replaySeconds,
+		kReplaySeconds_,
+		static_cast<double>(replayBytes) / (1024.0 * 1024.0));
 
 	if (isRecordingGameView_) {
 		ImGui::SameLine();
@@ -1368,6 +1474,100 @@ void GamePlayScene::UpdateRecordingCapture()
 	}
 
 	++recordingFrameIndex_;
+}
+
+void GamePlayScene::UpdateReplayCapture()
+{
+	if (!replayBufferEnabled_ || isRecordingGameView_) {
+		return;
+	}
+
+	replayFrameTimer_ += DirectXCommon::GetInstance()->GetDeltaTime();
+	constexpr float captureInterval = 1.0f / static_cast<float>(kReplayFramesPerSecond_);
+	if (replayFrameTimer_ < captureInterval) {
+		return;
+	}
+	while (replayFrameTimer_ >= captureInterval) {
+		replayFrameTimer_ -= captureInterval;
+	}
+
+	std::vector<unsigned char> sourcePixels;
+	int sourceWidth = 0;
+	int sourceHeight = 0;
+	if (!CaptureGameViewPixels(sourcePixels, sourceWidth, sourceHeight) || sourcePixels.empty() || sourceWidth <= 0 || sourceHeight <= 0) {
+		return;
+	}
+
+	const float scale = (std::min)(
+		1.0f,
+		(std::min)(
+			static_cast<float>(kReplayWidth_) / static_cast<float>(sourceWidth),
+			static_cast<float>(kReplayHeight_) / static_cast<float>(sourceHeight)));
+	const int targetWidth = (std::max)(1, static_cast<int>(static_cast<float>(sourceWidth) * scale));
+	const int targetHeight = (std::max)(1, static_cast<int>(static_cast<float>(sourceHeight) * scale));
+
+	if (!replayFrames_.empty() &&
+		(replayFrames_.front().width != targetWidth || replayFrames_.front().height != targetHeight)) {
+		replayFrames_.clear();
+	}
+
+	ReplayFrame replayFrame{};
+	replayFrame.width = targetWidth;
+	replayFrame.height = targetHeight;
+	replayFrame.pixels.resize(static_cast<size_t>(targetWidth) * static_cast<size_t>(targetHeight) * 4);
+	for (int y = 0; y < targetHeight; ++y) {
+		const int sourceY = (std::min)(sourceHeight - 1, y * sourceHeight / targetHeight);
+		for (int x = 0; x < targetWidth; ++x) {
+			const int sourceX = (std::min)(sourceWidth - 1, x * sourceWidth / targetWidth);
+			const size_t sourceOffset =
+				(static_cast<size_t>(sourceY) * static_cast<size_t>(sourceWidth) + static_cast<size_t>(sourceX)) * 4;
+			const size_t targetOffset =
+				(static_cast<size_t>(y) * static_cast<size_t>(targetWidth) + static_cast<size_t>(x)) * 4;
+			std::memcpy(replayFrame.pixels.data() + targetOffset, sourcePixels.data() + sourceOffset, 4);
+		}
+	}
+
+	replayFrames_.push_back(std::move(replayFrame));
+	const size_t maximumFrameCount = static_cast<size_t>(kReplaySeconds_ * kReplayFramesPerSecond_);
+	while (replayFrames_.size() > maximumFrameCount) {
+		replayFrames_.pop_front();
+	}
+}
+
+bool GamePlayScene::SaveReplayClip()
+{
+	if (replayFrames_.empty() || isRecordingGameView_) {
+		return false;
+	}
+	if (!CreateCaptureDirectories()) {
+		return false;
+	}
+
+	replayDirectory_ = GetCaptureDirectory("Replays");
+	const std::filesystem::path replayPath = replayDirectory_ / ("CG2_replay_" + MakeTimestampString() + ".avi");
+	const ReplayFrame& firstFrame = replayFrames_.front();
+	recordingFrameIndex_ = 0;
+	if (!BeginRecordingAvi(replayPath, firstFrame.width, firstFrame.height, kReplayFramesPerSecond_)) {
+		return false;
+	}
+
+	bool success = true;
+	for (const ReplayFrame& frame : replayFrames_) {
+		if (frame.width != firstFrame.width || frame.height != firstFrame.height ||
+			!AppendRecordingFrame(frame.pixels, frame.width, frame.height)) {
+			success = false;
+			break;
+		}
+		++recordingFrameIndex_;
+	}
+	EndRecordingAvi();
+	if (!success) {
+		return false;
+	}
+
+	lastReplayPath_ = replayPath;
+	lastVideoPath_ = replayPath;
+	return true;
 }
 
 void GamePlayScene::DrawInspectorImGui()
@@ -1486,6 +1686,86 @@ void GamePlayScene::DrawGamePlayInspectorTabs()
 		ImGuiManager::GetInstance()->CameraWindow(cameraManager.get(), true);
 		ImGui::EndTabItem();
 	}
+	DrawEcsInspectorImGui();
+#endif
+}
+
+void GamePlayScene::DrawEcsInspectorImGui()
+{
+#ifdef USE_IMGUI
+	if (!ImGui::BeginTabItem("ECS")) {
+		return;
+	}
+
+	ImGui::TextWrapped("Every GamePlay model and 2D texture is registered as an Entity.");
+	ImGui::TextDisabled("Add a Box Collider to a 3D model when you need simple collision checks.");
+	ImGui::Separator();
+
+	const std::vector<Ecs::Entity>& entities = ecsWorld_.GetEntities();
+	if (entities.empty()) {
+		ImGui::TextDisabled("No Entity exists in this scene.");
+		ImGui::EndTabItem();
+		return;
+	}
+
+	ImGui::BeginChild("EcsEntityList", ImVec2(0.0f, 110.0f), true);
+	for (Ecs::Entity entity : entities) {
+		const Ecs::NameComponent* name = ecsWorld_.GetName(entity);
+		const bool isModel = ecsWorld_.HasModel(entity);
+		const char* type = isModel ? "3D" : "2D";
+		const std::string label = "#" + std::to_string(entity) + " [" + type + "] " + (name ? name->value : "Unnamed");
+		if (ImGui::Selectable(label.c_str(), selectedEcsEntity_ == entity)) {
+			selectedEcsEntity_ = entity;
+		}
+	}
+	ImGui::EndChild();
+
+	if (!ecsWorld_.IsAlive(selectedEcsEntity_)) {
+		selectedEcsEntity_ = entities.front();
+	}
+
+	ImGui::Separator();
+	const Ecs::NameComponent* name = ecsWorld_.GetName(selectedEcsEntity_);
+	ImGui::Text("Entity #%u", selectedEcsEntity_);
+	if (name) {
+		ImGui::TextWrapped("Name: %s", name->value.c_str());
+	}
+
+	if (const Ecs::TransformComponent* transform = ecsWorld_.GetTransform(selectedEcsEntity_)) {
+		ImGui::TextDisabled("Transform is synchronized from the selected Object3d.");
+		ImGui::Text("Position: %.2f, %.2f, %.2f", transform->value.translate.x, transform->value.translate.y, transform->value.translate.z);
+		ImGui::Text("Scale: %.2f, %.2f, %.2f", transform->value.scale.x, transform->value.scale.y, transform->value.scale.z);
+	}
+
+	if (!ecsWorld_.HasModel(selectedEcsEntity_)) {
+		ImGui::TextDisabled("2D textures are entities too. Box Collider is currently available for 3D models only.");
+		ImGui::EndTabItem();
+		return;
+	}
+
+	if (!ecsWorld_.HasBoxCollider(selectedEcsEntity_)) {
+		if (ImGui::Button("Add Box Collider")) {
+			ecsWorld_.AddBoxCollider(selectedEcsEntity_);
+		}
+		ImGui::SameLine();
+		ImGui::TextDisabled("Default size: 1 x 1 x 1");
+	} else if (Ecs::BoxColliderComponent* collider = ecsWorld_.GetBoxCollider(selectedEcsEntity_)) {
+		ImGui::Separator();
+		ImGui::Text("Box Collider");
+		ImGui::Checkbox("Enabled", &collider->enabled);
+		ImGui::SameLine();
+		ImGui::Checkbox("Trigger", &collider->isTrigger);
+		ImGui::DragFloat3("Center Offset", &collider->center.x, 0.01f);
+		ImGui::DragFloat3("Half Extents", &collider->halfExtents.x, 0.01f, 0.01f, 100.0f);
+		ImGui::TextColored(
+			collider->isColliding ? ImVec4(1.0f, 0.3f, 0.3f, 1.0f) : ImVec4(0.4f, 0.75f, 1.0f, 1.0f),
+			collider->isColliding ? "Collision: overlapping" : "Collision: no overlap");
+		if (ImGui::Button("Remove Box Collider")) {
+			ecsWorld_.RemoveBoxCollider(selectedEcsEntity_);
+		}
+	}
+
+	ImGui::EndTabItem();
 #endif
 }
 
@@ -1516,13 +1796,13 @@ void GamePlayScene::DrawModelShelfImGui()
 	};
 	callbacks.drawExtraToolbar = [this, &state, resourceDirectory]() {
 		ImGui::SameLine();
+		ImGui::Checkbox("Collision Wire", &showCollisionDebug_);
+		ImGui::SameLine();
 		if (ImGui::SmallButton("Open Resources")) {
 			state.message = OpenFolderInExplorer(resourceDirectory)
 				? "Opened resources folder: " + resourceDirectory.string()
 				: "Could not open resources folder: " + resourceDirectory.string();
 		}
-		ImGui::SameLine();
-		ImGui::Checkbox("Collision Wire", &showCollisionDebug_);
 	};
 	callbacks.drawExtraStatus = [this]() {
 		if (!isModelPreviewMode_) {
@@ -2168,11 +2448,16 @@ void GamePlayScene::DrawSelectedObjectGizmo()
 			mouseDelta.x * activeGizmoScreenDirectionX_ +
 			mouseDelta.y * activeGizmoScreenDirectionY_;
 		const float worldMove = projectedDrag * moveScale;
-		Transform& transform = selectedObject->GetTransform();
-		transform.translate.x += activeGizmoWorldDirection_.x * worldMove;
-		transform.translate.y += activeGizmoWorldDirection_.y * worldMove;
-		transform.translate.z += activeGizmoWorldDirection_.z * worldMove;
-		selectedObject->SetTranslate(transform.translate);
+		if (!selectedObject->IsTransformReturning() && !selectedObject->IsTransformMovingForward() &&
+			std::abs(worldMove) > 0.000001f) {
+			Transform& transform = selectedObject->GetTransform();
+			const Transform beforeEdit = transform;
+			transform.translate.x += activeGizmoWorldDirection_.x * worldMove;
+			transform.translate.y += activeGizmoWorldDirection_.y * worldMove;
+			transform.translate.z += activeGizmoWorldDirection_.z * worldMove;
+			selectedObject->SetTranslate(transform.translate);
+			selectedObject->RecordTransformEdit(beforeEdit);
+		}
 	}
 
 	const auto axisColor = [&](GizmoAxis axis, ImU32 normalColor) {
@@ -2268,6 +2553,10 @@ void GamePlayScene::DrawCollisionDebugOverlay()
 		if (!object) {
 			return;
 		}
+		const Ecs::Entity entity = ecsWorld_.FindEntity(object.get());
+		if (entity != Ecs::kInvalidEntity && ecsWorld_.HasBoxCollider(entity)) {
+			return;
+		}
 		CollisionDebugBox box{};
 		if (BuildWorldAabb(*object, box.aabb)) {
 			boxes.push_back(box);
@@ -2282,6 +2571,13 @@ void GamePlayScene::DrawCollisionDebugOverlay()
 		}
 		for (const auto& object : animationObjects) {
 			appendObject(object);
+		}
+		for (Ecs::Entity entity : ecsWorld_.GetEntities()) {
+			const Ecs::BoxColliderComponent* collider = ecsWorld_.GetBoxCollider(entity);
+			if (!collider || !collider->enabled) {
+				continue;
+			}
+			boxes.push_back({ collider->worldBounds, collider->isColliding });
 		}
 	}
 
@@ -2347,6 +2643,458 @@ void GamePlayScene::DrawCollisionDebugOverlay()
 
 	drawList->PopClipRect();
 #endif
+}
+
+void GamePlayScene::InitializeTimePlaybackSmokeFromEnvironment()
+{
+	if (GetEnvironmentString("CG2_TIME_PLAYBACK_SMOKE") != "1") {
+		return;
+	}
+
+	timePlaybackSmokeEnabled_ = true;
+	timePlaybackSmokeFinished_ = false;
+	timePlaybackSmokeStage_ = 0;
+	timePlaybackSmokeStableFrames_ = 0;
+	timePlaybackSmokeDeleteIterations_ = 0;
+	timePlaybackSmokeStageTime_ = 0.0f;
+	timePlaybackSmokeModelFile_.clear();
+
+	std::error_code errorCode;
+	std::filesystem::create_directories("logs", errorCode);
+	timePlaybackSmokeLogPath_ =
+		std::filesystem::path("logs") / ("time_playback_smoke_" + MakeTimestampString() + ".log");
+
+	if (uiSmokeEnabled_) {
+		FinishTimePlaybackSmoke(false, "CG2_GAMEPLAY_UI_SMOKE cannot run at the same time.");
+		return;
+	}
+	if (!objectPlane || !objectAxis || !objectAxis->IsAnimating()) {
+		FinishTimePlaybackSmoke(false, "Required normal and animation test objects were not initialized.");
+		return;
+	}
+
+	const auto modelIt = std::find_if(modelLibrary_.begin(), modelLibrary_.end(), [](const ResourceModelEntry& entry) {
+		return entry.canLoad && !entry.hasAnimation && !entry.isTexture;
+	});
+	if (modelIt == modelLibrary_.end()) {
+		FinishTimePlaybackSmoke(false, "No loadable normal model was available for delete/reset stress.");
+		return;
+	}
+	timePlaybackSmokeModelFile_ = modelIt->fileName;
+
+	// Deterministically verify the common controller before exercising it through
+	// Object3d and the frame loop.
+	Transform localOrigin{ { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } };
+	Transform localMiddle{ { 1.2f, 1.1f, 1.4f }, { 0.1f, 0.2f, -0.1f }, { 1.0f, 2.0f, 0.0f } };
+	Transform localTarget{ { 1.5f, 0.8f, 2.0f }, { 0.2f, -0.4f, 0.6f }, { 4.0f, -2.0f, 1.0f } };
+	Transform localTransform = localMiddle;
+	TransformPlaybackController controller;
+	controller.RecordEdit(localOrigin, localTransform, 1.0f);
+	controller.RecordEdit(localMiddle, localTarget, 1.0f);
+	localTransform = localTarget;
+	controller.SetReturning(true);
+	controller.Update(localTransform, 0.5f);
+	const Transform localPaused = localTransform;
+	if (!controller.IsReturning() || !NearlyEqual(controller.GetPlaybackTime(), 1.5f) ||
+		!NearlyEqual(controller.GetDuration(), 2.0f) ||
+		!NearlyEqual(localPaused.translate, Vector3{ 2.5f, 0.0f, 0.5f })) {
+		FinishTimePlaybackSmoke(false, "A two-second transform edit did not reverse by exactly half a second.");
+		return;
+	}
+	controller.SetReturning(false);
+	controller.Update(localTransform, 0.25f);
+	if (!NearlyEqual(localTransform, localPaused) || !controller.CanMoveForward()) {
+		FinishTimePlaybackSmoke(false, "Transform Return did not pause at the unchecked position.");
+		return;
+	}
+	if (!controller.StartMoveForward()) {
+		FinishTimePlaybackSmoke(false, "Transform Move could not start after a paused Return.");
+		return;
+	}
+	controller.Update(localTransform, 0.5f);
+	if (!NearlyEqual(localTransform, localTarget) || controller.IsMovingForward()) {
+		FinishTimePlaybackSmoke(false, "Transform Move did not replay to the edited target.");
+		return;
+	}
+	controller.SetReturning(true);
+	controller.Update(localTransform, 2.0f);
+	if (!NearlyEqual(localTransform, localOrigin) || controller.IsReturning() || !controller.CanMoveForward()) {
+		FinishTimePlaybackSmoke(false, "Transform Return did not auto-stop at its original position.");
+		return;
+	}
+
+	TransformPlaybackController compactedController;
+	Transform compactedTransform = localOrigin;
+	for (int index = 0; index < 4096; ++index) {
+		const Transform beforeEdit = compactedTransform;
+		compactedTransform.translate.x += 0.001f;
+		compactedController.RecordEdit(beforeEdit, compactedTransform, 0.01f);
+	}
+	const Transform compactedTarget = compactedTransform;
+	if (!NearlyEqual(compactedController.GetDuration(), 40.96f, 0.01f)) {
+		FinishTimePlaybackSmoke(false, "Compacted transform history did not preserve its total edit time.");
+		return;
+	}
+	compactedController.SetReturning(true);
+	compactedController.Update(compactedTransform, 40.96f);
+	if (!NearlyEqual(compactedTransform, localOrigin) || !compactedController.CanMoveForward()) {
+		FinishTimePlaybackSmoke(false, "Compacted transform history did not preserve its original endpoint.");
+		return;
+	}
+	if (!compactedController.StartMoveForward()) {
+		FinishTimePlaybackSmoke(false, "Compacted transform history could not start Move.");
+		return;
+	}
+	compactedController.Update(compactedTransform, 40.96f);
+	if (!NearlyEqual(compactedTransform, compactedTarget)) {
+		FinishTimePlaybackSmoke(false, "Compacted transform history did not preserve its edited endpoint.");
+		return;
+	}
+
+	ClearAddedSceneModels();
+	activeEmitter = nullptr;
+	hitEffect_.enabled = false;
+	ringEffect_.enabled = false;
+	cylinderEffect_.enabled = false;
+	pillarSparkleEffect_.enabled = false;
+	lightCoreEffect_.enabled = false;
+	lightRainEffect_.enabled = false;
+	lightSpiralEffect_.enabled = false;
+
+	ParticleManager* particleManager = ParticleManager::GetInstance();
+	particleManager->SetReturning(false);
+	particleManager->SetAutoWindSwitchEnabled(false);
+	particleManager->SetWindEnabled(false);
+	particleManager->ClearAllParticles();
+
+	timePlaybackSmokeOrigin_ = objectPlane->GetTransform();
+	timePlaybackSmokeTarget_ = timePlaybackSmokeOrigin_;
+	timePlaybackSmokeTarget_.translate.x += 4.0f;
+	timePlaybackSmokeTarget_.translate.y += 1.5f;
+	timePlaybackSmokeTarget_.rotate.y += 0.75f;
+	timePlaybackSmokeTarget_.scale = { 1.4f, 0.8f, 1.2f };
+	objectPlane->GetTransform() = timePlaybackSmokeTarget_;
+	objectPlane->RecordTransformEdit(timePlaybackSmokeOrigin_, 2.0f);
+	objectPlane->SetTransformReturning(true);
+	if (!objectPlane->IsTransformReturning() ||
+		!NearlyEqual(objectPlane->GetTransformPlaybackDuration(), 2.0f)) {
+		FinishTimePlaybackSmoke(false, "Object3d Transform Return did not start.");
+	}
+}
+
+void GamePlayScene::UpdateTimePlaybackSmoke()
+{
+	if (!timePlaybackSmokeEnabled_ || timePlaybackSmokeFinished_) {
+		return;
+	}
+
+	auto fail = [this](const std::string& message) {
+		FinishTimePlaybackSmoke(false, message);
+	};
+	if (!objectPlane || !objectAxis) {
+		fail("A playback test object was deleted unexpectedly.");
+		return;
+	}
+
+	ParticleManager* particleManager = ParticleManager::GetInstance();
+	const float deltaTime = DirectXCommon::GetInstance()->GetDeltaTime();
+
+	switch (timePlaybackSmokeStage_) {
+	case 0: // Pause Transform Return near its midpoint.
+		if (!objectPlane->IsTransformReturning()) {
+			fail("Transform Return stopped before the midpoint pause test.");
+			return;
+		}
+		if (objectPlane->GetTransformPlaybackProgress() > 0.55f) {
+			return;
+		}
+		objectPlane->SetTransformReturning(false);
+		timePlaybackSmokePaused_ = objectPlane->GetTransform();
+		if (objectPlane->IsTransformReturning() || !objectPlane->CanMoveTransformForward()) {
+			fail("Unchecking Transform Return did not enable Move from the paused position.");
+			return;
+		}
+		timePlaybackSmokeStableFrames_ = 0;
+		timePlaybackSmokeStage_ = 1;
+		return;
+
+	case 1: // The object must remain still while Return is unchecked.
+		if (!NearlyEqual(objectPlane->GetTransform(), timePlaybackSmokePaused_)) {
+			fail("The transform moved after Return was unchecked.");
+			return;
+		}
+		if (++timePlaybackSmokeStableFrames_ < 8) {
+			return;
+		}
+		if (!objectPlane->MoveTransformForward()) {
+			fail("Move did not start from the paused transform.");
+			return;
+		}
+		timePlaybackSmokeStage_ = 2;
+		return;
+
+	case 2: // Move replays to the latest edited transform.
+		if (objectPlane->IsTransformMovingForward()) {
+			return;
+		}
+		if (!NearlyEqual(objectPlane->GetTransform(), timePlaybackSmokeTarget_)) {
+			fail("Move did not reach the transform edited in ImGui.");
+			return;
+		}
+		objectPlane->SetTransformReturning(true);
+		if (!objectPlane->IsTransformReturning()) {
+			fail("A second Transform Return did not start.");
+			return;
+		}
+		timePlaybackSmokeStage_ = 3;
+		return;
+
+	case 3: // A complete Return reaches the original transform and auto-stops.
+		if (objectPlane->IsTransformReturning()) {
+			return;
+		}
+		if (!NearlyEqual(objectPlane->GetTransform(), timePlaybackSmokeOrigin_) ||
+			!objectPlane->CanMoveTransformForward()) {
+			fail("A complete Transform Return did not stop at the original transform.");
+			return;
+		}
+		timePlaybackSmokeStage_ = 4;
+		return;
+
+	case 4: // Destroy active playback controllers repeatedly with shelf models.
+		if (timePlaybackSmokeDeleteIterations_ < 32) {
+			if (!AddModelToScene(timePlaybackSmokeModelFile_)) {
+				fail("Shelf model could not be added during playback delete stress.");
+				return;
+			}
+			if (normalObjects.size() != baseNormalObjectCount_ + 1) {
+				fail("Shelf normal model count changed unexpectedly during delete stress.");
+				return;
+			}
+			Object3d* addedObject = normalObjects.back().get();
+			const Transform beforeEdit = addedObject->GetTransform();
+			addedObject->GetTransform().translate.x += 2.0f;
+			addedObject->RecordTransformEdit(beforeEdit);
+			addedObject->SetTransformReturning(true);
+			ClearAddedSceneModels();
+			if (normalObjects.size() != baseNormalObjectCount_ ||
+				animationObjects.size() != baseAnimationObjectCount_) {
+				fail("Deleting an active shelf model did not restore the base model counts.");
+				return;
+			}
+			++timePlaybackSmokeDeleteIterations_;
+			return;
+		}
+
+		objectAxis->SetAnimationTime(0.35f);
+		objectAxis->SetAnimationReturning(true);
+		if (!objectAxis->IsAnimationReturning()) {
+			fail("Animation Return did not start.");
+			return;
+		}
+		timePlaybackSmokePreviousAnimationTime_ = objectAxis->GetAnimationTime();
+		timePlaybackSmokeStage_ = 5;
+		return;
+
+	case 5: { // Animation time decreases to zero and Return auto-clears.
+		const float animationTime = objectAxis->GetAnimationTime();
+		if (objectAxis->IsAnimationReturning()) {
+			if (animationTime > timePlaybackSmokePreviousAnimationTime_ + 0.001f) {
+				fail("Animation time increased while Return was checked.");
+				return;
+			}
+			timePlaybackSmokePreviousAnimationTime_ = animationTime;
+			return;
+		}
+		if (!NearlyEqual(animationTime, 0.0f)) {
+			fail("Animation Return cleared before reaching startup time zero.");
+			return;
+		}
+		timePlaybackSmokeStage_ = 6;
+		return;
+	}
+
+	case 6: // Forward animation automatically resumes after reaching zero.
+		if (objectAxis->IsAnimationReturning()) {
+			fail("Animation Return became checked again after auto-clear.");
+			return;
+		}
+		if (objectAxis->GetAnimationTime() <= 0.03f) {
+			return;
+		}
+		particleManager->ClearAllParticles();
+		particleManager->SetReturning(false);
+		particleManager->EmitCylinderEffect("Cylinder", 1, { 0.0f, 0.0f, 0.0f }, 1.0f);
+		{
+			ParticlePlaybackSnapshot snapshot{};
+			if (!particleManager->GetPlaybackSnapshot("Cylinder", snapshot) ||
+				snapshot.count != 1 || !snapshot.isEndless) {
+				fail("The endless particle for reverse playback could not be created.");
+				return;
+			}
+			timePlaybackSmokeParticleRotation_ = snapshot.transform.rotate.y;
+		}
+		timePlaybackSmokeStageTime_ = 0.0f;
+		timePlaybackSmokeStage_ = 7;
+		return;
+
+	case 7: { // Establish a visible forward particle motion.
+		timePlaybackSmokeStageTime_ += deltaTime;
+		ParticlePlaybackSnapshot snapshot{};
+		if (!particleManager->GetPlaybackSnapshot("Cylinder", snapshot) || snapshot.count != 1) {
+			fail("The endless particle disappeared during forward playback.");
+			return;
+		}
+		if (timePlaybackSmokeStageTime_ < 0.35f) {
+			return;
+		}
+		if (snapshot.transform.rotate.y <= timePlaybackSmokeParticleRotation_ + 0.1f) {
+			fail("The particle did not move forward before Return.");
+			return;
+		}
+		timePlaybackSmokeParticleRotation_ = snapshot.transform.rotate.y;
+		particleManager->SetReturning(true);
+		particleManager->EmitCylinderEffect("Cylinder", 1, { 0.0f, 0.0f, 0.0f }, 1.0f);
+		ParticlePlaybackSnapshot afterBlockedEmit{};
+		if (!particleManager->GetPlaybackSnapshot("Cylinder", afterBlockedEmit) || afterBlockedEmit.count != 1) {
+			fail("Particle emission was not paused during Return.");
+			return;
+		}
+		timePlaybackSmokeStageTime_ = 0.0f;
+		timePlaybackSmokeStage_ = 8;
+		return;
+	}
+
+	case 8: { // Return remains active and the endless particle reverses continuously.
+		timePlaybackSmokeStageTime_ += deltaTime;
+		ParticlePlaybackSnapshot snapshot{};
+		if (!particleManager->IsReturning() ||
+			!particleManager->GetPlaybackSnapshot("Cylinder", snapshot) ||
+			snapshot.count != 1 || !snapshot.isEndless) {
+			fail("Endless particle Return stopped or deleted a particle unexpectedly.");
+			return;
+		}
+		if (timePlaybackSmokeStageTime_ < 2.5f) {
+			return;
+		}
+		if (snapshot.transform.rotate.y >= timePlaybackSmokeParticleRotation_ - 0.5f) {
+			fail("The particle did not continue moving backward while Return stayed checked.");
+			return;
+		}
+		timePlaybackSmokeParticleRotation_ = snapshot.transform.rotate.y;
+		particleManager->SetReturning(false);
+		timePlaybackSmokeStageTime_ = 0.0f;
+		timePlaybackSmokeStage_ = 9;
+		return;
+	}
+
+	case 9: { // Unchecking Return resumes forward motion from the current state.
+		timePlaybackSmokeStageTime_ += deltaTime;
+		ParticlePlaybackSnapshot snapshot{};
+		if (particleManager->IsReturning() ||
+			!particleManager->GetPlaybackSnapshot("Cylinder", snapshot) || snapshot.count != 1) {
+			fail("The particle did not remain available after Return was unchecked.");
+			return;
+		}
+		if (timePlaybackSmokeStageTime_ < 0.35f) {
+			return;
+		}
+		if (snapshot.transform.rotate.y <= timePlaybackSmokeParticleRotation_ + 0.1f) {
+			fail("The particle did not resume forward motion from its reverse position.");
+			return;
+		}
+		particleManager->EmitCylinderEffect("Cylinder", 1, { 0.0f, 0.0f, 0.0f }, 1.0f);
+		ParticlePlaybackSnapshot afterResumedEmit{};
+		if (!particleManager->GetPlaybackSnapshot("Cylinder", afterResumedEmit) || afterResumedEmit.count != 2) {
+			fail("Particle emission did not resume after Return was unchecked.");
+			return;
+		}
+		particleManager->ClearAllParticles();
+		particleManager->EmitLightCore("LightCore", 1, { 0.0f, 0.0f, 0.0f }, 1.0f);
+		timePlaybackSmokeStageTime_ = 0.0f;
+		timePlaybackSmokeStage_ = 10;
+		return;
+	}
+
+	case 10: { // Give a finite particle some forward lifetime before rewinding it.
+		timePlaybackSmokeStageTime_ += deltaTime;
+		ParticlePlaybackSnapshot snapshot{};
+		if (!particleManager->GetPlaybackSnapshot("LightCore", snapshot) ||
+			snapshot.count != 1 || snapshot.isEndless) {
+			fail("The finite particle disappeared before its Return test.");
+			return;
+		}
+		if (timePlaybackSmokeStageTime_ < 0.25f) {
+			return;
+		}
+		particleManager->SetReturning(true);
+		timePlaybackSmokeStageTime_ = 0.0f;
+		timePlaybackSmokeStage_ = 11;
+		return;
+	}
+
+	case 11: { // Reverse past time zero; the bounded particle set must keep cycling.
+		timePlaybackSmokeStageTime_ += deltaTime;
+		ParticlePlaybackSnapshot snapshot{};
+		if (!particleManager->IsReturning() ||
+			!particleManager->GetPlaybackSnapshot("LightCore", snapshot) || snapshot.count != 1) {
+			fail("A finite particle was deleted while continuously returning past time zero.");
+			return;
+		}
+		if (timePlaybackSmokeStageTime_ < 1.35f) {
+			return;
+		}
+		if (snapshot.currentTime < 0.0f || snapshot.currentTime >= snapshot.lifeTime) {
+			fail("Finite particle Return did not wrap its playback time safely.");
+			return;
+		}
+		timePlaybackSmokeParticleRotation_ = snapshot.currentTime;
+		particleManager->SetReturning(false);
+		timePlaybackSmokeStageTime_ = 0.0f;
+		timePlaybackSmokeStage_ = 12;
+		return;
+	}
+
+	case 12: { // Finite particles also resume from their current reverse time.
+		timePlaybackSmokeStageTime_ += deltaTime;
+		ParticlePlaybackSnapshot snapshot{};
+		if (particleManager->IsReturning() ||
+			!particleManager->GetPlaybackSnapshot("LightCore", snapshot) || snapshot.count != 1) {
+			fail("The finite particle did not remain available after Return was unchecked.");
+			return;
+		}
+		if (timePlaybackSmokeStageTime_ < 0.15f) {
+			return;
+		}
+		if (snapshot.currentTime <= timePlaybackSmokeParticleRotation_ + 0.05f) {
+			fail("The finite particle did not resume forward from its reverse time.");
+			return;
+		}
+		particleManager->ClearAllParticles();
+		FinishTimePlaybackSmoke(
+			true,
+			"OK transform=2sTimeline+pause+move+return deleteStress=32 animation=return+autoResume particle=endless+finiteReturn+resume");
+		return;
+	}
+
+	default:
+		fail("Unknown time playback smoke stage.");
+		return;
+	}
+}
+
+void GamePlayScene::FinishTimePlaybackSmoke(bool success, const std::string& message)
+{
+	if (timePlaybackSmokeFinished_) {
+		return;
+	}
+
+	timePlaybackSmokeFinished_ = true;
+	std::ofstream log(timePlaybackSmokeLogPath_, std::ios::app);
+	if (log) {
+		log << (success ? "SUCCESS: " : "FAILURE: ") << message << '\n';
+	}
+	PostQuitMessage(success ? 0 : 1);
 }
 
 void GamePlayScene::InitializeUiSmokeFromEnvironment()
@@ -2520,14 +3268,14 @@ void GamePlayScene::UpdateUiSmokeAfterDraw()
 	}
 
 	const std::filesystem::path screenshotPath =
-		GetUserMediaDirectory("Pictures", "CG2Captures") / ("CG2_ui_smoke_" + MakeTimestampString() + ".bmp");
+		GetCaptureDirectory("Screenshots") / ("CG2_ui_smoke_" + MakeTimestampString() + ".bmp");
 	if (!SavePixelsAsBmp(screenshotPath, pixels, width, height)) {
 		FinishUiSmoke(false, "SavePixelsAsBmp failed: " + screenshotPath.string());
 		return;
 	}
 
 	const std::filesystem::path videoPath =
-		GetUserMediaDirectory("Videos", "CG2Recordings") / ("CG2_ui_smoke_" + MakeTimestampString() + ".avi");
+		GetCaptureDirectory("Videos") / ("CG2_ui_smoke_" + MakeTimestampString() + ".avi");
 	recordingFrameIndex_ = 0;
 	if (!BeginRecordingAvi(videoPath, width, height)) {
 		FinishUiSmoke(false, "BeginRecordingAvi failed: " + videoPath.string());
@@ -2691,12 +3439,12 @@ void GamePlayScene::Update()
 	{
 		sprite->Update();
 	}
+	UpdateEcsWorld();
 	skyBox_->Update();
 
 	//ゲームの処琁E
 
 	ImGuiManager::GetInstance()->Begin("GamePlay");
-	DrawTopToolsImGui();
 	DrawInspectorImGui();
 	DrawModelShelfImGui();
 	HandleModelDropOnGameView();
@@ -2776,6 +3524,8 @@ void GamePlayScene::Update()
 		ParticleManager::GetInstance()->EmitHitEffect("Hit", static_cast<uint32_t>(hitEffect_.emitCount), hitPosition, hitEffect_.scale);
 		ParticleManager::GetInstance()->EmitRingEffect("Ring", static_cast<uint32_t>(ringEffect_.emitCount), hitPosition, ringEffect_.scale);
 	}
+
+	UpdateTimePlaybackSmoke();
 }
 
 void GamePlayScene::Draw()
@@ -2841,7 +3591,6 @@ void GamePlayScene::Draw()
 	ImGuiManager::GetInstance()->Draw(DirectXCommon::GetInstance());
 
 	DirectXCommon::GetInstance()->PostDraw();
-	UpdateRecordingCapture();
 	UpdateUiSmokeAfterDraw();
 
 }
@@ -2867,6 +3616,10 @@ void GamePlayScene::Finalize()
 	recordingVideoPath_.clear();
 	lastScreenshotPath_.clear();
 	lastVideoPath_.clear();
+	replayDirectory_.clear();
+	lastReplayPath_.clear();
+	replayFrames_.clear();
+	replayFrameTimer_ = 0.0f;
 	lastCaptureMessage_.clear();
 	lastModelShelfMessage_.clear();
 	baseNormalObjectCount_ = 0;
@@ -2886,6 +3639,8 @@ void GamePlayScene::Finalize()
 	sprites.clear();
 	normalObjects.clear();
 	animationObjects.clear();
+	ecsWorld_.Clear();
+	selectedEcsEntity_ = Ecs::kInvalidEntity;
 	upCamera.reset();
 	mainCamera.reset();
 	cameraManager.reset();

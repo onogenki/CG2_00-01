@@ -33,14 +33,26 @@ void Object3d::Initialize(Object3dCommon* object3dCommon)
 	CreateSpotLightData();
 	//Transform変数を作る
 	transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+	transformPlayback_.Reset();
+	animationReturnState_.Reset();
 }
 
 void Object3d::Update()
 {
+	const float deltaTime = DirectXCommon::GetInstance()->GetDeltaTime();
+	transformPlayback_.Update(transform, deltaTime);
 
 	if (model_ && isAnimating_ && currentAnimation_.duration > 0.0f)
 	{// 実時間を 1/60 秒ずつ進める
-		animationTime_ += DirectXCommon::GetInstance()->GetDeltaTime();
+		if (animationReturnState_.IsReturning()) {
+			animationTime_ -= deltaTime;
+			if (animationTime_ <= 0.0f) {
+				animationTime_ = 0.0f;
+				animationReturnState_.Reset();
+			}
+		} else {
+			animationTime_ += deltaTime;
+		}
 
 		// ループOFFなら、自動的にアニメーションの1本分の長さ（duration)にする
 		if (!isLoop_ && maxPlayTime_ == 0.0f) {
@@ -48,7 +60,7 @@ void Object3d::Update()
 		}
 
 		//時間指定されてる場合の止まる処理
-		if (maxPlayTime_ > 0.0f)
+		if (!animationReturnState_.IsReturning() && maxPlayTime_ > 0.0f)
 		{
 			if (animationTime_ >= maxPlayTime_)
 			{
@@ -81,6 +93,16 @@ void Object3d::Update()
 	}
 	Matrix4x4 inverseMatrix = Inverse(worldMatrix);
 	transformationMatrixData->WorldInverseTranspose = Transpose(inverseMatrix);
+}
+
+void Object3d::RecordTransformEdit(const Transform& before)
+{
+	RecordTransformEdit(before, DirectXCommon::GetInstance()->GetDeltaTime());
+}
+
+void Object3d::RecordTransformEdit(const Transform& before, float elapsedSeconds)
+{
+	transformPlayback_.RecordEdit(before, transform, elapsedSeconds);
 }
 
 void Object3d::Draw()
@@ -204,6 +226,7 @@ void Object3d::PlayAnimation(const Model::Animation& animation)
 {
 	currentAnimation_ = animation;
 	animationTime_ = 0.0f;
+	animationReturnState_.Reset();
 	isAnimating_ = true;
 	if (model_ && isSkeletal_) {
 		model_->BuildAnimationMapping(skeleton_, currentAnimation_);

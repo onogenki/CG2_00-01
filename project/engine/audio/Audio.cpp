@@ -30,22 +30,31 @@ void Audio::Initialize()
 {
 	//初期化処理
 	HRESULT result = XAudio2Create(&xAudio2_, 0, XAUDIO2_DEFAULT_PROCESSOR);
-	assert(SUCCEEDED(result));
+	if (FAILED(result)) {
+		return;
+	}
 
 	result = xAudio2_->CreateMasteringVoice(&masterVoice_);
-	assert(SUCCEEDED(result));
+	if (FAILED(result)) {
+		xAudio2_.Reset();
+		return;
+	}
 
 	result = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
-	assert(SUCCEEDED(result));
+	if (FAILED(result)) {
+		masterVoice_->DestroyVoice();
+		masterVoice_ = nullptr;
+		xAudio2_.Reset();
+	}
 }
 
 //音声データの読み込み
-void Audio::LoadFile(const std::string& filename)
+bool Audio::LoadFile(const std::string& filename)
 {
 
 	// 既に読み込み済みなら何もしない（二重読み込み防止）
 	if (soundDatas_.find(filename) != soundDatas_.end()) {
-		return;
+		return true;
 	}
 
 	HRESULT result;
@@ -56,23 +65,36 @@ void Audio::LoadFile(const std::string& filename)
 	//SourceReader作成
 	ComPtr<IMFSourceReader> pReader;
 	result = MFCreateSourceReaderFromURL(filePathW.c_str(), nullptr, &pReader);
-	assert(SUCCEEDED(result));
+	if (FAILED(result)) {
+		return false;
+	}
 
 	//PCM形式にフォーマット指定する
 	ComPtr<IMFMediaType> pPCMType;
-	MFCreateMediaType(&pPCMType);
+	result = MFCreateMediaType(&pPCMType);
+	if (FAILED(result)) {
+		return false;
+	}
 	pPCMType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
 	pPCMType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
 	result = pReader->SetCurrentMediaType((DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, nullptr, pPCMType.Get());
-	assert(SUCCEEDED(result));
+	if (FAILED(result)) {
+		return false;
+	}
 
 	//実際にセットされたメディアタイプを取得する
 	ComPtr<IMFMediaType>pOutType;
-	pReader->GetCurrentMediaType((DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, &pOutType);
+	result = pReader->GetCurrentMediaType((DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, &pOutType);
+	if (FAILED(result)) {
+		return false;
+	}
 
 	//Waveフォーマットを取得する
 	WAVEFORMATEX* waveFormat = nullptr;
-	MFCreateWaveFormatExFromMFMediaType(pOutType.Get(), &waveFormat, nullptr);
+	result = MFCreateWaveFormatExFromMFMediaType(pOutType.Get(), &waveFormat, nullptr);
+	if (FAILED(result) || !waveFormat) {
+		return false;
+	}
 
 	//コンテナに格納する音声データ
 	SoundData soundData = {};
@@ -87,6 +109,9 @@ void Audio::LoadFile(const std::string& filename)
 		LONGLONG llTimeStamp = 0;
 		//サンプルを読み込む
 		result = pReader->ReadSample(MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, &stramIndex, &flags, &llTimeStamp, &pSample);
+		if (FAILED(result)) {
+			return false;
+		}
 		//ストリームの末尾に達したら抜ける
 		if (flags & MF_SOURCE_READERF_ENDOFSTREAM)break;
 
@@ -107,28 +132,40 @@ void Audio::LoadFile(const std::string& filename)
 	}
 
 	soundDatas_[filename] = soundData;
+	return true;
 }
 
 //音声データ解放
 void Audio::Unload()
 {
+	for (IXAudio2SourceVoice* voice : sourceVoices_) {
+		voice->Stop();
+		voice->DestroyVoice();
+	}
+	sourceVoices_.clear();
 	//バッファのメモリを解放
 	soundDatas_.clear();
 }
 
 //音声再生
-void Audio::PlayWave(const std::string& filename)
+bool Audio::PlayWave(const std::string& filename)
 {
 	HRESULT result;
+	ReleaseFinishedVoices();
 
 	// 本棚から音声データを探し出す
-	assert(soundDatas_.find(filename) != soundDatas_.end() && "その音はまだロードされていません！");
-	SoundData& soundData = soundDatas_[filename];
+	auto soundIt = soundDatas_.find(filename);
+	if (!xAudio2_ || soundIt == soundDatas_.end()) {
+		return false;
+	}
+	SoundData& soundData = soundIt->second;
 
 	//波形フォーマットを先にSourceVoiceの生成
 	IXAudio2SourceVoice* pSourceVoice = nullptr;
 	result = xAudio2_->CreateSourceVoice(&pSourceVoice, &soundData.wfex);
-	assert(SUCCEEDED(result));
+	if (FAILED(result)) {
+		return false;
+	}
 
 	//再生する波形データの設定
 	XAUDIO2_BUFFER buf{};
@@ -138,6 +175,29 @@ void Audio::PlayWave(const std::string& filename)
 
 	//波形データの再生
 	result = pSourceVoice->SubmitSourceBuffer(&buf);
+	if (FAILED(result)) {
+		pSourceVoice->DestroyVoice();
+		return false;
+	}
 	result = pSourceVoice->Start();
+	if (FAILED(result)) {
+		pSourceVoice->DestroyVoice();
+		return false;
+	}
+	sourceVoices_.push_back(pSourceVoice);
+	return true;
+}
 
+void Audio::ReleaseFinishedVoices()
+{
+	for (auto it = sourceVoices_.begin(); it != sourceVoices_.end();) {
+		XAUDIO2_VOICE_STATE state{};
+		(*it)->GetState(&state);
+		if (state.BuffersQueued == 0) {
+			(*it)->DestroyVoice();
+			it = sourceVoices_.erase(it);
+		} else {
+			++it;
+		}
+	}
 }
