@@ -179,10 +179,10 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="engine\3d\Object3dCommon.cpp" />
     <ClCompile Include="engine\3d\SkyBox.cpp" />
     <ClCompile Include="engine\audio\Audio.cpp" />
-	<ClCompile Include="engine\ecs\EcsSystems.cpp" />
-	<ClCompile Include="engine\ecs\EcsWorld.cpp" />
+    <ClCompile Include="engine\ecs\EcsSystems.cpp" />
+    <ClCompile Include="engine\ecs\EcsWorld.cpp" />
     <ClCompile Include="engine\base\D3DResourceLeakChecker.cpp" />
-	<ClCompile Include="engine\base\CaptureManager.cpp" />
+    <ClCompile Include="engine\base\CaptureManager.cpp" />
     <ClCompile Include="engine\base\DirectXCommon.cpp" />
     <ClCompile Include="engine\base\Framework.cpp" />
     <ClCompile Include="engine\base\Game.cpp" />
@@ -320,11 +320,11 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="engine\3d\Object3dCommon.h" />
     <ClInclude Include="engine\3d\SkyBox.h" />
     <ClInclude Include="engine\audio\Audio.h" />
-	<ClInclude Include="engine\ecs\EcsSystems.h" />
-	<ClInclude Include="engine\ecs\EcsWorld.h" />
+    <ClInclude Include="engine\ecs\EcsSystems.h" />
+    <ClInclude Include="engine\ecs\EcsWorld.h" />
     <ClInclude Include="engine\base\AbstractSceneFactory.h" />
-	<ClInclude Include="engine\base\CaptureManager.h" />
-	<ClInclude Include="engine\base\TimePlayback.h" />
+    <ClInclude Include="engine\base\CaptureManager.h" />
+    <ClInclude Include="engine\base\TimePlayback.h" />
     <ClInclude Include="engine\base\BaseScene.h" />
     <ClInclude Include="engine\base\D3DResourceLeakChecker.h" />
     <ClInclude Include="engine\base\DirectXCommon.h" />
@@ -350,10 +350,18 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="engine\scene\GamePlayScene.h" />
     <ClInclude Include="engine\scene\TitleScene.h" />
     <ClInclude Include="externals\imgui\imconfig.h" />
-    <ClInclude Include="externals\imgui\imgui.h" />
-    <ClInclude Include="externals\imgui\imgui_impl_dx12.h" />
-    <ClInclude Include="externals\imgui\imgui_impl_win32.h" />
-    <ClInclude Include="externals\imgui\imgui_internal.h" />
+    <ClInclude Include="externals\imgui\imgui.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imgui_impl_dx12.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imgui_impl_win32.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imgui_internal.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="externals\imgui\imstb_rectpack.h" />
     <ClInclude Include="externals\imgui\imstb_textedit.h" />
     <ClInclude Include="externals\imgui\imstb_truetype.h" />

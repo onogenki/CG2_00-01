@@ -19,7 +19,7 @@ namespace StringUtility
 		//実際に変換を行う
 		MultiByteToWideChar(CP_UTF8, 0, str.c_str(), static_cast<int>(str.length()), &result[0], sizeNeeded);
 
-		return std::wstring();
+		return result;
 	}
 
 	//std::string(ワイド文字)->std::string(マルチバイト)
