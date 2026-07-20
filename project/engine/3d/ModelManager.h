@@ -18,10 +18,10 @@ public:
 	void Finalize();
 
 	//モデルファイルの読み込み
-	bool LoadModel(const std::string& filePath);
+	bool LoadModel(const std::string& fileName);
 
 	//モデルファイルパス
-	Model* FindModel(const std::string& filePath);
+	Model* FindModel(const std::string& fileName);
 
 private:
 	static ModelManager* instance;

@@ -7,6 +7,9 @@
 #include <xaudio2.h>
 #include <wrl.h>
 #include <unordered_map>
+#include <atomic>
+#include <memory>
+#include <mutex>
 
 //音声データ
 struct SoundData {
@@ -32,6 +35,7 @@ public:
 	Audio& operator=(const Audio&) = delete;
 
 	void Initialize();
+	void Update();
 
 	bool LoadFile(const std::string& filename);
 	bool PlayWave(const std::string& filename);
@@ -46,7 +50,9 @@ private:
 	IXAudio2MasteringVoice* masterVoice_ = nullptr;
 
 	std::unordered_map<std::string, SoundData> soundDatas_;
-	std::vector<IXAudio2SourceVoice*> sourceVoices_;
+	class SourceVoiceCallback;
+	std::vector<std::shared_ptr<SourceVoiceCallback>> sourceVoiceCallbacks_;
+	std::mutex sourceVoiceMutex_;
 
 	void ReleaseFinishedVoices();
 };

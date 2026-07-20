@@ -12,6 +12,26 @@
 
 using namespace Microsoft::WRL;
 
+class Audio::SourceVoiceCallback final : public IXAudio2VoiceCallback {
+public:
+	void SetVoice(IXAudio2SourceVoice* voice) { voice_ = voice; }
+	IXAudio2SourceVoice* GetVoice() const { return voice_; }
+	bool IsFinished() const { return isFinished_.load(std::memory_order_acquire); }
+	void MarkFinished() { isFinished_.store(true, std::memory_order_release); }
+
+	void STDMETHODCALLTYPE OnVoiceProcessingPassStart(UINT32) override {}
+	void STDMETHODCALLTYPE OnVoiceProcessingPassEnd() override {}
+	void STDMETHODCALLTYPE OnStreamEnd() override { MarkFinished(); }
+	void STDMETHODCALLTYPE OnBufferStart(void*) override {}
+	void STDMETHODCALLTYPE OnBufferEnd(void*) override { MarkFinished(); }
+	void STDMETHODCALLTYPE OnLoopEnd(void*) override {}
+	void STDMETHODCALLTYPE OnVoiceError(void*, HRESULT) override { MarkFinished(); }
+
+private:
+	IXAudio2SourceVoice* voice_ = nullptr;
+	std::atomic_bool isFinished_ = false;
+};
+
 std::wstring ConvertString(const std::string& str) {
 	if (str.empty()) {
 		return std::wstring();
@@ -135,14 +155,24 @@ bool Audio::LoadFile(const std::string& filename)
 	return true;
 }
 
+void Audio::Update()
+{
+	ReleaseFinishedVoices();
+}
+
 //音声データ解放
 void Audio::Unload()
 {
-	for (IXAudio2SourceVoice* voice : sourceVoices_) {
+	std::vector<std::shared_ptr<SourceVoiceCallback>> callbacks;
+	{
+		std::scoped_lock lock(sourceVoiceMutex_);
+		callbacks.swap(sourceVoiceCallbacks_);
+	}
+	for (const auto& callback : callbacks) {
+		IXAudio2SourceVoice* voice = callback->GetVoice();
 		voice->Stop();
 		voice->DestroyVoice();
 	}
-	sourceVoices_.clear();
 	//バッファのメモリを解放
 	soundDatas_.clear();
 }
@@ -151,7 +181,6 @@ void Audio::Unload()
 bool Audio::PlayWave(const std::string& filename)
 {
 	HRESULT result;
-	ReleaseFinishedVoices();
 
 	// 本棚から音声データを探し出す
 	auto soundIt = soundDatas_.find(filename);
@@ -161,11 +190,13 @@ bool Audio::PlayWave(const std::string& filename)
 	SoundData& soundData = soundIt->second;
 
 	//波形フォーマットを先にSourceVoiceの生成
+	auto callback = std::make_shared<SourceVoiceCallback>();
 	IXAudio2SourceVoice* pSourceVoice = nullptr;
-	result = xAudio2_->CreateSourceVoice(&pSourceVoice, &soundData.wfex);
+	result = xAudio2_->CreateSourceVoice(&pSourceVoice, &soundData.wfex, 0, XAUDIO2_DEFAULT_FREQ_RATIO, callback.get());
 	if (FAILED(result)) {
 		return false;
 	}
+	callback->SetVoice(pSourceVoice);
 
 	//再生する波形データの設定
 	XAUDIO2_BUFFER buf{};
@@ -179,25 +210,35 @@ bool Audio::PlayWave(const std::string& filename)
 		pSourceVoice->DestroyVoice();
 		return false;
 	}
+	{
+		std::scoped_lock lock(sourceVoiceMutex_);
+		sourceVoiceCallbacks_.push_back(callback);
+	}
 	result = pSourceVoice->Start();
 	if (FAILED(result)) {
-		pSourceVoice->DestroyVoice();
+		callback->MarkFinished();
+		ReleaseFinishedVoices();
 		return false;
 	}
-	sourceVoices_.push_back(pSourceVoice);
 	return true;
 }
 
 void Audio::ReleaseFinishedVoices()
 {
-	for (auto it = sourceVoices_.begin(); it != sourceVoices_.end();) {
-		XAUDIO2_VOICE_STATE state{};
-		(*it)->GetState(&state);
-		if (state.BuffersQueued == 0) {
-			(*it)->DestroyVoice();
-			it = sourceVoices_.erase(it);
-		} else {
-			++it;
+	std::vector<std::shared_ptr<SourceVoiceCallback>> callbacksToRelease;
+	{
+		std::scoped_lock lock(sourceVoiceMutex_);
+		for (auto it = sourceVoiceCallbacks_.begin(); it != sourceVoiceCallbacks_.end();) {
+			if ((*it)->IsFinished()) {
+				callbacksToRelease.push_back(std::move(*it));
+				it = sourceVoiceCallbacks_.erase(it);
+			} else {
+				++it;
+			}
 		}
+	}
+
+	for (const auto& callback : callbacksToRelease) {
+		callback->GetVoice()->DestroyVoice();
 	}
 }

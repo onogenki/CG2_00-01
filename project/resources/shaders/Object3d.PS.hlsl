@@ -91,8 +91,8 @@ PixelShaderOutput main(VertexShaderOutput input)
         gDirectionalLight.intensity;
 
     // ‹¾–Ê”½ŽË
-    float32_t3 halfVectorDirectional = normalize(-L + toEye);
-    float NDotHDirectional = dot(N, halfVectorDirectional);
+    float32_t3 reflectedDirectional = reflect(-L, N);
+    float NDotHDirectional = dot(toEye, reflectedDirectional);
     float specularPowDirectional =
         pow(saturate(NDotHDirectional), gMaterial.shininess);
     float32_t3 specularDirectionalLight =
@@ -118,8 +118,8 @@ PixelShaderOutput main(VertexShaderOutput input)
     float32_t3 diffusePointLight =
     gMaterial.color.rgb * textureColor.rgb * gPointLight.color.rgb * cosPoint * gPointLight.intensity * pointFactor;
     //‹¾–Ê”½ŽË
-    float32_t3 halfVectorPoint = normalize(-pointLightDirection + toEye);
-    float NDotHPoint = dot(N, halfVectorPoint);
+    float32_t3 reflectedPoint = reflect(pointLightDirection, N);
+    float NDotHPoint = dot(toEye, reflectedPoint);
     float specularPowPoint = pow(saturate(NDotHPoint), gMaterial.shininess);
     float32_t3 specularPointLight =
     gPointLight.color.rgb * gPointLight.intensity * pointFactor * specularPowPoint * float32_t3(1.0f, 1.0f, 1.0f);
@@ -144,8 +144,8 @@ PixelShaderOutput main(VertexShaderOutput input)
     float32_t3 diffuseSpotLight = gMaterial.color.rgb * textureColor.rgb * gSpotLight.color.rgb * cosSpot * gSpotLight.intensity * attenuationFactor * falloffFactor;
  
     //‹¾–Ê”½ŽË
-    float32_t3 halfVectorSpot = normalize(-spotLightDirectionOnSurface + toEye);
-    float NDotHSpot = dot(N, halfVectorSpot);
+    float32_t3 reflectedSpot = reflect(spotLightDirectionOnSurface, N);
+    float NDotHSpot = dot(toEye, reflectedSpot);
     float specularPowSpot = pow(saturate(NDotHSpot), gMaterial.shininess);
     float32_t3 specularSpotLight =
         gSpotLight.color.rgb * gSpotLight.intensity * attenuationFactor * falloffFactor * specularPowSpot * float32_t3(1.0f, 1.0f, 1.0f);

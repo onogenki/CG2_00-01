@@ -72,6 +72,7 @@ struct VertexData {
 
 struct ParticleGroup
 {
+	using UpdateCallback = void (*)(Particle& particle, float signedDeltaTime, bool returning);
     // マテリアルデータ
     std::string textureFilePath;
     uint32_t textureSrvIndex;
@@ -87,6 +88,7 @@ struct ParticleGroup
     D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
     uint32_t vertexCount = 6;
     bool useBillboard = true;
+	UpdateCallback updateCallback = nullptr;
 };
 
 struct ParticlePlaybackSnapshot
@@ -160,8 +162,9 @@ public:
     bool GetBillboardEnabled(const std::string& name) const;
     void SetBillboardEnabled(const std::string& name, bool isEnabled);
 
-    bool IsCollision(const AABB aabb, const Vector3& point);
+	bool IsCollision(const AABB aabb, const Vector3& point);
 private:
+	static void UpdateCylinderParticle(Particle& particle, float signedDeltaTime, bool returning);
     ParticleManager() = default;
     ~ParticleManager() = default;
     ParticleManager(const ParticleManager&) = delete;

@@ -4,7 +4,7 @@
 #include <memory>
 #include "../../externals/nlohmann/json.hpp"
 
-LevelLoader::LevelData* LevelLoader::Load(const std::string& fileName)
+std::unique_ptr<LevelLoader::LevelData> LevelLoader::Load(const std::string& fileName)
 {
 	const std::string fullpath = "resources/levels/" + fileName + ".json";
 
@@ -39,12 +39,11 @@ LevelLoader::LevelData* LevelLoader::Load(const std::string& fileName)
 	assert(deserialized.contains("objects"));
 
 	//レベルエディタ格納インスタンスを生成
-	LevelData* levelData = new LevelData();
+	auto levelData = std::make_unique<LevelData>();
 
 	try {
 		LoadObjects(deserialized["objects"], levelData->objects);
 	} catch (const nlohmann::json::exception&) {
-		delete levelData;
 		return nullptr;
 	}
 

@@ -268,7 +268,7 @@ void GamePlayScene::Initialize()
 	animationObjects.push_back(std::move(objAxis));//アニメーションモチE��専用に登録
 
 	// レベルチE�Eタからオブジェクトを生�E、E�E置
-	std::unique_ptr<LevelLoader::LevelData> levelData(LevelLoader::Load("scene"));
+	std::unique_ptr<LevelLoader::LevelData> levelData = LevelLoader::Load("scene");
 	auto createLevelObjects = [&](auto&& self, const std::vector<LevelLoader::ObjectData>& objects) -> void
 	{
 		for (const LevelLoader::ObjectData& objectData : objects)

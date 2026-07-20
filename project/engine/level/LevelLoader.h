@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <memory>
 #include "Vector3.h"
 #include "../../externals/nlohmann/json.hpp"
 
@@ -35,7 +36,7 @@ public:
 		std::vector<ObjectData> objects;
 	};
 
-	static LevelData* Load(const std::string& fileName);
+	static std::unique_ptr<LevelData> Load(const std::string& fileName);
 
 	static ObjectData LoadObject(const nlohmann::json& object);
 	static void LoadObjects(const nlohmann::json& objects, std::vector<ObjectData>& objectList);
