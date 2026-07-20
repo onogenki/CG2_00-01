@@ -6,8 +6,8 @@
 SceneFactory::SceneFactory()
 {
 	// 新しいシーンは生成関数と名前をここへ登録する。
-	RegisterScene("TITLE", []() { return new TitleScene(); });
-	RegisterScene("GAMEPLAY", []() { return new GamePlayScene(); });
+	RegisterScene("TITLE", []() { return std::make_unique<TitleScene>(); });
+	RegisterScene("GAMEPLAY", []() { return std::make_unique<GamePlayScene>(); });
 }
 
 void SceneFactory::RegisterScene(const std::string& sceneName, SceneCreator creator)
@@ -17,7 +17,7 @@ void SceneFactory::RegisterScene(const std::string& sceneName, SceneCreator crea
 	}
 }
 
-BaseScene* SceneFactory::CreateScene(const std::string& sceneName)
+std::unique_ptr<BaseScene> SceneFactory::CreateScene(const std::string& sceneName)
 {
 	const auto creator = creators_.find(sceneName);
 	return creator != creators_.end() ? creator->second() : nullptr;

@@ -145,6 +145,7 @@ void Framework::Update()
 	}
 	dxCommon_->ResizeIfNeeded();
 	input_->Update();
+	Audio::GetInstance()->Update();
 
 	//マネージャーにシーンの更新(と切り替え)を任せる
 	SceneManager::GetInstance()->Update();

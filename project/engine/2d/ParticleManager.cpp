@@ -291,6 +291,7 @@ void ParticleManager::CreateCylinderParticleGroup(
     ParticleGroup newGroup{};
     newGroup.textureFilePath = textureFilePath;
     newGroup.useBillboard = false;
+	newGroup.updateCallback = UpdateCylinderParticle;
 
     newGroup.instancingResource = dxCommon_->CreateBufferResource(sizeof(ParticleForGPU) * kNumMaxInstance);
     newGroup.instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&newGroup.mappedData));
@@ -421,6 +422,29 @@ bool ParticleManager::IsCollision(const AABB aabb, const Vector3& point)
         (point.z >= aabb.min.z && point.z <= aabb.max.z);
 }
 
+void ParticleManager::UpdateCylinderParticle(Particle& particle, float signedDeltaTime, bool returning)
+{
+    particle.transform.rotate.y += 1.5f * signedDeltaTime;
+
+    // 逆再生時は、境界で反転した速度を先に戻してからスケールを巻き戻す。
+    if (returning) {
+        if (particle.transform.scale.y >= 1.2f && particle.scaleVelocityY < 0.0f) {
+            particle.scaleVelocityY *= -1.0f;
+        } else if (particle.transform.scale.y <= 0.5f && particle.scaleVelocityY > 0.0f) {
+            particle.scaleVelocityY *= -1.0f;
+        }
+    }
+
+    particle.transform.scale.y += particle.scaleVelocityY * signedDeltaTime;
+    if (particle.transform.scale.y >= 1.2f) {
+        particle.transform.scale.y = 1.2f;
+        particle.scaleVelocityY *= -1.0f;
+    } else if (particle.transform.scale.y <= 0.5f) {
+        particle.transform.scale.y = 0.5f;
+        particle.scaleVelocityY *= -1.0f;
+    }
+}
+
 // パーティクルの発生
 void ParticleManager::Emit(const std::string name, const Vector3& position, uint32_t count,bool receivesWind, float scaleMultiplier) {
 	if (returnState_.IsReturning()) return;
@@ -428,18 +452,12 @@ void ParticleManager::Emit(const std::string name, const Vector3& position, uint
     if (groupIt == particleGroups_.end()) {
         return;
     }
-    // 登録済みのパーティクルグループ名かチェックしてassert
-    assert(particleGroups_.find(name) != particleGroups_.end() && "指定されたグループ名が見つかりません");
-
     // 指定されたグループの参照を取得
     ParticleGroup& group = groupIt->second;
 
     std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
     std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
     std::uniform_real_distribution<float> distTime(1.0f, 3.0f);
-
-    auto it = particleGroups_.find(name);
-    assert(it != particleGroups_.end() && "発生させようとしたパーティクルグループ名が存在しません。");
 
     for (uint32_t i = 0; i < count; ++i) {
         Particle newParticle;
@@ -471,8 +489,6 @@ void ParticleManager::EmitHitEffect(const std::string name, uint32_t count, cons
     if (groupIt == particleGroups_.end()) {
         return;
     }
-    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
-
     ParticleGroup& group = groupIt->second;
 
     std::uniform_real_distribution<float> distRotate(-std::numbers::pi_v<float>, std::numbers::pi_v<float>);
@@ -502,8 +518,6 @@ void ParticleManager::EmitRingEffect(const std::string name, uint32_t count, con
     if (groupIt == particleGroups_.end()) {
         return;
     }
-    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
-
     ParticleGroup& group = groupIt->second;
     std::uniform_real_distribution<float> distRotate(-std::numbers::pi_v<float>, std::numbers::pi_v<float>);
     std::uniform_real_distribution<float> distScale(1.0f, 1.8f);
@@ -533,8 +547,6 @@ void ParticleManager::EmitCylinderEffect(const std::string name, uint32_t count,
     if (groupIt == particleGroups_.end()) {
         return;
     }
-    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
-
     ParticleGroup& group = groupIt->second;
     std::uniform_real_distribution<float> distHeight(0.5f, 1.2f);
     std::uniform_real_distribution<float> distStretchSpeed(0.5f, 0.7f);
@@ -563,8 +575,6 @@ void ParticleManager::EmitPillarSparkle(const std::string name, uint32_t count, 
     if (groupIt == particleGroups_.end()) {
         return;
     }
-    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
-
     ParticleGroup& group = groupIt->second;
     std::uniform_real_distribution<float> rightOffsetDistribution(-0.45f, 0.45f);
     std::uniform_real_distribution<float> upOffsetDistribution(-0.1f, 1.25f);
@@ -623,8 +633,6 @@ void ParticleManager::EmitLightCore(const std::string name, uint32_t count, cons
     if (groupIt == particleGroups_.end()) {
         return;
     }
-    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
-
     ParticleGroup& group = groupIt->second;
     std::uniform_real_distribution<float> offsetDistribution(-0.08f, 0.08f);
     Vector3 cameraRight = { 1.0f, 0.0f, 0.0f };
@@ -666,8 +674,6 @@ void ParticleManager::EmitLightRain(const std::string name, uint32_t count, cons
     if (groupIt == particleGroups_.end()) {
         return;
     }
-    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
-
     ParticleGroup& group = groupIt->second;
     std::uniform_real_distribution<float> positionXDistribution(-1.7f, 1.7f);
     std::uniform_real_distribution<float> positionYDistribution(1.8f, 3.5f);
@@ -718,8 +724,6 @@ void ParticleManager::EmitLightSpiral(const std::string name, uint32_t count, co
     if (groupIt == particleGroups_.end()) {
         return;
     }
-    assert(particleGroups_.find(name) != particleGroups_.end() && "Particle group not found");
-
     ParticleGroup& group = groupIt->second;
     const uint32_t particlesPerArm = (std::max)(count / 2, 1u);
     const float minimumRadius = 0.2f * scaleMultiplier;
@@ -815,28 +819,8 @@ void ParticleManager::Update() {
                 continue;
             }
 
-            //Fieldの範囲内のParticleには加速度を適用
-            if (pair.first == "Cylinder") {
-                particle.transform.rotate.y += 1.5f * signedDeltaTime;
-
-                // At a bounce, forward playback clamps the scale and flips the
-                // velocity. Reverse playback must undo that flip before moving.
-                if (returning) {
-                    if (particle.transform.scale.y >= 1.2f && particle.scaleVelocityY < 0.0f) {
-                        particle.scaleVelocityY *= -1.0f;
-                    } else if (particle.transform.scale.y <= 0.5f && particle.scaleVelocityY > 0.0f) {
-                        particle.scaleVelocityY *= -1.0f;
-                    }
-                }
-                particle.transform.scale.y += particle.scaleVelocityY * signedDeltaTime;
-
-                if (particle.transform.scale.y >= 1.2f) {
-                    particle.transform.scale.y = 1.2f;
-                    particle.scaleVelocityY *= -1.0f;
-                } else if (particle.transform.scale.y <= 0.5f) {
-                    particle.transform.scale.y = 0.5f;
-                    particle.scaleVelocityY *= -1.0f;
-                }
+            if (group.updateCallback) {
+                group.updateCallback(particle, signedDeltaTime, returning);
             }
 
             if (particle.isSpiral) {

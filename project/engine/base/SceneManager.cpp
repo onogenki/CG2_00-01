@@ -1,6 +1,7 @@
 #include "SceneManager.h"
 #include "CaptureManager.h"
 #include "DirectXCommon.h"
+#include "Logger.h"
 
 SceneManager* SceneManager::GetInstance()
 {
@@ -56,12 +57,18 @@ void SceneManager::Draw()
 
 bool SceneManager::ChangeScene(const std::string& sceneName)
 {
-	if (sceneFactory_ == nullptr || nextScene_ != nullptr || isChangingScene_ || sceneChangeCooldownFrames_ > 0) {
+	if (sceneFactory_ == nullptr) {
+		Logger::Log("Scene change failed: scene factory is not set.");
+		return false;
+	}
+	if (nextScene_ != nullptr || isChangingScene_ || sceneChangeCooldownFrames_ > 0) {
+		Logger::Log("Scene change failed: another scene transition is already pending.");
 		return false;
 	}
 
-	std::unique_ptr<BaseScene> newScene(sceneFactory_->CreateScene(sceneName));
+	std::unique_ptr<BaseScene> newScene = sceneFactory_->CreateScene(sceneName);
 	if (!newScene) {
+		Logger::Log("Scene change failed: could not create scene '" + sceneName + "'.");
 		return false;
 	}
 
