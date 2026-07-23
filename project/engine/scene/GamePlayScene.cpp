@@ -3386,6 +3386,7 @@ void GamePlayScene::Update()
 	}
 	//パーティクル全体を更新
 	ParticleManager::GetInstance()->Update();
+	GPUParticle::GetInstance()->Update(DirectXCommon::GetInstance()->GetDeltaTime());
 
 	//通常3Dモデルを更新
 	for (auto& object3d : normalObjects) {

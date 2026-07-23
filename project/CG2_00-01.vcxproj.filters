@@ -171,6 +171,7 @@
 	<FxCompile Include="resources\shaders\GPUParticle.PS.hlsl" />
 	<FxCompile Include="resources\shaders\GPUParticle.VS.hlsl" />
 	<FxCompile Include="resources\shaders\InitializeParticle.CS.hlsl" />
+	<FxCompile Include="resources\shaders\EmitParticle.CS.hlsl" />
     <FxCompile Include="resources\shaders\Particle.VS.hlsl" />
     <FxCompile Include="resources\shaders\Object3d.PS.hlsl" />
     <FxCompile Include="resources\shaders\Object3d.VS.hlsl" />
