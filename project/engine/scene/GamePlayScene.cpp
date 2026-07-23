@@ -2,6 +2,7 @@
 #include "TextureManager.h"
 #include "ModelManager.h"
 #include "ParticleManager.h"
+#include "GPUParticle.h"
 #include "PostEffect.h"
 #include "ImGuiManager.h"
 #include "Input.h"
@@ -3564,6 +3565,7 @@ void GamePlayScene::Draw()
 
 	//パーティクル描画
 	ParticleManager::GetInstance()->Draw();
+	GPUParticle::GetInstance()->Draw(cameraManager->GetActiveCamera());
 
 	// スプライト描画
 	//Spriteの描画準備。Spriteの描画に共通のグラフィックスコマンドを積む。
