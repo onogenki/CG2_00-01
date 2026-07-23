@@ -33,7 +33,6 @@ private:
 	bool AddModelToTitle(const std::string& fileName);
 	bool AddTextureToTitle(const std::string& textureFilePath);
 
-	std::unique_ptr<Sprite> sprite_;
 	std::unique_ptr<SkyBox> skyBox_;
 
 	std::vector<std::unique_ptr<Object3d>> normalObjects;
@@ -44,6 +43,8 @@ private:
 	Object3d::PointLight pointLight_{};
 	Object3d::SpotLight spotLight_{};
 	size_t baseNormalObjectCount_ = 0;
+	//最初からタイトルに置くスプライトの数です。追加したスプライトだけを削除できるようにします。
+	size_t baseSpriteCount_ = 0;
 	size_t selectedTitleSpriteIndex_ = 0;
 	int inspectorAutoSelectSpriteFrames_ = 0;
 	Object3d* obj = nullptr;

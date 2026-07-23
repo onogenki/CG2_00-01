@@ -23,6 +23,7 @@ class CameraManager;
 class Camera;
 class SpriteCommon;
 
+// 現在Gameが管理する大まかな画面状態。
 enum class SceneType {
 	TITLE,
 	GAMEPLAY
@@ -32,6 +33,7 @@ class Game : public Framework
 {
 public:
 
+	// Frameworkのライフサイクルに合わせてゲーム全体を管理する。
 	void Initialize() override;
 	void Finalize()override;
 	void Update()override;
@@ -39,7 +41,9 @@ public:
 
 private:
 
+	// 環境変数で指定されたシーン再起動テストの設定を読む。
 	void InitializeSceneStressFromEnvironment();
+	// 有効時は一定フレームごとにシーンを切り替え、初期化・破棄を検証する。
 	void UpdateSceneStress();
 
 	SceneType currentScene_ = SceneType::TITLE;

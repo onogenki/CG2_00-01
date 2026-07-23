@@ -185,8 +185,8 @@ void Object3dCommon::CreateGraphicsPipeline()
 
 	// RasiterZerStateの設定
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
-	// カリングしない(裏面も表示する)
-	rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
+	// カリングしない(裏面表示しない)
+	rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
 	// 三角形の中を塗りつぶす
 	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 
@@ -397,7 +397,7 @@ void Object3dCommon::CreateSkinningGraphicsPipeline()
 
 	// RasiterZerStateの設定
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
-	// カリングしない(裏面も表示する)
+	// カリングしない(裏面表示しない)
 	rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
 	// 三角形の中を塗りつぶす
 	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
@@ -611,7 +611,7 @@ void Object3dCommon::CreateSkyboxPipeline()
 
 	// RasterizerStateの設定
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
-	// カリングする（内側向きに作られているためBACKで内側が見えます）
+	// カリングする（内側向きに作られているためBACKで内側が見えない）
 	rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
 	// 三角形の中を塗りつぶす
 	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;

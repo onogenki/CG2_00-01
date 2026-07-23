@@ -157,7 +157,7 @@ void GamePlayScene::Initialize()
 	PostEffect::GetInstance()->SetSepia(false);
 	ParticleManager::GetInstance()->ClearAllGroups();
 
-	//3Dオブジェクト�E通部の初期匁E
+	//3Dオブジェクト共通部の初期化
 	object3dCommon = Object3dCommon::GetInstance();
 	object3dCommon->Initialize(dxCommon);
 
@@ -181,9 +181,9 @@ void GamePlayScene::Initialize()
 	upCamera->SetTranslate({ 0.0f,5.0f,-5.0f });
 	cameraManager->AddCamera("UpCamera", upCamera.get());
 
-	//MainCameraをアクチE��チE
+	//MainCameraをアクティブにする
 	cameraManager->SetActiveCamera("MainCamera");
-	//共通部にはマネージャのアクチE��ブカメラを渡ぁE
+	//共通部にはマネージャのアクティブカメラを渡す
 	object3dCommon->SetDefaultCamera(cameraManager->GetActiveCamera());
 
 	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");//1枚目
@@ -203,31 +203,31 @@ void GamePlayScene::Initialize()
 	ParticleManager::GetInstance()->CreateParticleGroup("LightRain", "Resources/gradationLine.png");
 	ParticleManager::GetInstance()->CreateParticleGroup("LightSpiral", "Resources/circle2.png");
 	
-	//.objファイルからモチE��を読み込む
+	//モデルファイルを読み込む
 	ModelManager::GetInstance()->LoadModel("terrain.obj");
 	ModelManager::GetInstance()->LoadModel("sphere.obj");
-	ModelManager::GetInstance()->LoadModel("AnimatedCube.gltf");//アニメーションありのモチE��
-	ModelManager::GetInstance()->LoadModel("walk.gltf");//アニメーションのみだが忁E��E
-	ModelManager::GetInstance()->LoadModel("sneakWalk.gltf");//アニメーションのみだが忁E��E
-	ModelManager::GetInstance()->LoadModel("human.gltf");//持ってきたも�E
+	ModelManager::GetInstance()->LoadModel("AnimatedCube.gltf");//アニメーション付きのモデル
+	ModelManager::GetInstance()->LoadModel("walk.gltf");//アニメーション専用モデル
+	ModelManager::GetInstance()->LoadModel("sneakWalk.gltf");//アニメーション専用モデル
+	ModelManager::GetInstance()->LoadModel("human.gltf");//追加したモデル
 	ModelManager::GetInstance()->LoadModel("playerCloudAnimation.gltf");//持ってきたアニメーション
 
 	//アニメーションの読み込み
 	walkAnimation_ = Model::LoadAnimationFile("./resources", "walk.gltf");//アニメーションのみ
 	sneakWalkAnimation_ = Model::LoadAnimationFile("./resources", "sneakWalk.gltf");//アニメーションのみ
-	humanAnimation_ = Model::LoadAnimationFile("./resources", "human.gltf");//持ってきたも�E
-	hissatu_ = Model::LoadAnimationFile("./resources", "playerCloudAnimation.gltf");//持ってきたも�E
+	humanAnimation_ = Model::LoadAnimationFile("./resources", "human.gltf");//追加したアニメーション
+	hissatu_ = Model::LoadAnimationFile("./resources", "playerCloudAnimation.gltf");//追加したアニメーション
 
 	// skyBoxの背景
 	TextureManager::GetInstance()->LoadTexture("Resources/qwantani_moon_noon_puresky_1k.dds");
 
-	// skyBoxによってモチE��の反封E��映り込む
+	// SkyBoxによるモデルへの環境反射
 	object3dCommon->SetEnvironmentTexturePath("Resources/qwantani_moon_noon_puresky_1k.dds");
 
 	//Skybox
 	skyBox_ = std::make_unique<SkyBox>();
 	skyBox_->Initialize(dxCommon, cameraManager->GetActiveCamera());
-	// 添付されてぁE��DDSチE��スチャのパスを指定すめE
+	// 添付されているDDSテクスチャのパスを指定する
 	skyBox_->SetTexture("Resources/qwantani_moon_noon_puresky_1k.dds");
 
 	//音声読み込み
@@ -236,38 +236,38 @@ void GamePlayScene::Initialize()
 	Audio::GetInstance()->PlayWave("Resources/Alarm01.wav");
 
 	///
-	/// 3Dオブジェクト生戁E
-	/// normalとanimationに刁E��てる�Eは処琁E��軽くするためE
+	/// 3Dオブジェクト生成
+	/// 通常モデルとアニメーションモデルを分けて処理を軽くする
 	
-	// 一時的に unique_ptr を作り、�E期化してから vector に move する
+	// 一時的に unique_ptr を作り、初期化してから vector に move する
 	auto objPlane = std::make_unique<Object3d>();
 	objPlane->Initialize(object3dCommon);
 	objPlane->SetModel("terrain.obj");
 	objPlane->GetTransform().translate = { 1.0f, -2.0f, 10.0f };
-	objectPlane = objPlane.get();           // 中身を指すだけ�Eポインタを保孁E
-	normalObjects.push_back(std::move(objPlane));//通常(obj)モチE��入れる
+	objectPlane = objPlane.get();           // 中身を指すポインタを保持
+	normalObjects.push_back(std::move(objPlane));//通常モデルとして登録
 
 	auto objAxis = std::make_unique<Object3d>();
 	objAxis->Initialize(object3dCommon);
-	objAxis->SetModel("human.gltf");//アニメーションモチE��読み込み
-	objAxis->InitializeAnimation();//skinClusterぁE回だけ作られてisSkeletal_がtrueになめE
-	objAxis->SetEnvironmentCoefficient(0.3f);//こ�EモチE��の反封E�E強ぁE
+	objAxis->SetModel("human.gltf");//アニメーションモデルを読み込む
+	objAxis->InitializeAnimation();//SkinClusterを作成してisSkeletal_をtrueにする
+	objAxis->SetEnvironmentCoefficient(0.3f);//このモデルの反射を強くする
 	objAxis->GetTransform().translate = { 2.0f, 0.0f, 0.0f };
 	objAxis->GetTransform().rotate = { 0.0f,0.0f,0.0f };
 	objAxis->GetTransform().scale = { 0.2f,0.2f,0.2f };
 
 	objAxis->PlayAnimation(humanAnimation_);//アニメーション再生
 
-	//1ループ�E生させる場吁Eループや時間持E��させたぁE��合�E削除する)
+	//1ループのみ再生する場合はループや時間維持の設定を無効にする
 	objAxis->SetIsLoop(false);
-	//時間持E��したいなら利用(アニメーション時間で演�Eなどができる)
+	//時間を維持したい場合に利用する（アニメーション時間で演出などができる）
 	//objAxis->SetMaxPlayTime(6.0f);
 
 	objectAxis = objAxis.get();//外部保存用に記録
 
-	animationObjects.push_back(std::move(objAxis));//アニメーションモチE��専用に登録
+	animationObjects.push_back(std::move(objAxis));//アニメーションモデルとして登録
 
-	// レベルチE�Eタからオブジェクトを生�E、E�E置
+	// レベルデータからオブジェクトを生成、配置
 	std::unique_ptr<LevelLoader::LevelData> levelData = LevelLoader::Load("scene");
 	auto createLevelObjects = [&](auto&& self, const std::vector<LevelLoader::ObjectData>& objects) -> void
 	{
@@ -308,7 +308,7 @@ void GamePlayScene::Initialize()
 		sprite->Initialize(spriteCommon, "Resources/monsterBall.png");
 
 		if (i % 2 == 0) {
-			// 偶数にモンスターボ�Eルpng
+			// 偶数番目にはUVチェッカーのPNGを設定
 			sprite->SetTexture("Resources/uvChecker.png");
 		}
 		Vector2 pos = { 0.0f + i * 0.0f, 0.0f + i * 50.0f };
@@ -317,20 +317,20 @@ void GamePlayScene::Initialize()
 		sprites.push_back(std::move(sprite));
 	}
 
-	// ライト�E初期値を設定すめE
-	// 平行�E源�EOFF (Intensity = 0.0f)
+	// ライトの初期値を設定する
+	// 平行光源はOFF（Intensity = 0.0f）
 	directionalLight.direction = { 1.0f, -1.0f, 1.0f };
 	directionalLight.intensity = 0.0f;
 	directionalLight.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
-	// 点光源�EON (初期位置 0, 2, 0)
+	// 点光源はON（初期位置 0, 2, 0）
 	pointLight.position = { 0.0f, 2.0f, 0.0f };
 	pointLight.intensity = 1.0f;
 	pointLight.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	pointLight.radius = 10.0f;
 	pointLight.decay = 1.0f;
 
-	//スポットライチE
+	//スポットライト
 	spotLight.position = { 2.0f,1.25f,0.0f };
 	spotLight.intensity = 4.0f;
 	spotLight.color = { 1.0f,1.0f,1.0f,1.0f };
@@ -342,16 +342,16 @@ void GamePlayScene::Initialize()
 		std::cos(std::numbers::pi_v<float> / 3.0f);
 	spotLight.cosFalloffStart = 1.0f;
 
-	//パ�EチE��クル
-	//座標、E回�E発生数、発生頻度[秒]
+	//パーティクル
+	//座標、回転、発生数、発生頻度[秒]
 	emitterTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 
-	//Circleパ�EチE��クル
+	//Circleパーティクル
 	emitterCircle = std::make_unique<ParticleEmitter>("Circle", emitterTransform, 1, 0.1f,false);
-	//四角形のパ�EチE��クル(風に吹かれる方)
+	//四角形のパーティクル（風に吹かれる方）
 	emitterPlane = std::make_unique<ParticleEmitter>("Plane", emitterTransform, 1, 0.3f,true);
 
-	//最初�Ecircleにする
+	//最初はCircleにする
 	activeEmitter = emitterCircle.get();
 
 	selectedUI = 0;
@@ -3374,56 +3374,56 @@ void GamePlayScene::Update()
 	//カメラの更新
 	cameraManager->Update();
 
-	//カメラのビュープロジェクション行�Eを渡して更新
+	//カメラのビュープロジェクション行列を渡して更新
 	Matrix4x4 viewMatrix = cameraManager->GetActiveCamera()->GetViewMatrix();
 	Matrix4x4 projectionMatrix = cameraManager->GetActiveCamera()->GetProjectionMatrix();
 	Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 
-	// 安�Eのために NullチェチE��を追加
+	// 安全のためにNullチェックを追加
 	if (activeEmitter) {
 		activeEmitter->Update();
 	}
-	//パ�EチE��クル全体�E更新
+	//パーティクル全体を更新
 	ParticleManager::GetInstance()->Update();
 
-	//3Dオブジェクト�E更新通常モチE��
+	//通常3Dモデルを更新
 	for (auto& object3d : normalObjects) {
-		//毎フレーム、�Eネ�Eジャから今�EアクチE��ブカメラをもらう
+		//毎フレーム、マネージャから現在のアクティブカメラを取得する
 		object3d->SetCamera(cameraManager->GetActiveCamera());
 		float length = Length(directionalLight.direction);
 		if (length > 0.0f) {
 			directionalLight.direction = Normalize(directionalLight.direction);
 		} else {
-			// 0の場合�E適当な下向きにするなど、エラーを回避する
+			// 0の場合は適当な下向きにするなど、エラーを回避する
 			directionalLight.direction = { 0.0f, -1.0f, 0.0f };
 		}
-		object3d->SetDirectionalLight(directionalLight);//光を他�EモチE��にも�Eけ与えめE
+		object3d->SetDirectionalLight(directionalLight);//光を他のモデルにも設定する
 		object3d->SetPointLight(pointLight);
 		object3d->SetSpotLight(spotLight);
 		object3d->Update();
 	}
 
-	// アニメーションの時間確誁E
+	// アニメーションの時間確認
 	this->animationTime_ = objectAxis->GetAnimationTime();
 
-	//3Dオブジェクト�E更新アニメーションモチE��
+	//アニメーション3Dモデルを更新
 	for (auto& object3d : animationObjects) {
-		//毎フレーム、�Eネ�Eジャから今�EアクチE��ブカメラをもらう
+		//毎フレーム、マネージャから現在のアクティブカメラを取得する
 		object3d->SetCamera(cameraManager->GetActiveCamera());
 		float length = Length(directionalLight.direction);
 		if (length > 0.0f) {
 			directionalLight.direction = Normalize(directionalLight.direction);
 		} else {
-			// 0の場合�E適当な下向きにするなど、エラーを回避する
+			// 0の場合は適当な下向きにするなど、エラーを回避する
 			directionalLight.direction = { 0.0f, -1.0f, 0.0f };
 		}
-		object3d->SetDirectionalLight(directionalLight);//光を他�EモチE��にも�Eけ与えめE
+		object3d->SetDirectionalLight(directionalLight);//光を他のモデルにも設定する
 		object3d->SetPointLight(pointLight);
 		object3d->SetSpotLight(spotLight);
 		object3d->Update();
 	}
 
-	//スプライト�E更新
+	//スプライトを更新
 	if (previewObject_) {
 		previewObject_->SetCamera(cameraManager->GetActiveCamera());
 		previewObject_->SetDirectionalLight(directionalLight);
@@ -3442,7 +3442,7 @@ void GamePlayScene::Update()
 	UpdateEcsWorld();
 	skyBox_->Update();
 
-	//ゲームの処琁E
+	//ゲームの処理
 
 	ImGuiManager::GetInstance()->Begin("GamePlay");
 	DrawInspectorImGui();
@@ -3468,7 +3468,7 @@ void GamePlayScene::Update()
 		}
 	}
 #endif
-	// スケルトンをGame Viewの映像座標へ合わせ、モチE��の上へ重�Eて表示する、E
+	// スケルトンをGame Viewの映像座標へ合わせ、モデルの上へ重ねて表示する。
 	if (ImGuiManager::GetInstance()->IsSkeletonDebugDrawEnabled() && !animationObjects.empty())
 	{
 		Object3d* animationObject = animationObjects[0].get();
@@ -3493,7 +3493,7 @@ void GamePlayScene::Update()
 	UpdateParticleEffectEmission();
 
 
-	//Cキーが押されたらCylinderエフェクト�E表示を�Eり替える
+	//Cキーが押されたらCylinderエフェクトの表示を切り替える
 	if (Input::GetInstance()->TriggerKey(DIK_0))
 	{
 		if (isCylinderEffectVisible_) {
@@ -3514,7 +3514,7 @@ void GamePlayScene::Update()
 		}
 	}
 
-	//数字�EPキーが押されてぁE��めE
+	//Pキーが押されたらHitエフェクトを表示する
 	if (Input::GetInstance()->TriggerKey(DIK_P))
 	{
 		Vector3 hitPosition = objectAxis->GetTransform().translate;
@@ -3531,11 +3531,11 @@ void GamePlayScene::Update()
 void GamePlayScene::Draw()
 {
 
-	//描画前�E琁E
+	//描画前処理
 	DirectXCommon::GetInstance()->PreDraw();
 	SrvManager::GetInstance()->PreDraw();
 
-	// 先に通常モチE��用を描画(処琁E��軽くするためE
+	// 先に通常モデル用を描画する（処理を軽くするため）
 	if (isModelPreviewMode_ && previewObject_) {
 		object3dCommon->SetCommonDrawSetting();
 		previewObject_->Draw();
@@ -3554,7 +3554,7 @@ void GamePlayScene::Draw()
 		skyBox_->Draw();
 	}
 
-	// アニメーションモチE��用の描画
+	// アニメーションモデル用の描画
 	object3dCommon->SetCommonDrawSetting();
 	for (const auto& object3d : animationObjects) {
 		if (object3d->IsSkeletal()) {
@@ -3562,18 +3562,18 @@ void GamePlayScene::Draw()
 		}
 	}
 
-	//パ�EチE��クル描画
+	//パーティクル描画
 	ParticleManager::GetInstance()->Draw();
 
 	// スプライト描画
-	//Spriteの描画準備Spriteの描画に共通�EグラフィチE��スコマンドを積�E
+	//Spriteの描画準備。Spriteの描画に共通のグラフィックスコマンドを積む。
 	spriteCommon->SetCommonDrawSetting();
 	for (const auto& sprite : sprites)
 	{
 		sprite->Draw();
 	}
 
-	// SceneはRenderTextureへ描画済みなので、ImGuiの直前にSwapChainへ刁E��替える
+	// SceneはRenderTextureへ描画済みなので、ImGuiの直前にSwapChainへ切り替える
 	}
 	if (PostEffect::GetInstance()->IsEnabled()) {
 		DirectXCommon::GetInstance()->PreDrawForPostEffectTexture();
@@ -3581,7 +3581,7 @@ void GamePlayScene::Draw()
 	}
 	DirectXCommon::GetInstance()->PreDrawForSwapChain(PostEffect::GetInstance()->IsEnabled());
 #ifndef USE_IMGUI
-	// RenderTextureのSceneを�E画面三角形でSwapChainへコピ�Eする
+	// RenderTextureのSceneを全画面三角形でSwapChainへコピーする
 	if (PostEffect::GetInstance()->IsEnabled()) {
 		PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetPostEffectTextureSrvIndex(), false);
 	} else {
@@ -3597,10 +3597,10 @@ void GamePlayScene::Draw()
 
 void GamePlayScene::Finalize()
 {
-	//GPUの完亁E��E��
+	//GPUの完了を待機
 	DirectXCommon::GetInstance()->WaitForGPU();
 
-	// 中途半端に生き残ってぁE��粒子が原因のアクセス違反を防ぁE
+	// 中途半端に生き残っている粒子が原因のアクセス違反を防ぐ
 	ParticleManager::GetInstance()->SetCameraManager(nullptr);
 	ParticleManager::GetInstance()->ClearAllGroups();
 

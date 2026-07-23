@@ -10,6 +10,7 @@
 #include "SceneManager.h"
 #include "PostEffect.h"
 #include "CaptureManager.h"
+#include "Mirror.h"
 #include <cmath>
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui_internal.h"
@@ -184,7 +185,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 	ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
 
 	const std::string currentSceneName = sceneName ? sceneName : "";
-	if (showModelWindow_ && currentSceneName != "GamePlay") {
+	if (showModelWindow_ && currentSceneName != "GamePlay" && currentSceneName != "Stage1") {
 		if (inspectorDockId_ != 0) {
 			ImGui::SetNextWindowDockID(inspectorDockId_, ImGuiCond_Always);
 		}
@@ -1088,6 +1089,146 @@ void ImGuiManager::PostEffectWindow()
 	PostEffect::GetInstance()->SetSepia(isSepia);
 	ImGui::End();
 #else
+#endif
+}
+
+void ImGuiManager::DrawObbCollisionDebug(const MyMath::OBB& obb, const MyMath::Sphere& sphere, const Camera* camera, bool isColliding)
+{
+#ifdef USE_IMGUI
+	(void)sphere;
+	if (camera == nullptr) {
+		return;
+	}
+
+	float rectX = 0.0f;
+	float rectY = 0.0f;
+	float rectWidth = 0.0f;
+	float rectHeight = 0.0f;
+	if (!GetGameViewRect(rectX, rectY, rectWidth, rectHeight)) {
+		return;
+	}
+
+	const Matrix4x4& viewProjectionMatrix = camera->GetViewProjectionMatrix();
+	const ImVec2 imageMin(rectX, rectY);
+	const ImVec2 imageMax(rectX + rectWidth, rectY + rectHeight);
+	ImDrawList* drawList = ImGui::GetForegroundDrawList();
+	drawList->PushClipRect(imageMin, imageMax, true);
+
+	const auto projectToGameView = [&](const Vector3& position, ImVec2& screenPosition) {
+		const float x = position.x * viewProjectionMatrix.m[0][0] + position.y * viewProjectionMatrix.m[1][0] + position.z * viewProjectionMatrix.m[2][0] + viewProjectionMatrix.m[3][0];
+		const float y = position.x * viewProjectionMatrix.m[0][1] + position.y * viewProjectionMatrix.m[1][1] + position.z * viewProjectionMatrix.m[2][1] + viewProjectionMatrix.m[3][1];
+		const float w = position.x * viewProjectionMatrix.m[0][3] + position.y * viewProjectionMatrix.m[1][3] + position.z * viewProjectionMatrix.m[2][3] + viewProjectionMatrix.m[3][3];
+		if (w <= 0.0f) {
+			return false;
+		}
+		screenPosition = ImVec2(
+			imageMin.x + (x / w + 1.0f) * 0.5f * rectWidth,
+			imageMin.y + (1.0f - y / w) * 0.5f * rectHeight);
+		return true;
+	};
+
+	const auto makeCorner = [&](float signX, float signY, float signZ) {
+		return Vector3{
+			obb.center.x + obb.orientations[0].x * obb.size.x * signX + obb.orientations[1].x * obb.size.y * signY + obb.orientations[2].x * obb.size.z * signZ,
+			obb.center.y + obb.orientations[0].y * obb.size.x * signX + obb.orientations[1].y * obb.size.y * signY + obb.orientations[2].y * obb.size.z * signZ,
+			obb.center.z + obb.orientations[0].z * obb.size.x * signX + obb.orientations[1].z * obb.size.y * signY + obb.orientations[2].z * obb.size.z * signZ,
+		};
+	};
+
+	const Vector3 corners[8]{
+		makeCorner(-1.0f, -1.0f, -1.0f), makeCorner(1.0f, -1.0f, -1.0f),
+		makeCorner(-1.0f, 1.0f, -1.0f), makeCorner(1.0f, 1.0f, -1.0f),
+		makeCorner(-1.0f, -1.0f, 1.0f), makeCorner(1.0f, -1.0f, 1.0f),
+		makeCorner(-1.0f, 1.0f, 1.0f), makeCorner(1.0f, 1.0f, 1.0f),
+	};
+	const int edges[12][2]{
+		{0, 1}, {1, 3}, {3, 2}, {2, 0},
+		{4, 5}, {5, 7}, {7, 6}, {6, 4},
+		{0, 4}, {1, 5}, {2, 6}, {3, 7},
+	};
+
+	ImVec2 projected[8]{};
+	bool visible[8]{};
+	for (int cornerIndex = 0; cornerIndex < 8; ++cornerIndex) {
+		visible[cornerIndex] = projectToGameView(corners[cornerIndex], projected[cornerIndex]);
+	}
+
+	const ImU32 color = isColliding ? IM_COL32(255, 60, 60, 255) : IM_COL32(70, 160, 255, 255);
+	for (const auto& edge : edges) {
+		if (visible[edge[0]] && visible[edge[1]]) {
+			drawList->AddLine(projected[edge[0]], projected[edge[1]], color, 2.0f);
+		}
+	}
+
+	drawList->PopClipRect();
+#else
+	(void)obb;
+	(void)sphere;
+	(void)camera;
+	(void)isColliding;
+#endif
+}
+
+bool ImGuiManager::MirrorDebugWindow(Mirror& mirror, float& mirrorYaw, const Camera& reflectionCamera)
+{
+#ifdef USE_IMGUI
+	if (inspectorDockId_ != 0) {
+		ImGui::SetNextWindowDockID(inspectorDockId_, ImGuiCond_Always);
+	}
+	if (!ImGui::Begin("Inspector", &showModelWindow_)) {
+		ImGui::End();
+		return false;
+	}
+
+	// ---------- 鏡の説明 ----------
+	ImGui::Text("Step 1: The mirror is a visible plane and data object.");
+	ImGui::Text("Reflection rendering is not enabled yet.");
+
+	bool isChanged = false;
+
+	// ---------- 鏡の中心位置 ----------
+	Vector3 center = mirror.GetCenter();
+	if (ImGui::DragFloat3("Mirror Center", &center.x, 0.05f)) {
+		mirror.SetCenter(center);
+		isChanged = true;
+	}
+
+	// ---------- 鏡の幅と高さ ----------
+	float width = mirror.GetWidth();
+	float height = mirror.GetHeight();
+	if (ImGui::DragFloat("Mirror Width", &width, 0.05f, 0.01f, 20.0f) |
+		ImGui::DragFloat("Mirror Height", &height, 0.05f, 0.01f, 20.0f)) {
+		mirror.SetSize(width, height);
+		isChanged = true;
+	}
+
+	// ---------- 鏡の左右回転と正面方向 ----------
+	if (ImGui::SliderAngle("Mirror Y Rotation", &mirrorYaw, -180.0f, 180.0f)) {
+		// plane.obj の正面はローカル座標の +Z 方向です。
+		// Y 軸回転後の正面方向を計算して、鏡の法線として保存します。
+		mirror.SetNormal({ std::sin(mirrorYaw), 0.0f, std::cos(mirrorYaw) });
+		isChanged = true;
+	}
+
+	const Vector3& normal = mirror.GetNormal();
+	ImGui::Text("Mirror Normal: %.2f, %.2f, %.2f", normal.x, normal.y, normal.z);
+	ImGui::Separator();
+
+	// ---------- 反射カメラの確認 ----------
+	const Vector3& reflectionPosition = reflectionCamera.GetTranslate();
+	const Vector3& reflectionRotate = reflectionCamera.GetRotate();
+	ImGui::Text("Reflection Camera Position: %.2f, %.2f, %.2f", reflectionPosition.x, reflectionPosition.y, reflectionPosition.z);
+	ImGui::Text("Reflection Camera Rotation: %.2f, %.2f, %.2f", reflectionRotate.x, reflectionRotate.y, reflectionRotate.z);
+	ImGui::TextWrapped("The reflection camera is updating. Next, it will draw the room into a mirror texture.");
+	ImGui::End();
+
+	return isChanged;
+#else
+	// ImGui を使用しない構成では、鏡の値を変更せず false を返します。
+	(void)mirror;
+	(void)mirrorYaw;
+	(void)reflectionCamera;
+	return false;
 #endif
 }
 
