@@ -91,6 +91,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> computeRootSignature_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> initializePipelineState_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> emitPipelineState_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> updatePipelineState_;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> graphicsRootSignature_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState_;
 };

@@ -106,10 +106,6 @@ void GPUParticle::Update(float deltaTime)
 		emitterData_->emit = 0;
 	}
 
-	if (emitterData_->emit == 0) {
-		return;
-	}
-
 	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
 	srvManager_->PreDraw();
 	D3D12_RESOURCE_BARRIER transitionToUav{};
@@ -121,18 +117,29 @@ void GPUParticle::Update(float deltaTime)
 	commandList->ResourceBarrier(1, &transitionToUav);
 
 	commandList->SetComputeRootSignature(computeRootSignature_.Get());
-	commandList->SetPipelineState(emitPipelineState_.Get());
 	srvManager_->SetComputeRootDescriptorTable(0, particleUavIndex_);
-	commandList->SetComputeRootConstantBufferView(1, emitterResource_->GetGPUVirtualAddress());
+	if (emitterData_->emit != 0) {
+		commandList->SetPipelineState(emitPipelineState_.Get());
+		commandList->SetComputeRootConstantBufferView(1, emitterResource_->GetGPUVirtualAddress());
+		commandList->SetComputeRootConstantBufferView(2, perFrameResource_->GetGPUVirtualAddress());
+		commandList->Dispatch(1, 1, 1);
+
+		D3D12_RESOURCE_BARRIER emitUavBarriers[2] = {};
+		emitUavBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+		emitUavBarriers[0].UAV.pResource = particleResource_.Get();
+		emitUavBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+		emitUavBarriers[1].UAV.pResource = freeCounterResource_.Get();
+		commandList->ResourceBarrier(_countof(emitUavBarriers), emitUavBarriers);
+	}
+
+	commandList->SetPipelineState(updatePipelineState_.Get());
 	commandList->SetComputeRootConstantBufferView(2, perFrameResource_->GetGPUVirtualAddress());
 	commandList->Dispatch(1, 1, 1);
 
-	D3D12_RESOURCE_BARRIER uavBarriers[2] = {};
-	uavBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-	uavBarriers[0].UAV.pResource = particleResource_.Get();
-	uavBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-	uavBarriers[1].UAV.pResource = freeCounterResource_.Get();
-	commandList->ResourceBarrier(_countof(uavBarriers), uavBarriers);
+	D3D12_RESOURCE_BARRIER updateUavBarrier{};
+	updateUavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	updateUavBarrier.UAV.pResource = particleResource_.Get();
+	commandList->ResourceBarrier(1, &updateUavBarrier);
 
 	D3D12_RESOURCE_BARRIER transitionToSrv{};
 	transitionToSrv.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -186,6 +193,7 @@ void GPUParticle::Finalize()
 	computeRootSignature_.Reset();
 	initializePipelineState_.Reset();
 	emitPipelineState_.Reset();
+	updatePipelineState_.Reset();
 	graphicsRootSignature_.Reset();
 	graphicsPipelineState_.Reset();
 	perViewData_ = nullptr;
@@ -236,6 +244,11 @@ void GPUParticle::CreateComputePipeline()
 	Microsoft::WRL::ComPtr<IDxcBlob> emitShaderBlob = dxCommon_->CompileShader(L"resources/shaders/EmitParticle.CS.hlsl", L"cs_6_0");
 	pipelineStateDesc.CS = { emitShaderBlob->GetBufferPointer(), emitShaderBlob->GetBufferSize() };
 	hr = dxCommon_->GetDevice()->CreateComputePipelineState(&pipelineStateDesc, IID_PPV_ARGS(&emitPipelineState_));
+	assert(SUCCEEDED(hr));
+
+	Microsoft::WRL::ComPtr<IDxcBlob> updateShaderBlob = dxCommon_->CompileShader(L"resources/shaders/UpdateParticle.CS.hlsl", L"cs_6_0");
+	pipelineStateDesc.CS = { updateShaderBlob->GetBufferPointer(), updateShaderBlob->GetBufferSize() };
+	hr = dxCommon_->GetDevice()->CreateComputePipelineState(&pipelineStateDesc, IID_PPV_ARGS(&updatePipelineState_));
 	assert(SUCCEEDED(hr));
 }
 
