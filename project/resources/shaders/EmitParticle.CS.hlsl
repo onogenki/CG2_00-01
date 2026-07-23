@@ -77,6 +77,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
             {
                 Particle particle = (Particle)0;
                 particle.scale = generator.Generate3d();
+                particle.lifeTime = 3.0f;
                 float32_t3 direction = generator.Generate3d() * 2.0f - 1.0f;
                 float directionLengthSquared = dot(direction, direction);
                 if (directionLengthSquared < 0.0001f)
@@ -89,6 +90,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
                 }
                 float radius = pow(generator.Generate1d(), 1.0f / 3.0f) * gEmitter.radius;
                 particle.translate = gEmitter.translate + direction * radius;
+                particle.velocity = (generator.Generate3d() - 0.5f) * 0.5f;
                 particle.color.rgb = generator.Generate3d();
                 particle.color.a = 1.0f;
                 gParticles[particleIndex] = particle;
