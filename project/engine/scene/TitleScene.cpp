@@ -57,8 +57,10 @@ bool TitleScene::AddTextureToTitle(const std::string& textureFilePath)
 		const float scale = 180.0f / largestSide;
 		sprite->SetSize({ originalSize.x * scale, originalSize.y * scale });
 	}
-	const float x = 180.0f + static_cast<float>(addedSprites_.size() % 4) * 190.0f;
-	const float y = 160.0f + static_cast<float>(addedSprites_.size() / 4) * 160.0f;
+	//初期スプライトを数えず、追加したテクスチャだけを並べる
+	const size_t addedSpriteIndex = addedSprites_.size() - baseSpriteCount_;
+	const float x = 180.0f + static_cast<float>(addedSpriteIndex % 4) * 190.0f;
+	const float y = 160.0f + static_cast<float>(addedSpriteIndex / 4) * 160.0f;
 	sprite->SetPosition({ x, y });
 	addedSprites_.push_back(std::move(sprite));
 	selectedTitleSpriteIndex_ = addedSprites_.size() - 1;
@@ -73,7 +75,7 @@ void TitleScene::DrawTitleModelShelfImGui()
 	callbacks.addedModelCount =
 		(normalObjects.size() > baseNormalObjectCount_ ? normalObjects.size() - baseNormalObjectCount_ : 0) +
 		animationObjects_.size();
-	callbacks.addedTextureCount = addedSprites_.size();
+	callbacks.addedTextureCount = addedSprites_.size() - baseSpriteCount_;
 	callbacks.addModel = [this](const std::string& fileName) { return AddModelToTitle(fileName); };
 	callbacks.addTexture = [this](const std::string& textureFilePath) { return AddTextureToTitle(textureFilePath); };
 	callbacks.clearAdded = [this]() {
@@ -82,7 +84,8 @@ void TitleScene::DrawTitleModelShelfImGui()
 			obj = normalObjects.empty() ? nullptr : normalObjects.front().get();
 		}
 		animationObjects_.clear();
-		addedSprites_.clear();
+		//最初からあるタイトル用スプライトは残し、後から追加したものだけを消す
+		addedSprites_.resize(baseSpriteCount_);
 		selectedTitleSpriteIndex_ = 0;
 		inspectorAutoSelectSpriteFrames_ = 0;
 	};
@@ -105,7 +108,8 @@ void TitleScene::DrawTitleInspectorImGui()
 	options.directionalLight = &directionalLight_;
 	options.pointLight = &pointLight_;
 	options.spotLight = &spotLight_;
-	options.addedSpriteCount = addedSprites_.size();
+	options.addedSpriteCount = addedSprites_.size() - baseSpriteCount_;
+	options.protectedSpriteCount = baseSpriteCount_;
 	options.protectedNormalObjectCount = baseNormalObjectCount_;
 	options.forcedSpriteIndex = forcedSpriteIndex;
 	options.selectSpriteTab = forcedSpriteIndex >= 0;
@@ -185,9 +189,13 @@ void TitleScene::Initialize()
 
 	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
 
-	sprite_ = std::make_unique<Sprite>();
-	sprite_->Initialize(spriteCommon, "Resources/uvChecker.png");
-	sprite_->SetPosition({ 0.0f, 0.0f });
+	//初期スプライトもInspectorで編集できる一覧へ入れる
+	auto titleSprite = std::make_unique<Sprite>();
+	titleSprite->Initialize(spriteCommon, "Resources/uvChecker.png");
+	titleSprite->SetPosition({ 0.0f, 0.0f });
+	addedSprites_.push_back(std::move(titleSprite));
+	baseSpriteCount_ = addedSprites_.size();
+	selectedTitleSpriteIndex_ = 0;
 
 	// skyBoxの背景
 	TextureManager::GetInstance()->LoadTexture("Resources/qwantani_moonrise_puresky_1k.dds");
@@ -238,7 +246,6 @@ void TitleScene::Update()
 	Matrix4x4 projectionMatrix = cameraManager->GetActiveCamera()->GetProjectionMatrix();
 	Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 
-	sprite_->Update();
 	for (auto& sprite : addedSprites_) {
 		sprite->Update();
 	}
@@ -256,6 +263,13 @@ void TitleScene::Update()
 		//シーン切り替え
 		SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
 	}
+
+	//ステージシーンへ
+	if (Input::GetInstance()->TriggerKey(DIK_RETURN) || Input::GetInstance()->IsPadButtonPressed(0, 3))
+	{
+		SceneManager::GetInstance()->ChangeScene("STAGE1");
+	}
+
 }
 
 void TitleScene::Draw()
@@ -281,7 +295,6 @@ void TitleScene::Draw()
 	}
 
 	spriteCommon->SetCommonDrawSetting();
-	sprite_->Draw();
 	for (const auto& sprite : addedSprites_) {
 		sprite->Draw();
 	}
@@ -311,7 +324,6 @@ void TitleScene::Finalize()
 	//GPUの完了待ち
 	DirectXCommon::GetInstance()->WaitForGPU();
 	obj = nullptr;
-	sprite_.reset();
 	addedSprites_.clear();
 	skyBox_.reset();
 	normalObjects.clear();
@@ -320,6 +332,7 @@ void TitleScene::Finalize()
 	shelfState_.selectedEntry.clear();
 	shelfState_.message.clear();
 	baseNormalObjectCount_ = 0;
+	baseSpriteCount_ = 0;
 	selectedTitleSpriteIndex_ = 0;
 	inspectorAutoSelectSpriteFrames_ = 0;
 	mainCamera.reset();

@@ -48,6 +48,9 @@
     <ClCompile Include="engine\math\MyMath.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+	<ClCompile Include="engine\math\Collision.cpp">
+	  <Filter>ソース ファイル</Filter>
+	</ClCompile>
     <ClCompile Include="engine\2d\Sprite.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -60,6 +63,9 @@
     <ClCompile Include="engine\3d\Camera.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+	<ClCompile Include="engine\3d\CameraController.cpp">
+	  <Filter>ソース ファイル</Filter>
+	</ClCompile>
     <ClCompile Include="engine\3d\CameraManager.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -75,6 +81,9 @@
     <ClCompile Include="engine\3d\Object3d.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+	<ClCompile Include="engine\3d\Player.cpp">
+	  <Filter>ソース ファイル</Filter>
+	</ClCompile>
     <ClCompile Include="engine\3d\Object3dCommon.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -147,6 +156,9 @@
     <ClCompile Include="engine\scene\GamePlayScene.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+	<ClCompile Include="engine\scene\Stage1.cpp">
+	  <Filter>ソース ファイル</Filter>
+	</ClCompile>
     <ClCompile Include="engine\scene\TitleScene.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -195,6 +207,8 @@
     <ClInclude Include="engine\math\Matrix4x4.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+	<ClInclude Include="engine\math\Collision.h">
+	  <Filter>ヘッダー ファイル</Filter>
     <ClInclude Include="engine\math\MyMath.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -222,6 +236,9 @@
     <ClInclude Include="engine\3d\Camera.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+	<ClInclude Include="engine\3d\CameraController.h">
+	  <Filter>ヘッダー ファイル</Filter>
+	</ClInclude>
     <ClInclude Include="engine\3d\CameraManager.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -234,9 +251,15 @@
     <ClInclude Include="engine\3d\ModelManager.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+	<ClInclude Include="engine\3d\Mirror.h">
+	  <Filter>ヘッダー ファイル</Filter>
+	</ClInclude>
     <ClInclude Include="engine\3d\Object3d.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+	<ClInclude Include="engine\3d\Player.h">
+	  <Filter>ヘッダー ファイル</Filter>
+	</ClInclude>
     <ClInclude Include="engine\3d\Object3dCommon.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -324,6 +347,9 @@
     <ClInclude Include="engine\scene\GamePlayScene.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+	<ClInclude Include="engine\scene\Stage1.h">
+	  <Filter>ヘッダー ファイル</Filter>
+	</ClInclude>
     <ClInclude Include="engine\scene\TitleScene.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>

@@ -8,10 +8,13 @@
 #include <utility>
 #include <vector>
 
+// ImGui上でリソース棚とシーン内オブジェクトの編集UIを構築する。
+// 実データの追加・削除はコールバックでGamePlaySceneへ委譲する。
 class SceneEditor
 {
 public:
 	struct ShelfEntry {
+		// resources配下で見つけたモデルまたはテクスチャ1件の表示情報。
 		std::string fileName;
 		std::string displayName;
 		std::string textureFilePath;
@@ -28,12 +31,14 @@ public:
 	};
 
 	struct ShelfState {
+		// スキャン結果と、UI上で現在選択されている項目を保持する。
 		std::vector<ShelfEntry> entries;
 		std::string selectedEntry;
 		std::string message;
 	};
 
 	struct ShelfCallbacks {
+		// リソースを追加・プレビューするためにシーン側が提供する処理。
 		std::string sceneLabel = "Scene";
 		size_t addedModelCount = 0;
 		size_t addedTextureCount = 0;
@@ -48,6 +53,7 @@ public:
 	};
 
 	struct InspectorOptions {
+		// インスペクターが直接編集するシーンデータとUI制御用の設定。
 		const char* description = nullptr;
 		std::vector<std::unique_ptr<Sprite>>* sprites = nullptr;
 		std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
@@ -71,8 +77,12 @@ public:
 		std::function<void()> drawExtraTabs;
 	};
 
+	// resources配下を調べ、棚へ表示するモデル・テクスチャを更新する。
 	static void ScanResourceShelf(ShelfState& state);
+	// モデル棚を描画し、追加・プレビュー操作をコールバックへ渡す。
 	static void DrawModelShelf(ShelfState& state, const ShelfCallbacks& callbacks);
+	// Game View上へのドラッグ&ドロップを処理する。
 	static void HandleShelfDropOnGameView(ShelfState& state, const ShelfCallbacks& callbacks);
+	// 選択済みスプライト、モデル、ライトを編集するインスペクターを描画する。
 	static void DrawInspector(const InspectorOptions& options);
 };

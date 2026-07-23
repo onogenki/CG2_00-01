@@ -171,11 +171,13 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="engine\2d\SpriteCommon.cpp" />
     <ClCompile Include="engine\2d\TextureManager.cpp" />
     <ClCompile Include="engine\3d\Camera.cpp" />
+	<ClCompile Include="engine\3d\CameraController.cpp" />
     <ClCompile Include="engine\3d\CameraManager.cpp" />
     <ClCompile Include="engine\3d\Model.cpp" />
     <ClCompile Include="engine\3d\ModelCommon.cpp" />
     <ClCompile Include="engine\3d\ModelManager.cpp" />
     <ClCompile Include="engine\3d\Object3d.cpp" />
+	<ClCompile Include="engine\3d\Player.cpp" />
     <ClCompile Include="engine\3d\Object3dCommon.cpp" />
     <ClCompile Include="engine\3d\SkyBox.cpp" />
     <ClCompile Include="engine\audio\Audio.cpp" />
@@ -197,7 +199,9 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="engine\ImGui\SceneEditor.cpp" />
     <ClCompile Include="engine\level\LevelLoader.cpp" />
     <ClCompile Include="engine\math\MyMath.cpp" />
+	<ClCompile Include="engine\math\Collision.cpp" />
     <ClCompile Include="engine\scene\GamePlayScene.cpp" />
+	<ClCompile Include="engine\scene\Stage1.cpp" />
     <ClCompile Include="engine\scene\TitleScene.cpp" />
     <ClCompile Include="externals\imgui\imgui.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
@@ -312,11 +316,14 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="engine\2d\SpriteCommon.h" />
     <ClInclude Include="engine\2d\TextureManager.h" />
     <ClInclude Include="engine\3d\Camera.h" />
+	<ClInclude Include="engine\3d\CameraController.h" />
     <ClInclude Include="engine\3d\CameraManager.h" />
     <ClInclude Include="engine\3d\Model.h" />
     <ClInclude Include="engine\3d\ModelCommon.h" />
     <ClInclude Include="engine\3d\ModelManager.h" />
+	<ClInclude Include="engine\3d\Mirror.h" />
     <ClInclude Include="engine\3d\Object3d.h" />
+	<ClInclude Include="engine\3d\Player.h" />
     <ClInclude Include="engine\3d\Object3dCommon.h" />
     <ClInclude Include="engine\3d\SkyBox.h" />
     <ClInclude Include="engine\audio\Audio.h" />
@@ -341,6 +348,7 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="engine\ImGui\SceneEditor.h" />
     <ClInclude Include="engine\level\LevelLoader.h" />
     <ClInclude Include="engine\math\Matrix4x4.h" />
+	<ClInclude Include="engine\math\Collision.h" />
     <ClInclude Include="engine\math\MyMath.h" />
     <ClInclude Include="engine\math\Quaternion.h" />
     <ClInclude Include="engine\math\Transform.h" />
@@ -348,6 +356,7 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="engine\math\Vector3.h" />
     <ClInclude Include="engine\math\Vector4.h" />
     <ClInclude Include="engine\scene\GamePlayScene.h" />
+	<ClInclude Include="engine\scene\Stage1.h" />
     <ClInclude Include="engine\scene\TitleScene.h" />
     <ClInclude Include="externals\imgui\imconfig.h" />
     <ClInclude Include="externals\imgui\imgui.h">

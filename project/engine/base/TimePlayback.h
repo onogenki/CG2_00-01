@@ -6,20 +6,26 @@
 #include <cmath>
 #include <vector>
 
+// 戻す操作が有効かどうかだけを共有する軽量な状態クラス。
 class ReturnPlaybackState
 {
 public:
 	bool IsReturning() const { return returning_; }
+	// UIなどから戻す状態を切り替える。
 	void SetReturning(bool returning) { returning_ = returning; }
+	// シーン切り替え時に状態を初期値へ戻す。
 	void Reset() { returning_ = false; }
 
 private:
 	bool returning_ = false;
 };
 
+// Transformの編集履歴を時系列のキーフレームとして保存し、
+// 戻す・再生のどちらにも同じ履歴を利用するコントローラー。
 class TransformPlaybackController
 {
 public:
+	// 編集前後のTransformを記録する。途中から編集した場合は未来側の履歴を破棄する。
 	void RecordEdit(const Transform& before, const Transform& after, float elapsedSeconds)
 	{
 		if (NearlyEqual(before, after)) {
@@ -46,6 +52,7 @@ public:
 		canMoveForward_ = false;
 	}
 
+	// trueで履歴を先頭へ向かって再生し、falseで停止する。
 	void SetReturning(bool returning)
 	{
 		if (returning && HasHistory()) {
@@ -60,6 +67,7 @@ public:
 		}
 	}
 
+	// 戻した位置から最新の編集状態へ向けて再生を開始する。
 	bool StartMoveForward()
 	{
 		if (!HasHistory() || returning_ || !canMoveForward_ || playbackTime_ >= duration_ - kEpsilon_) {
@@ -70,6 +78,7 @@ public:
 		return true;
 	}
 
+	// 現在の再生位置を進め、補間したTransformを呼び出し元へ反映する。
 	void Update(Transform& transform, float deltaTime)
 	{
 		const float step = (std::max)(0.0f, deltaTime);
@@ -147,12 +156,14 @@ private:
 		};
 	}
 
+	// Transformと、そのTransformに到達するまでの累積秒数。
 	struct Keyframe
 	{
 		Transform transform{};
 		float time = 0.0f;
 	};
 
+	// 指定時刻の前後キーフレームを線形補間してTransformを返す。
 	Transform Sample(float time) const
 	{
 		if (keyframes_.empty()) {
@@ -178,6 +189,7 @@ private:
 		return Interpolate(lower->transform, upper->transform, progress);
 	}
 
+	// 長時間の編集で履歴が無制限に増えないよう中間キーフレームを間引く。
 	void CompactKeyframesIfNeeded()
 	{
 		if (keyframes_.size() <= kMaximumKeyframes_) {
@@ -198,9 +210,9 @@ private:
 	static constexpr float kMinimumEditDurationSeconds_ = 1.0f / 240.0f;
 	static constexpr float kEpsilon_ = 0.0001f;
 	std::vector<Keyframe> keyframes_;
-	float playbackTime_ = 0.0f;
-	float duration_ = 0.0f;
-	bool returning_ = false;
-	bool movingForward_ = false;
-	bool canMoveForward_ = false;
+	float playbackTime_ = 0.0f;// 現在再生している履歴上の時刻。
+	float duration_ = 0.0f;// 履歴全体の長さ。
+	bool returning_ = false;// 先頭へ向かう逆再生中かどうか。
+	bool movingForward_ = false;// 最新状態へ向かう順再生中かどうか。
+	bool canMoveForward_ = false;// 戻した後に順再生を開始できるかどうか。
 };

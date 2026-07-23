@@ -6,6 +6,7 @@
 #include "ParticleEmitter.h"
 #include "SrvManager.h"
 #include "WinApp.h"
+#include "MyMath.h"
 
 #include <functional>
 #include <vector>
@@ -19,6 +20,7 @@
 
 class Sprite;
 struct Transform;
+class Mirror;
 
 class ImGuiManager
 {
@@ -58,6 +60,11 @@ public:
 	void CameraWindow(CameraManager* cameraManager, bool embedded = false);
 	std::string ParticleWindow(Transform& emitterTransform, bool embedded = false);
 	void PostEffectWindow();
+	// 鏡の中心・大きさ・回転を編集するデバッグ用ウィンドウを表示します。
+	// 値が変更されたフレームだけ true を返します。
+	bool MirrorDebugWindow(Mirror& mirror, float& mirrorYaw, const Camera& reflectionCamera);
+	//OBBをゲーム画面へワイヤー表示し、衝突中は赤、非衝突時は青で描画する
+	void DrawObbCollisionDebug(const MyMath::OBB& obb, const MyMath::Sphere& sphere, const Camera* camera, bool isColliding);
 	bool IsSkeletonDebugDrawEnabled() const;
 	bool IsMouseOverGameView(float mouseScreenX, float mouseScreenY) const;
 	bool GetGameViewRect(float& x, float& y, float& width, float& height) const;

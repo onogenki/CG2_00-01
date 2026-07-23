@@ -21,6 +21,7 @@ using namespace MyMath;
 namespace {
 std::string GetEnvironmentString(const char* name)
 {
+	// _dupenv_sで確保された文字列は、この関数内で必ず解放する。
 	char* value = nullptr;
 	size_t size = 0;
 	if (_dupenv_s(&value, &size, name) != 0 || value == nullptr) {
@@ -41,6 +42,7 @@ void Game::Initialize()
 	sceneFactory_ = std::make_unique<SceneFactory>();
 	SceneManager::GetInstance()->SetSceneFactory(sceneFactory_.get());
 
+	// 環境変数を指定すると、通常のタイトル画面を経由せず対象シーンを起動できる。
 	const std::string startSceneName = GetEnvironmentString("CG2_START_SCENE");
 	SceneManager::GetInstance()->ChangeScene(startSceneName.empty() ? "TITLE" : startSceneName);
 	InitializeSceneStressFromEnvironment();
@@ -65,6 +67,7 @@ void Game::Finalize()
 
 void Game::InitializeSceneStressFromEnvironment()
 {
+	// 自動テスト時だけ有効にするため、設定がなければ何も変更しない。
 	const std::string restartCountText = GetEnvironmentString("CG2_SCENE_STRESS_RESTARTS");
 	if (restartCountText.empty()) {
 		return;
@@ -84,6 +87,7 @@ void Game::InitializeSceneStressFromEnvironment()
 		sceneStressIntervalFrames_ = (std::max)(1, std::atoi(intervalText.c_str()));
 	}
 
+	// 再起動回数が有効なら、UpdateSceneStressでフレームごとに進行する。
 	sceneStressEnabled_ = true;
 	sceneStressCompletedRestarts_ = 0;
 	sceneStressFrameCounter_ = 0;
@@ -96,10 +100,12 @@ void Game::UpdateSceneStress()
 	}
 
 	SceneManager* sceneManager = SceneManager::GetInstance();
+	// シーン切り替え中は次の要求を積まず、完了を待つ。
 	if (sceneManager->HasPendingScene()) {
 		return;
 	}
 
+	// まず対象シーンへ移動してから再起動回数を数える。
 	if (sceneManager->GetCurrentSceneName() != sceneStressTarget_) {
 		sceneManager->ChangeScene(sceneStressTarget_);
 		return;
@@ -115,6 +121,7 @@ void Game::UpdateSceneStress()
 		return;
 	}
 
+	// 指定回数を終えたらフレームワークの終了要求を出す。
 	if (sceneStressCompletedRestarts_ >= sceneStressRequestedRestarts_ &&
 		!sceneManager->HasPendingScene()) {
 		endRequest_ = true;

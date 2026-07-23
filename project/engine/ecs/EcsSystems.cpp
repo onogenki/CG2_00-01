@@ -6,11 +6,13 @@
 
 namespace {
 
+// スケール値の符号を除いてAABBの大きさを求める。
 float Abs(float value)
 {
 	return value < 0.0f ? -value : value;
 }
 
+// 2つの軸平行境界ボックスが全軸で重なっているか判定する。
 bool IsOverlapping(const MyMath::AABB& first, const MyMath::AABB& second)
 {
 	return first.min.x <= second.max.x && first.max.x >= second.min.x &&
@@ -24,6 +26,7 @@ namespace Ecs {
 
 void TransformSyncSystem::Update(World& world)
 {
+	// 描画オブジェクトのTransformをECS側のコンポーネントへ同期する。
 	for (const auto& [entity, model] : world.models_) {
 		if (!model.object) {
 			continue;
@@ -34,6 +37,7 @@ void TransformSyncSystem::Update(World& world)
 
 void BoxCollisionSystem::Update(World& world)
 {
+	// 有効な各コライダーのローカル形状をワールド座標のAABBへ変換する。
 	std::vector<Entity> activeColliders;
 	for (auto& [entity, collider] : world.boxColliders_) {
 		collider.isColliding = false;
@@ -73,6 +77,7 @@ void BoxCollisionSystem::Update(World& world)
 		activeColliders.push_back(entity);
 	}
 
+	// 総当たりでペアを判定し、重なった両方の状態を更新する。
 	for (size_t first = 0; first < activeColliders.size(); ++first) {
 		for (size_t second = first + 1; second < activeColliders.size(); ++second) {
 			BoxColliderComponent& firstCollider = world.boxColliders_.at(activeColliders[first]);

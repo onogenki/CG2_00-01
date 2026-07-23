@@ -10,6 +10,8 @@
 #include <thread>
 #include <vector>
 
+// スクリーンショット、動画録画、リプレイ保存を管理するシングルトン。
+// GPUからの読み戻し後のエンコードはワーカースレッドで行い、描画を止めない。
 class CaptureManager
 {
 public:
@@ -18,32 +20,40 @@ public:
 	CaptureManager(const CaptureManager&) = delete;
 	CaptureManager& operator=(const CaptureManager&) = delete;
 
+	// 録画・リプレイ用のワーカースレッドを開始する。
 	void Initialize();
+	// 保留中のエンコードを完了してからワーカースレッドを停止する。
 	void Finalize();
+	// 撮影・録画・リプレイ保存を操作するImGuiを描画する。
 	void DrawImGui();
+	// PostDraw後にGPUバックバッファを読み戻して各キャプチャ要求を処理する。
 	void UpdateAfterDraw();
 
 	bool IsRecording() const { return isRecording_; }
 	const std::string& GetLastMessage() const { return lastMessage_; }
 
 private:
+	// UIで選択できる動画コンテナ形式。
 	enum class VideoFormat {
 		Avi,
 		Mp4,
 	};
 
+	// 現在フレームを書き込んでいるエンコーダー。
 	enum class ActiveVideoWriter {
 		None,
 		Avi,
 		Mp4,
 	};
 
+	// メモリ上のリプレイバッファへ圧縮して保持する1フレーム。
 	struct ReplayFrame {
 		std::vector<unsigned char> encodedPixels;
 		int width = 0;
 		int height = 0;
 	};
 
+	// リプレイ用に縮小・圧縮する前のピクセルデータ。
 	struct ReplayEncodeJob {
 		std::shared_ptr<const std::vector<unsigned char>> pixels;
 		int sourceWidth = 0;
@@ -53,6 +63,7 @@ private:
 		unsigned long long generation = 0;
 	};
 
+	// GPU読み戻しが必要な要求をフレーム単位でキューイングする。
 	struct PendingCaptureRequest {
 		bool photo = false;
 		bool startRecording = false;
@@ -61,6 +72,7 @@ private:
 		unsigned long long recordingGeneration = 0;
 	};
 
+	// 動画エンコーダースレッドへ渡す1フレーム。
 	struct VideoEncodeJob {
 		std::shared_ptr<const std::vector<unsigned char>> pixels;
 		int width = 0;
@@ -74,6 +86,7 @@ private:
 	std::filesystem::path GetCaptureDirectory(const char* folderName) const;
 	bool CreateCaptureDirectories() const;
 	std::string MakeTimestampString() const;
+	// 現在の描画結果をRGBAピクセル配列としてCPUメモリへ読み戻す。
 	bool CapturePixels(std::vector<unsigned char>& pixels, int& width, int& height) const;
 	bool SavePixelsAsBmp(
 		const std::filesystem::path& filePath,
@@ -98,6 +111,7 @@ private:
 		int height,
 		int frameRate);
 	bool AppendActiveVideoFrame(const std::vector<unsigned char>& pixels, int width, int height, int frameIndex);
+	// 録画フレームを非同期でエンコードするワーカーを管理する。
 	void StartVideoEncoder();
 	void StopVideoEncoder();
 	void WaitForVideoEncoder();
@@ -108,6 +122,7 @@ private:
 		int height,
 		int frameIndex);
 	void EndActiveVideo();
+	// リングバッファ内の直近フレームを動画ファイルとして保存する。
 	bool SaveReplayClip();
 	bool SaveReplayFrames(std::vector<ReplayFrame> frames);
 	void WaitForReplaySave();
@@ -123,6 +138,7 @@ private:
 		std::shared_ptr<const std::vector<unsigned char>> pixels,
 		int width,
 		int height);
+	// リプレイ用フレームを圧縮する専用ワーカーを管理する。
 	void StartReplayEncoder();
 	void StopReplayEncoder();
 	void ReplayEncoderWorker();
@@ -181,8 +197,10 @@ private:
 	std::filesystem::path lastScreenshotPath_;
 	std::filesystem::path lastVideoPath_;
 	std::filesystem::path lastReplayPath_;
+	// GPU読み戻し待ちの撮影要求。
 	std::deque<PendingCaptureRequest> pendingCaptureRequests_;
 	size_t droppedCaptureFrames_ = 0;
+	// 録画用エンコーダーへ渡すフレームキュー。
 	std::deque<VideoEncodeJob> videoEncodeJobs_;
 	std::mutex videoEncodeMutex_;
 	std::condition_variable videoEncodeWorkCondition_;
@@ -191,6 +209,7 @@ private:
 	std::atomic<bool> videoEncodeFailed_{ false };
 	bool videoEncoderStopping_ = false;
 	size_t videoEncoderActiveJobs_ = 0;
+	// 常に直近kReplaySeconds_秒だけを保持するリプレイリングバッファ。
 	std::deque<ReplayFrame> replayFrames_;
 	std::deque<ReplayEncodeJob> replayEncodeJobs_;
 	std::mutex replayMutex_;
@@ -207,6 +226,7 @@ private:
 	int replayTargetWidth_ = 0;
 	int replayTargetHeight_ = 0;
 	std::string lastMessage_;
+	// キャプチャ機能の自動検証で使用する状態。
 	bool smokeEnabled_ = false;
 	bool performanceBaselineEnabled_ = false;
 	bool smokeFinished_ = false;
