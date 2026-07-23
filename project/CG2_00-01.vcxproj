@@ -165,6 +165,7 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="engine\2d\ParticleEmitter.cpp" />
+	<ClCompile Include="engine\2d\GPUParticle.cpp" />
     <ClCompile Include="engine\2d\ParticleManager.cpp" />
     <ClCompile Include="engine\2d\PostEffect.cpp" />
     <ClCompile Include="engine\2d\Sprite.cpp" />
@@ -272,6 +273,21 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
+	<FxCompile Include="resources\shaders\GPUParticle.PS.hlsl">
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+	</FxCompile>
+	<FxCompile Include="resources\shaders\GPUParticle.VS.hlsl">
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+	</FxCompile>
+	<FxCompile Include="resources\shaders\InitializeParticle.CS.hlsl">
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+	</FxCompile>
     <FxCompile Include="resources\shaders\Particle.VS.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -310,6 +326,7 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\2d\ParticleEmitter.h" />
+	<ClInclude Include="engine\2d\GPUParticle.h" />
     <ClInclude Include="engine\2d\ParticleManager.h" />
     <ClInclude Include="engine\2d\PostEffect.h" />
     <ClInclude Include="engine\2d\Sprite.h" />

@@ -38,10 +38,12 @@ public:
 		bool forceOpaqueAlpha = false);
 	//SRV生成(Structured Buffer用)
 	void CreateSRVforStructuredBuffer(uint32_t srvIndex, ID3D12Resource* pResource, UINT numElements, UINT structureByteStride);
+	void CreateUAVforStructuredBuffer(uint32_t uavIndex, ID3D12Resource* pResource, UINT numElements, UINT structureByteStride);
 
 	void PreDraw();
 
 	void SetGraphicsRootDescriptorTable(UINT RootParameterIndex, uint32_t srvIndex);
+	void SetComputeRootDescriptorTable(UINT RootParameterIndex, uint32_t srvIndex);
 
 	//デスクリプタヒープを取得
 	ID3D12DescriptorHeap* GetDescriptorHeap() { return descriptorHeap.Get(); }

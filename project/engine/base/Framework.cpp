@@ -14,6 +14,7 @@
 #include "TextureManager.h"
 #include "ModelManager.h"
 #include "ParticleManager.h"
+#include "GPUParticle.h"
 #include "PostEffect.h"
 #include "Audio.h"
 #include "AbstractSceneFactory.h"
@@ -120,6 +121,7 @@ void Framework::Initialize()
 	TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
 	ModelManager::GetInstance()->Initialize(dxCommon_);
 	ParticleManager::GetInstance()->Initialize(dxCommon_, srvManager_);
+	GPUParticle::GetInstance()->Initialize(dxCommon_, srvManager_);
 	Audio::GetInstance()->Initialize();
 
 	//入力の初期化
@@ -162,6 +164,7 @@ void Framework::Finalize()
 	TextureManager::GetInstance()->Finalize();
 	ModelManager::GetInstance()->Finalize();
 	ParticleManager::GetInstance()->Finalize();
+	GPUParticle::GetInstance()->Finalize();
 	Audio::GetInstance()->Unload();
 
 	xAudio2_.Reset();
