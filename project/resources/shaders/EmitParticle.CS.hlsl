@@ -58,7 +58,8 @@ class RandomGenerator
 
 static const uint32_t kMaxParticles = 1024;
 RWStructuredBuffer<Particle> gParticles : register(u0);
-RWStructuredBuffer<int32_t> gFreeCounter : register(u1);
+RWStructuredBuffer<int32_t> gFreeListIndex : register(u1);
+RWStructuredBuffer<int32_t> gFreeList : register(u2);
 ConstantBuffer<EmitterSphere> gEmitter : register(b0);
 ConstantBuffer<PerFrame> gPerFrame : register(b1);
 
@@ -71,10 +72,11 @@ void main(uint3 DTid : SV_DispatchThreadID)
         generator.seed = (float32_t3(DTid) + gPerFrame.time) * gPerFrame.time;
         for (uint32_t countIndex = 0; countIndex < gEmitter.count && countIndex < kMaxParticles; ++countIndex)
         {
-            int32_t particleIndex;
-            InterlockedAdd(gFreeCounter[0], 1, particleIndex);
-            if (particleIndex < kMaxParticles)
+            int32_t freeListIndex;
+            InterlockedAdd(gFreeListIndex[0], -1, freeListIndex);
+            if (freeListIndex >= 0)
             {
+                uint32_t particleIndex = gFreeList[freeListIndex];
                 Particle particle = (Particle)0;
                 particle.scale = generator.Generate3d();
                 particle.lifeTime = 3.0f;
@@ -94,6 +96,11 @@ void main(uint3 DTid : SV_DispatchThreadID)
                 particle.color.rgb = generator.Generate3d();
                 particle.color.a = 1.0f;
                 gParticles[particleIndex] = particle;
+            }
+            else
+            {
+                InterlockedAdd(gFreeListIndex[0], 1, freeListIndex);
+                break;
             }
         }
     }

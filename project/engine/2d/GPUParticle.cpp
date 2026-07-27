@@ -10,7 +10,7 @@ void GPUParticle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 {
 	assert(dxCommon);
 	assert(srvManager);
-	assert(srvManager->CanAllocate(3));
+	assert(srvManager->CanAllocate(4));
 
 	dxCommon_ = dxCommon;
 	srvManager_ = srvManager;
@@ -35,30 +35,43 @@ void GPUParticle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 		IID_PPV_ARGS(&particleResource_));
 	assert(SUCCEEDED(hr));
 
-	D3D12_RESOURCE_DESC counterResourceDesc{};
-	counterResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	counterResourceDesc.Width = sizeof(int32_t);
-	counterResourceDesc.Height = 1;
-	counterResourceDesc.DepthOrArraySize = 1;
-	counterResourceDesc.MipLevels = 1;
-	counterResourceDesc.SampleDesc.Count = 1;
-	counterResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	counterResourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+	D3D12_RESOURCE_DESC freeListIndexResourceDesc{};
+	freeListIndexResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	freeListIndexResourceDesc.Width = sizeof(int32_t);
+	freeListIndexResourceDesc.Height = 1;
+	freeListIndexResourceDesc.DepthOrArraySize = 1;
+	freeListIndexResourceDesc.MipLevels = 1;
+	freeListIndexResourceDesc.SampleDesc.Count = 1;
+	freeListIndexResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	freeListIndexResourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 	hr = dxCommon_->GetDevice()->CreateCommittedResource(
 		&heapProperties,
 		D3D12_HEAP_FLAG_NONE,
-		&counterResourceDesc,
+		&freeListIndexResourceDesc,
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
 		nullptr,
-		IID_PPV_ARGS(&freeCounterResource_));
+		IID_PPV_ARGS(&freeListIndexResource_));
+	assert(SUCCEEDED(hr));
+
+	D3D12_RESOURCE_DESC freeListResourceDesc = freeListIndexResourceDesc;
+	freeListResourceDesc.Width = sizeof(int32_t) * kMaxParticles;
+	hr = dxCommon_->GetDevice()->CreateCommittedResource(
+		&heapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&freeListResourceDesc,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		nullptr,
+		IID_PPV_ARGS(&freeListResource_));
 	assert(SUCCEEDED(hr));
 
 	particleSrvIndex_ = srvManager_->Allocate();
 	particleUavIndex_ = srvManager_->Allocate();
-	freeCounterUavIndex_ = srvManager_->Allocate();
+	freeListIndexUavIndex_ = srvManager_->Allocate();
+	freeListUavIndex_ = srvManager_->Allocate();
 	srvManager_->CreateSRVforStructuredBuffer(particleSrvIndex_, particleResource_.Get(), kMaxParticles, sizeof(Particle));
 	srvManager_->CreateUAVforStructuredBuffer(particleUavIndex_, particleResource_.Get(), kMaxParticles, sizeof(Particle));
-	srvManager_->CreateUAVforStructuredBuffer(freeCounterUavIndex_, freeCounterResource_.Get(), 1, sizeof(int32_t));
+	srvManager_->CreateUAVforStructuredBuffer(freeListIndexUavIndex_, freeListIndexResource_.Get(), 1, sizeof(int32_t));
+	srvManager_->CreateUAVforStructuredBuffer(freeListUavIndex_, freeListResource_.Get(), kMaxParticles, sizeof(int32_t));
 
 	CreateComputePipeline();
 	CreateGraphicsPipeline();
@@ -124,11 +137,13 @@ void GPUParticle::Update(float deltaTime)
 		commandList->SetComputeRootConstantBufferView(2, perFrameResource_->GetGPUVirtualAddress());
 		commandList->Dispatch(1, 1, 1);
 
-		D3D12_RESOURCE_BARRIER emitUavBarriers[2] = {};
+		D3D12_RESOURCE_BARRIER emitUavBarriers[3] = {};
 		emitUavBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
 		emitUavBarriers[0].UAV.pResource = particleResource_.Get();
 		emitUavBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-		emitUavBarriers[1].UAV.pResource = freeCounterResource_.Get();
+		emitUavBarriers[1].UAV.pResource = freeListIndexResource_.Get();
+		emitUavBarriers[2].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+		emitUavBarriers[2].UAV.pResource = freeListResource_.Get();
 		commandList->ResourceBarrier(_countof(emitUavBarriers), emitUavBarriers);
 	}
 
@@ -136,10 +151,14 @@ void GPUParticle::Update(float deltaTime)
 	commandList->SetComputeRootConstantBufferView(2, perFrameResource_->GetGPUVirtualAddress());
 	commandList->Dispatch(1, 1, 1);
 
-	D3D12_RESOURCE_BARRIER updateUavBarrier{};
-	updateUavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-	updateUavBarrier.UAV.pResource = particleResource_.Get();
-	commandList->ResourceBarrier(1, &updateUavBarrier);
+	D3D12_RESOURCE_BARRIER updateUavBarriers[3] = {};
+	updateUavBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	updateUavBarriers[0].UAV.pResource = particleResource_.Get();
+	updateUavBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	updateUavBarriers[1].UAV.pResource = freeListIndexResource_.Get();
+	updateUavBarriers[2].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	updateUavBarriers[2].UAV.pResource = freeListResource_.Get();
+	commandList->ResourceBarrier(_countof(updateUavBarriers), updateUavBarriers);
 
 	D3D12_RESOURCE_BARRIER transitionToSrv{};
 	transitionToSrv.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -179,13 +198,16 @@ void GPUParticle::Finalize()
 	if (srvManager_) {
 		srvManager_->Free(particleSrvIndex_);
 		srvManager_->Free(particleUavIndex_);
-		srvManager_->Free(freeCounterUavIndex_);
+		srvManager_->Free(freeListIndexUavIndex_);
+		srvManager_->Free(freeListUavIndex_);
 	}
 	particleSrvIndex_ = SrvManager::kInvalidSrvIndex;
 	particleUavIndex_ = SrvManager::kInvalidSrvIndex;
-	freeCounterUavIndex_ = SrvManager::kInvalidSrvIndex;
+	freeListIndexUavIndex_ = SrvManager::kInvalidSrvIndex;
+	freeListUavIndex_ = SrvManager::kInvalidSrvIndex;
 	particleResource_.Reset();
-	freeCounterResource_.Reset();
+	freeListIndexResource_.Reset();
+	freeListResource_.Reset();
 	vertexResource_.Reset();
 	perViewResource_.Reset();
 	emitterResource_.Reset();
@@ -207,7 +229,7 @@ void GPUParticle::CreateComputePipeline()
 {
 	D3D12_DESCRIPTOR_RANGE descriptorRange{};
 	descriptorRange.BaseShaderRegister = 0;
-	descriptorRange.NumDescriptors = 2;
+	descriptorRange.NumDescriptors = 3;
 	descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
 	descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
@@ -356,11 +378,13 @@ void GPUParticle::InitializeParticles()
 	srvManager_->SetComputeRootDescriptorTable(0, particleUavIndex_);
 	commandList->Dispatch(1, 1, 1);
 
-	D3D12_RESOURCE_BARRIER uavBarriers[2] = {};
+	D3D12_RESOURCE_BARRIER uavBarriers[3] = {};
 	uavBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
 	uavBarriers[0].UAV.pResource = particleResource_.Get();
 	uavBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-	uavBarriers[1].UAV.pResource = freeCounterResource_.Get();
+	uavBarriers[1].UAV.pResource = freeListIndexResource_.Get();
+	uavBarriers[2].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	uavBarriers[2].UAV.pResource = freeListResource_.Get();
 	commandList->ResourceBarrier(_countof(uavBarriers), uavBarriers);
 
 	D3D12_RESOURCE_BARRIER transitionBarrier{};
