@@ -16,6 +16,8 @@ struct PerFrame
 
 static const uint32_t kMaxParticles = 1024;
 RWStructuredBuffer<Particle> gParticles : register(u0);
+RWStructuredBuffer<int32_t> gFreeListIndex : register(u1);
+RWStructuredBuffer<int32_t> gFreeList : register(u2);
 ConstantBuffer<PerFrame> gPerFrame : register(b1);
 
 [numthreads(1024, 1, 1)]
@@ -29,6 +31,20 @@ void main(uint3 DTid : SV_DispatchThreadID)
         particle.currentTime += gPerFrame.deltaTime;
         float alpha = 1.0f - particle.currentTime / particle.lifeTime;
         particle.color.a = saturate(alpha);
+        if (particle.color.a == 0.0f)
+        {
+            particle.scale = float32_t3(0.0f, 0.0f, 0.0f);
+            int32_t freeListIndex;
+            InterlockedAdd(gFreeListIndex[0], 1, freeListIndex);
+            if (freeListIndex < kMaxParticles - 1)
+            {
+                gFreeList[freeListIndex + 1] = particleIndex;
+            }
+            else
+            {
+                InterlockedAdd(gFreeListIndex[0], -1, freeListIndex);
+            }
+        }
         gParticles[particleIndex] = particle;
     }
 }
