@@ -203,6 +203,10 @@ void GamePlayScene::Initialize()
 	ParticleManager::GetInstance()->CreateParticleGroup("LightCore", "Resources/circle2.png");
 	ParticleManager::GetInstance()->CreateParticleGroup("LightRain", "Resources/gradationLine.png");
 	ParticleManager::GetInstance()->CreateParticleGroup("LightSpiral", "Resources/circle2.png");
+	GPUParticle::GetInstance()->SetEmitterType(0, GPUParticle::EmitterType::Mix);
+	GPUParticle::GetInstance()->SetEmitterParticleType(0, GPUParticle::ParticleType::Trail);
+	GPUParticle::GetInstance()->SetEmitterType(1, GPUParticle::EmitterType::Mix);
+	GPUParticle::GetInstance()->SetEmitterParticleType(1, GPUParticle::ParticleType::Trail);
 	
 	//モデルファイルを読み込む
 	ModelManager::GetInstance()->LoadModel("terrain.obj");
@@ -267,6 +271,25 @@ void GamePlayScene::Initialize()
 	objectAxis = objAxis.get();//外部保存用に記録
 
 	animationObjects.push_back(std::move(objAxis));//アニメーションモデルとして登録
+
+	handWeapon_ = std::make_unique<Object3d>();
+	handWeapon_->Initialize(object3dCommon);
+	handWeapon_->SetModel("sphere.obj");
+	handWeapon_->GetModel()->SetTexture("Resources/monsterBall.png");
+	handWeapon_->GetTransform().scale = { 1.5f, 1.5f, 1.5f };
+	handWeapon_->GetTransform().translate = { 0.0f, 0.25f, 0.0f };
+
+	auto objWalk = std::make_unique<Object3d>();
+	objWalk->Initialize(object3dCommon);
+	objWalk->SetModel("walk.gltf");
+	objWalk->InitializeAnimation();
+	objWalk->SetEnvironmentCoefficient(0.3f);
+	objWalk->GetTransform().translate = { -2.0f, 0.0f, 0.0f };
+	objWalk->GetTransform().scale = { 1.0f, 1.0f, 1.0f };
+	objWalk->PlayAnimation(walkAnimation_);
+	objWalk->SetIsLoop(true);
+	walkObject_ = objWalk.get();
+	animationObjects.push_back(std::move(objWalk));
 
 	// レベルデータからオブジェクトを生成、配置
 	std::unique_ptr<LevelLoader::LevelData> levelData = LevelLoader::Load("scene");
@@ -3386,7 +3409,6 @@ void GamePlayScene::Update()
 	}
 	//パーティクル全体を更新
 	ParticleManager::GetInstance()->Update();
-	GPUParticle::GetInstance()->Update(DirectXCommon::GetInstance()->GetDeltaTime());
 
 	//通常3Dモデルを更新
 	for (auto& object3d : normalObjects) {
@@ -3405,7 +3427,35 @@ void GamePlayScene::Update()
 		object3d->Update();
 	}
 
+
 	// アニメーションの時間確認
+	Vector3 moveDirection{};
+	Input* input = Input::GetInstance();
+	if (input->PushKey(DIK_W)) {
+		moveDirection.z += 1.0f;
+	}
+	if (input->PushKey(DIK_S)) {
+		moveDirection.z -= 1.0f;
+	}
+	if (input->PushKey(DIK_A)) {
+		moveDirection.x -= 1.0f;
+	}
+	if (input->PushKey(DIK_D)) {
+		moveDirection.x += 1.0f;
+	}
+	if (walkObject_)
+	{
+		if (Length(moveDirection) > 0.0f) {
+			moveDirection = Normalize(moveDirection);
+			walkObject_->GetTransform().translate.x += moveDirection.x * 2.0f * DirectXCommon::GetInstance()->GetDeltaTime();
+			walkObject_->GetTransform().translate.z += moveDirection.z * 2.0f * DirectXCommon::GetInstance()->GetDeltaTime();
+			walkObject_->GetTransform().rotate.y = std::atan2(moveDirection.x, moveDirection.z);
+			walkObject_->SetAnimationPlaying(true);
+		} else {
+			walkObject_->SetAnimationPlaying(false);
+		}
+	}
+
 	this->animationTime_ = objectAxis->GetAnimationTime();
 
 	//アニメーション3Dモデルを更新
@@ -3426,6 +3476,38 @@ void GamePlayScene::Update()
 	}
 
 	//スプライトを更新
+	Matrix4x4 handWorldMatrix{};
+	if (objectAxis && objectAxis->GetJointWorldMatrix("ボーン.016", handWorldMatrix))
+	{
+		if (handWeapon_)
+		{
+			handWeapon_->SetParentWorldMatrix(handWorldMatrix);
+			handWeapon_->SetCamera(cameraManager->GetActiveCamera());
+			handWeapon_->SetDirectionalLight(directionalLight);
+			handWeapon_->SetPointLight(pointLight);
+			handWeapon_->SetSpotLight(spotLight);
+			handWeapon_->Update();
+		}
+	}
+	Matrix4x4 leftFootWorldMatrix{};
+	Matrix4x4 rightFootWorldMatrix{};
+	const bool hasLeftFoot = walkObject_ && walkObject_->GetJointWorldMatrix("mixamorig:LeftFoot", leftFootWorldMatrix);
+	const bool hasRightFoot = walkObject_ && walkObject_->GetJointWorldMatrix("mixamorig:RightFoot", rightFootWorldMatrix);
+	if (Length(moveDirection) > 0.0f && (hasLeftFoot || hasRightFoot))
+	{
+		GPUParticle::GetInstance()->SetEmitterTranslate(0, { leftFootWorldMatrix.m[3][0], leftFootWorldMatrix.m[3][1], leftFootWorldMatrix.m[3][2] });
+		GPUParticle::GetInstance()->SetEmitterEnabled(0, hasLeftFoot);
+		GPUParticle::GetInstance()->SetEmitterTranslate(1, { rightFootWorldMatrix.m[3][0], rightFootWorldMatrix.m[3][1], rightFootWorldMatrix.m[3][2] });
+		GPUParticle::GetInstance()->SetEmitterEnabled(1, hasRightFoot);
+	}
+	else
+	{
+		GPUParticle::GetInstance()->SetEmitterEnabled(0, false);
+		GPUParticle::GetInstance()->SetEmitterEnabled(1, false);
+	}
+	GPUParticle::GetInstance()->SetDirectionalLight(directionalLight.color, directionalLight.direction, directionalLight.intensity);
+	GPUParticle::GetInstance()->Update(DirectXCommon::GetInstance()->GetDeltaTime());
+
 	if (previewObject_) {
 		previewObject_->SetCamera(cameraManager->GetActiveCamera());
 		previewObject_->SetDirectionalLight(directionalLight);
@@ -3563,6 +3645,10 @@ void GamePlayScene::Draw()
 			object3d->Draw();
 		}
 	}
+	if (handWeapon_)
+	{
+		handWeapon_->Draw();
+	}
 
 	//パーティクル描画
 	ParticleManager::GetInstance()->Draw();
@@ -3610,6 +3696,7 @@ void GamePlayScene::Finalize()
 	activeEmitter = nullptr;
 	objectPlane = nullptr;
 	objectAxis = nullptr;
+	walkObject_ = nullptr;
 	EndRecordingAvi();
 	isRecordingGameView_ = false;
 	recordingTime_ = 0.0f;
@@ -3631,6 +3718,7 @@ void GamePlayScene::Finalize()
 	ClearSceneObjectSelection();
 	ClearSceneSpriteSelection();
 	previewObject_.reset();
+	handWeapon_.reset();
 	selectedLibraryModel_.clear();
 	previewModelFile_.clear();
 	modelLibrary_.clear();
