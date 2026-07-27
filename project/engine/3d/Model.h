@@ -59,6 +59,12 @@ public:
 		std::string textureFilePath;
 	};
 
+	struct MeshData {
+		uint32_t indexOffset;
+		uint32_t indexCount;
+		uint32_t materialIndex;
+	};
+
 	struct Node
 	{
 		QuaternionTransform transform;
@@ -123,7 +129,8 @@ public:
 		std::map<std::string, JointWeightData> skinClusterData;
 		std::vector<VertexData> vertices;
 		std::vector<uint32_t>indices;
-		MaterialData material;
+		std::vector<MaterialData> materials;
+		std::vector<MeshData> meshes;
 		Node rootNode;
 	};
 

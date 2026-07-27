@@ -69,6 +69,10 @@ public:
 
 	void Draw();
 
+	bool GetJointWorldMatrix(const std::string& jointName, Matrix4x4& worldMatrix) const;
+	void SetParentWorldMatrix(const Matrix4x4& parentWorldMatrix);
+	void ClearParentWorldMatrix();
+
 	// モデルをポインタでセットする 
 	void SetModel(Model* model) { this->model_ = model; }
 
@@ -79,6 +83,7 @@ public:
 	void InitializeAnimation();
 
 	void PlayAnimation(const Model::Animation& animation);
+	void SetAnimationPlaying(bool isPlaying) { isAnimating_ = isPlaying; }
 
 	//ループするかどうかの関数(falseで1ループのみ)
 	void SetIsLoop(bool isLoop) { isLoop_ = isLoop; }
@@ -156,6 +161,8 @@ private:
 
 	//3Dオブジェクト自身のトランスフォーム
 	Transform transform{};
+	Matrix4x4 parentWorldMatrix_{};
+	bool hasParentWorldMatrix_ = false;
 
 	//座標変換リソース(ConstantBuffer)
 	void CreateTransformationMatrixData();

@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <cstdint>
 #include <d3d12.h>
 #include <wrl.h>
@@ -14,6 +15,22 @@ class GPUParticle
 {
 public:
 	static constexpr uint32_t kMaxParticles = 1024;
+	static constexpr uint32_t kMaxEmitters = 2;
+
+	enum class EmitterType : uint32_t
+	{
+		Sphere,
+		Box,
+		Cone,
+		Mesh,
+		Mix,
+	};
+
+	enum class ParticleType : uint32_t
+	{
+		Billboard,
+		Trail,
+	};
 
 	static GPUParticle* GetInstance() {
 		static GPUParticle instance;
@@ -23,6 +40,12 @@ public:
 	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
 	void Update(float deltaTime);
 	void Draw(const Camera* camera);
+	void SetEmitterTranslate(uint32_t emitterIndex, const Vector3& translate);
+	void SetEmitterEnabled(uint32_t emitterIndex, bool isEnabled);
+	void SetEmitterType(uint32_t emitterIndex, EmitterType type);
+	void SetEmitterParticleType(uint32_t emitterIndex, ParticleType type);
+	void SetFieldAcceleration(const Vector3& acceleration) { fieldData_->acceleration = acceleration; }
+	void SetDirectionalLight(const Vector4& color, const Vector3& direction, float intensity);
 	void Finalize();
 
 private:
@@ -31,6 +54,7 @@ private:
 		kComputeRootParameterUav,
 		kComputeRootParameterEmitter,
 		kComputeRootParameterPerFrame,
+		kComputeRootParameterField,
 		kComputeRootParameterCount,
 	};
 
@@ -39,6 +63,7 @@ private:
 		kGraphicsRootParameterPerView,
 		kGraphicsRootParameterParticle,
 		kGraphicsRootParameterTexture,
+		kGraphicsRootParameterDirectionalLight,
 		kGraphicsRootParameterCount,
 	};
 
@@ -50,6 +75,8 @@ private:
 		Vector3 velocity;
 		float currentTime;
 		Vector4 color;
+		uint32_t particleType;
+		uint32_t emitterType;
 	};
 
 	struct PerView
@@ -58,20 +85,37 @@ private:
 		Matrix4x4 billboardMatrix;
 	};
 
-	struct EmitterSphere
+	struct Emitter
 	{
 		Vector3 translate;
 		float radius;
+		Vector3 boxSize;
 		uint32_t count;
 		float frequency;
 		float frequencyTime;
 		uint32_t emit;
+		uint32_t type;
+		uint32_t particleType;
+		uint32_t padding[3];
 	};
 
 	struct PerFrame
 	{
 		float time;
 		float deltaTime;
+	};
+
+	struct Field
+	{
+		Vector3 acceleration;
+		float drag;
+	};
+
+	struct DirectionalLight
+	{
+		Vector4 color;
+		Vector3 direction;
+		float intensity;
 	};
 
 	struct VertexData
@@ -105,12 +149,17 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> drawArgumentsResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> perViewResource_;
-	Microsoft::WRL::ComPtr<ID3D12Resource> emitterResource_;
+	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, kMaxEmitters> emitterResources_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> perFrameResource_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> fieldResource_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource_;
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
 	PerView* perViewData_ = nullptr;
-	EmitterSphere* emitterData_ = nullptr;
+	std::array<Emitter*, kMaxEmitters> emitterData_{};
 	PerFrame* perFrameData_ = nullptr;
+	Field* fieldData_ = nullptr;
+	DirectionalLight* directionalLightData_ = nullptr;
+	std::array<bool, kMaxEmitters> isEmitterEnabled_{};
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> computeRootSignature_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> initializePipelineState_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> emitPipelineState_;

@@ -83,6 +83,10 @@ void Object3d::Update()
 	}
 	//TransformからWorldMatrixを作る
 	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+	if (hasParentWorldMatrix_)
+	{
+		worldMatrix = Multiply(worldMatrix, parentWorldMatrix_);
+	}
 
 	if (camera)
 	{
@@ -93,6 +97,36 @@ void Object3d::Update()
 	}
 	Matrix4x4 inverseMatrix = Inverse(worldMatrix);
 	transformationMatrixData->WorldInverseTranspose = Transpose(inverseMatrix);
+}
+
+bool Object3d::GetJointWorldMatrix(const std::string& jointName, Matrix4x4& worldMatrix) const
+{
+	if (!isSkeletal_)
+	{
+		return false;
+	}
+
+	const auto jointIterator = skeleton_.jointMap.find(jointName);
+	if (jointIterator == skeleton_.jointMap.end())
+	{
+		return false;
+	}
+
+	const Matrix4x4 modelWorldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+	worldMatrix = Multiply(skeleton_.joints[jointIterator->second].skeletonSpaceMatrix, modelWorldMatrix);
+	return true;
+}
+
+void Object3d::SetParentWorldMatrix(const Matrix4x4& parentWorldMatrix)
+{
+	parentWorldMatrix_ = parentWorldMatrix;
+	hasParentWorldMatrix_ = true;
+}
+
+void Object3d::ClearParentWorldMatrix()
+{
+	parentWorldMatrix_ = MakeIdentity4x4();
+	hasParentWorldMatrix_ = false;
 }
 
 void Object3d::RecordTransformEdit(const Transform& before)

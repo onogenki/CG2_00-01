@@ -6,6 +6,8 @@ struct Particle
     float32_t3 velocity;
     float currentTime;
     float32_t4 color;
+    uint32_t particleType;
+    uint32_t emitterType;
 };
 
 struct PerView
@@ -25,6 +27,7 @@ struct VertexShaderOutput
     float32_t4 position : SV_POSITION;
     float32_t2 texcoord : TEXCOORD0;
     float32_t4 color : COLOR0;
+    uint32_t emitterType : EMITTERTYPE0;
 };
 
 StructuredBuffer<Particle> gParticles : register(t0);
@@ -40,10 +43,15 @@ VertexShaderOutput main(VertexShaderInput input, uint32_t instanceId : SV_Instan
     worldMatrix[1] *= particle.scale.y;
     worldMatrix[2] *= particle.scale.z;
     worldMatrix[3].xyz = particle.translate;
+    if (particle.particleType == 1)
+    {
+        worldMatrix[0] *= 1.0f + length(particle.velocity) * 8.0f;
+    }
 
     VertexShaderOutput output;
     output.position = mul(mul(input.position, worldMatrix), gPerView.viewProjectionMatrix);
     output.texcoord = input.texcoord;
     output.color = particle.color;
+    output.emitterType = particle.emitterType;
     return output;
 }

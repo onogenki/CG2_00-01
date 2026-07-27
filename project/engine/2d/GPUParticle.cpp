@@ -119,32 +119,96 @@ void GPUParticle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 
 	perViewResource_ = dxCommon_->CreateBufferResource(sizeof(PerView));
 	perViewResource_->Map(0, nullptr, reinterpret_cast<void**>(&perViewData_));
-	emitterResource_ = dxCommon_->CreateBufferResource(sizeof(EmitterSphere));
-	emitterResource_->Map(0, nullptr, reinterpret_cast<void**>(&emitterData_));
-	emitterData_->translate = { 0.0f, 0.0f, 0.0f };
-	emitterData_->radius = 1.0f;
-	emitterData_->count = 10;
-	emitterData_->frequency = 0.5f;
-	emitterData_->frequencyTime = 0.0f;
-	emitterData_->emit = 0;
+	for (uint32_t emitterIndex = 0; emitterIndex < kMaxEmitters; ++emitterIndex)
+	{
+		emitterResources_[emitterIndex] = dxCommon_->CreateBufferResource(sizeof(Emitter));
+		emitterResources_[emitterIndex]->Map(0, nullptr, reinterpret_cast<void**>(&emitterData_[emitterIndex]));
+		emitterData_[emitterIndex]->translate = { 0.0f, 0.0f, 0.0f };
+		emitterData_[emitterIndex]->radius = 0.15f;
+		emitterData_[emitterIndex]->boxSize = { 0.15f, 0.20f, 0.15f };
+		emitterData_[emitterIndex]->count = 1;
+		emitterData_[emitterIndex]->frequency = 0.15f;
+		emitterData_[emitterIndex]->frequencyTime = 0.0f;
+		emitterData_[emitterIndex]->emit = 0;
+		emitterData_[emitterIndex]->type = static_cast<uint32_t>(EmitterType::Sphere);
+		emitterData_[emitterIndex]->particleType = static_cast<uint32_t>(ParticleType::Trail);
+	}
 	perFrameResource_ = dxCommon_->CreateBufferResource(sizeof(PerFrame));
 	perFrameResource_->Map(0, nullptr, reinterpret_cast<void**>(&perFrameData_));
 	perFrameData_->time = 0.0f;
 	perFrameData_->deltaTime = 0.0f;
+	fieldResource_ = dxCommon_->CreateBufferResource(sizeof(Field));
+	fieldResource_->Map(0, nullptr, reinterpret_cast<void**>(&fieldData_));
+	fieldData_->acceleration = { 0.0f, -0.5f, 0.0f };
+	fieldData_->drag = 0.0f;
+	directionalLightResource_ = dxCommon_->CreateBufferResource(sizeof(DirectionalLight));
+	directionalLightResource_->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData_));
+	directionalLightData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	directionalLightData_->direction = { 0.0f, -1.0f, 0.0f };
+	directionalLightData_->intensity = 1.0f;
 
 	InitializeParticles();
+}
+
+void GPUParticle::SetEmitterTranslate(uint32_t emitterIndex, const Vector3& translate)
+{
+	if (emitterIndex < kMaxEmitters)
+	{
+		emitterData_[emitterIndex]->translate = translate;
+	}
+}
+
+void GPUParticle::SetEmitterEnabled(uint32_t emitterIndex, bool isEnabled)
+{
+	if (emitterIndex < kMaxEmitters)
+	{
+		isEmitterEnabled_[emitterIndex] = isEnabled;
+	}
+}
+
+void GPUParticle::SetEmitterType(uint32_t emitterIndex, EmitterType type)
+{
+	if (emitterIndex < kMaxEmitters)
+	{
+		emitterData_[emitterIndex]->type = static_cast<uint32_t>(type);
+	}
+}
+
+void GPUParticle::SetEmitterParticleType(uint32_t emitterIndex, ParticleType type)
+{
+	if (emitterIndex < kMaxEmitters)
+	{
+		emitterData_[emitterIndex]->particleType = static_cast<uint32_t>(type);
+	}
+}
+
+void GPUParticle::SetDirectionalLight(const Vector4& color, const Vector3& direction, float intensity)
+{
+	directionalLightData_->color = color;
+	directionalLightData_->direction = direction;
+	directionalLightData_->intensity = intensity;
 }
 
 void GPUParticle::Update(float deltaTime)
 {
 	perFrameData_->time += deltaTime;
 	perFrameData_->deltaTime = deltaTime;
-	emitterData_->frequencyTime += deltaTime;
-	if (emitterData_->frequency <= emitterData_->frequencyTime) {
-		emitterData_->frequencyTime -= emitterData_->frequency;
-		emitterData_->emit = 1;
-	} else {
-		emitterData_->emit = 0;
+	for (uint32_t emitterIndex = 0; emitterIndex < kMaxEmitters; ++emitterIndex)
+	{
+		Emitter& emitter = *emitterData_[emitterIndex];
+		if (!isEmitterEnabled_[emitterIndex])
+		{
+			emitter.frequencyTime = 0.0f;
+			emitter.emit = 0;
+		}
+		else if (emitter.frequency <= emitter.frequencyTime + deltaTime) {
+			emitter.frequencyTime += deltaTime;
+			emitter.frequencyTime -= emitter.frequency;
+			emitter.emit = 1;
+		} else {
+			emitter.frequencyTime += deltaTime;
+			emitter.emit = 0;
+		}
 	}
 
 	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
@@ -169,12 +233,21 @@ void GPUParticle::Update(float deltaTime)
 
 	commandList->SetComputeRootSignature(computeRootSignature_.Get());
 	srvManager_->SetComputeRootDescriptorTable(kComputeRootParameterUav, particleUavIndex_);
-	if (emitterData_->emit != 0) {
+	bool emitted = false;
+	for (uint32_t emitterIndex = 0; emitterIndex < kMaxEmitters; ++emitterIndex)
+	{
+		Emitter& emitter = *emitterData_[emitterIndex];
+		if (emitter.emit == 0) {
+			continue;
+		}
 		commandList->SetPipelineState(emitPipelineState_.Get());
-		commandList->SetComputeRootConstantBufferView(kComputeRootParameterEmitter, emitterResource_->GetGPUVirtualAddress());
+		commandList->SetComputeRootConstantBufferView(kComputeRootParameterEmitter, emitterResources_[emitterIndex]->GetGPUVirtualAddress());
 		commandList->SetComputeRootConstantBufferView(kComputeRootParameterPerFrame, perFrameResource_->GetGPUVirtualAddress());
-		commandList->Dispatch(1, 1, 1);
+		commandList->Dispatch((emitter.count + 63) / 64, 1, 1);
+		emitted = true;
+	}
 
+	if (emitted) {
 		D3D12_RESOURCE_BARRIER emitUavBarriers[3] = {};
 		emitUavBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
 		emitUavBarriers[0].UAV.pResource = particleResource_.Get();
@@ -187,6 +260,7 @@ void GPUParticle::Update(float deltaTime)
 
 	commandList->SetPipelineState(updatePipelineState_.Get());
 	commandList->SetComputeRootConstantBufferView(kComputeRootParameterPerFrame, perFrameResource_->GetGPUVirtualAddress());
+	commandList->SetComputeRootConstantBufferView(kComputeRootParameterField, fieldResource_->GetGPUVirtualAddress());
 	commandList->Dispatch(1, 1, 1);
 
 	D3D12_RESOURCE_BARRIER updateUavBarriers[5] = {};
@@ -242,6 +316,7 @@ void GPUParticle::Draw(const Camera* camera)
 	commandList->SetGraphicsRootConstantBufferView(kGraphicsRootParameterPerView, perViewResource_->GetGPUVirtualAddress());
 	srvManager_->SetGraphicsRootDescriptorTable(kGraphicsRootParameterParticle, particleSrvIndex_);
 	commandList->SetGraphicsRootDescriptorTable(kGraphicsRootParameterTexture, TextureManager::GetInstance()->GetSrvHandleGPU("Resources/circle2.png"));
+	commandList->SetGraphicsRootConstantBufferView(kGraphicsRootParameterDirectionalLight, directionalLightResource_->GetGPUVirtualAddress());
 	commandList->ExecuteIndirect(drawCommandSignature_.Get(), 1, drawArgumentsResource_.Get(), 0, nullptr, 0);
 }
 
@@ -270,8 +345,13 @@ void GPUParticle::Finalize()
 	drawArgumentsResource_.Reset();
 	vertexResource_.Reset();
 	perViewResource_.Reset();
-	emitterResource_.Reset();
+	for (Microsoft::WRL::ComPtr<ID3D12Resource>& emitterResource : emitterResources_)
+	{
+		emitterResource.Reset();
+	}
 	perFrameResource_.Reset();
+	fieldResource_.Reset();
+	directionalLightResource_.Reset();
 	computeRootSignature_.Reset();
 	initializePipelineState_.Reset();
 	emitPipelineState_.Reset();
@@ -280,8 +360,10 @@ void GPUParticle::Finalize()
 	graphicsPipelineState_.Reset();
 	drawCommandSignature_.Reset();
 	perViewData_ = nullptr;
-	emitterData_ = nullptr;
+	emitterData_.fill(nullptr);
 	perFrameData_ = nullptr;
+	fieldData_ = nullptr;
+	directionalLightData_ = nullptr;
 	dxCommon_ = nullptr;
 	srvManager_ = nullptr;
 }
@@ -305,6 +387,9 @@ void GPUParticle::CreateComputePipeline()
 	rootParameters[kComputeRootParameterPerFrame].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[kComputeRootParameterPerFrame].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameters[kComputeRootParameterPerFrame].Descriptor.ShaderRegister = 1;
+	rootParameters[kComputeRootParameterField].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[kComputeRootParameterField].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[kComputeRootParameterField].Descriptor.ShaderRegister = 2;
 
 	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc{};
 	rootSignatureDesc.pParameters = rootParameters;
@@ -360,6 +445,9 @@ void GPUParticle::CreateGraphicsPipeline()
 	rootParameters[kGraphicsRootParameterTexture].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[kGraphicsRootParameterTexture].DescriptorTable.pDescriptorRanges = &textureDescriptorRange;
 	rootParameters[kGraphicsRootParameterTexture].DescriptorTable.NumDescriptorRanges = 1;
+	rootParameters[kGraphicsRootParameterDirectionalLight].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[kGraphicsRootParameterDirectionalLight].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[kGraphicsRootParameterDirectionalLight].Descriptor.ShaderRegister = 1;
 
 	D3D12_STATIC_SAMPLER_DESC staticSampler{};
 	staticSampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;

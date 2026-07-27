@@ -319,17 +319,18 @@ bool Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPat
 	CreateVertexData();
 	//マテリアルデータ作成
 	CreateMaterialData();
-	//pngが空ならuvChecker.pngに変える
-	const std::filesystem::path texturePath = modelData.material.textureFilePath;
-	if (modelData.material.textureFilePath.empty() ||
-		modelData.material.textureFilePath.find("None") != std::string::npos ||
-		modelData.material.textureFilePath.front() == '*' ||
-		!std::filesystem::exists(texturePath))
+	for (MaterialData& material : modelData.materials)
 	{
-		modelData.material.textureFilePath = "Resources/uvChecker.png";
+		const std::filesystem::path texturePath = material.textureFilePath;
+		if (material.textureFilePath.empty() ||
+			material.textureFilePath.find("None") != std::string::npos ||
+			material.textureFilePath.front() == '*' ||
+			!std::filesystem::exists(texturePath))
+		{
+			material.textureFilePath = "Resources/uvChecker.png";
+		}
+		TextureManager::GetInstance()->LoadTexture(material.textureFilePath);
 	}
-	//テクスチャ読み込み
-	TextureManager::GetInstance()->LoadTexture(modelData.material.textureFilePath);
 	return true;
 }
 
@@ -380,13 +381,14 @@ void Model::Draw()
 	// 3. マテリアルCBufferの設定 (RootParameter 0)
 	commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
-	// 5. テクスチャSRVの設定 (RootParameter 2)
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle =
-		TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureFilePath);
-	commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
-
-	// 描画
-	commandList->DrawIndexedInstanced(static_cast<UINT>(modelData.indices.size()), 1, 0, 0, 0);
+	for (const MeshData& mesh : modelData.meshes)
+	{
+		const MaterialData& material = modelData.materials[mesh.materialIndex];
+		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle =
+			TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);
+		commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
+		commandList->DrawIndexedInstanced(mesh.indexCount, 1, mesh.indexOffset, 0, 0);
+	}
 }
 
 void Model::Draw(const SkinCluster& skinCluster)
@@ -409,17 +411,18 @@ void Model::Draw(const SkinCluster& skinCluster)
 	// 3. マテリアルCBufferの設定 (RootParameter 0)
 	commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
-	// 5. テクスチャSRVの設定 (RootParameter 2)
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle =
-		TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureFilePath);
-	commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
-
 	// マトリックスパレットSRVの設定 (RootParameter 7)
 	// （※Object3dCommonで追加した [7] 番のパラメータに、パレットのSRVを渡します）
 	commandList->SetGraphicsRootDescriptorTable(7, skinCluster.paletteSrvHandle.second);
 
-	// 描画
-	commandList->DrawIndexedInstanced(static_cast<UINT>(modelData.indices.size()), 1, 0, 0, 0);
+	for (const MeshData& mesh : modelData.meshes)
+	{
+		const MaterialData& material = modelData.materials[mesh.materialIndex];
+		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle =
+			TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);
+		commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
+		commandList->DrawIndexedInstanced(mesh.indexCount, 1, mesh.indexOffset, 0, 0);
+	}
 
 }
 
@@ -469,18 +472,23 @@ void Model::DrawSkinned(const SkinCluster& skinCluster)
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle =
-		TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureFilePath);
-	commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
-
-	commandList->DrawIndexedInstanced(static_cast<UINT>(modelData.indices.size()), 1, 0, 0, 0);
+	for (const MeshData& mesh : modelData.meshes)
+	{
+		const MaterialData& material = modelData.materials[mesh.materialIndex];
+		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle =
+			TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);
+		commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
+		commandList->DrawIndexedInstanced(mesh.indexCount, 1, mesh.indexOffset, 0, 0);
+	}
 }
 
 void Model::SetTexture(const std::string& filePath)
 {//新しいテクスチャを読み込んで
 	TextureManager::GetInstance()->LoadTexture(filePath);
-	//文字列を書き換える
-	modelData.material.textureFilePath = filePath;
+	for (MaterialData& material : modelData.materials)
+	{
+		material.textureFilePath = filePath;
+	}
 }
 
 //アニメーション適用
@@ -590,6 +598,8 @@ bool Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 	// メンバ変数をクリアしておく
 	modelData.vertices.clear();
 	modelData.indices.clear();
+	modelData.materials.clear();
+	modelData.meshes.clear();
 
 	//assimpでobjを読む
 	Assimp::Importer importer;
@@ -609,6 +619,26 @@ bool Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 	}
 
 	modelData.rootNode = ReadNode(scene->mRootNode);
+	const std::filesystem::path modelPath = std::filesystem::path(directoryPath) / filename;
+	for (uint32_t materialIndex = 0; materialIndex < scene->mNumMaterials; ++materialIndex)
+	{
+		MaterialData materialData{};
+		aiMaterial* material = scene->mMaterials[materialIndex];
+		if (material->GetTextureCount(aiTextureType_DIFFUSE) != 0)
+		{
+			aiString textureFilePath;
+			material->GetTexture(aiTextureType_DIFFUSE, 0, &textureFilePath);
+			const std::filesystem::path texturePath = std::filesystem::path(textureFilePath.C_Str());
+			materialData.textureFilePath = texturePath.is_absolute()
+				? texturePath.generic_string()
+				: (modelPath.parent_path() / texturePath).generic_string();
+		}
+		modelData.materials.push_back(std::move(materialData));
+	}
+	if (modelData.materials.empty())
+	{
+		modelData.materials.push_back({});
+	}
 
 	for (uint32_t meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex)//mesh解析
 	{
@@ -618,6 +648,9 @@ bool Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 			continue;
 		}
 		uint32_t vertexOffset = static_cast<uint32_t>(modelData.vertices.size());
+		MeshData meshData{};
+		meshData.indexOffset = static_cast<uint32_t>(modelData.indices.size());
+		meshData.materialIndex = (std::min)(mesh->mMaterialIndex, static_cast<uint32_t>(modelData.materials.size() - 1));
 
 		//まず頂点をすべて解析して配列に突っ込む
 		for (uint32_t v = 0; v < mesh->mNumVertices; ++v)
@@ -650,6 +683,11 @@ bool Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 				modelData.indices.push_back(vertexIndex + vertexOffset);
 			}
 		}
+		meshData.indexCount = static_cast<uint32_t>(modelData.indices.size()) - meshData.indexOffset;
+		if (meshData.indexCount != 0)
+		{
+			modelData.meshes.push_back(meshData);
+		}
 
 		//SkinCluster
 		for (uint32_t boneIndex = 0; boneIndex < mesh->mNumBones; ++boneIndex)
@@ -678,22 +716,5 @@ bool Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 			}
 		}
 	}
-	//material解析
-	for (uint32_t materialIndex = 0; materialIndex < scene->mNumMaterials; ++materialIndex)
-	{
-		aiMaterial* material = scene->mMaterials[materialIndex];
-		if (material->GetTextureCount(aiTextureType_DIFFUSE) != 0)
-		{
-			aiString textureFilePath;
-			material->GetTexture(aiTextureType_DIFFUSE, 0, &textureFilePath);
-			const std::filesystem::path modelPath = std::filesystem::path(directoryPath) / filename;
-			const std::filesystem::path texturePath = std::filesystem::path(textureFilePath.C_Str());
-			if (texturePath.is_absolute()) {
-				modelData.material.textureFilePath = texturePath.generic_string();
-			} else {
-				modelData.material.textureFilePath = (modelPath.parent_path() / texturePath).generic_string();
-			}
-		}
-	}
-	return !modelData.vertices.empty() && !modelData.indices.empty();
+	return !modelData.vertices.empty() && !modelData.indices.empty() && !modelData.meshes.empty();
 }

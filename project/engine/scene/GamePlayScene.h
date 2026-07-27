@@ -129,6 +129,8 @@ private:
 
     std::vector<std::unique_ptr<Object3d>> normalObjects;//通常モデル  
     std::vector<std::unique_ptr<Object3d>> animationObjects;//アニメーションモデル 
+    std::unique_ptr<Object3d> handWeapon_;
+	Object3d* walkObject_ = nullptr;
 
     std::vector<std::unique_ptr<Sprite>> sprites;
 	Ecs::World ecsWorld_;
