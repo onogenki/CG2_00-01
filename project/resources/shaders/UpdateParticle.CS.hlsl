@@ -18,12 +18,23 @@ static const uint32_t kMaxParticles = 1024;
 RWStructuredBuffer<Particle> gParticles : register(u0);
 RWStructuredBuffer<int32_t> gFreeListIndex : register(u1);
 RWStructuredBuffer<int32_t> gFreeList : register(u2);
+RWStructuredBuffer<uint32_t> gActiveParticleIndices : register(u3);
+RWStructuredBuffer<uint32_t> gDrawArguments : register(u4);
 ConstantBuffer<PerFrame> gPerFrame : register(b1);
 
 [numthreads(1024, 1, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     const uint32_t particleIndex = DTid.x;
+    if (particleIndex == 0)
+    {
+        gDrawArguments[0] = 6;
+        gDrawArguments[1] = 0;
+        gDrawArguments[2] = 0;
+        gDrawArguments[3] = 0;
+    }
+    GroupMemoryBarrierWithGroupSync();
+
     if (particleIndex < kMaxParticles && gParticles[particleIndex].color.a != 0.0f)
     {
         Particle particle = gParticles[particleIndex];
@@ -46,5 +57,11 @@ void main(uint3 DTid : SV_DispatchThreadID)
             }
         }
         gParticles[particleIndex] = particle;
+        if (particle.color.a != 0.0f)
+        {
+            uint32_t activeParticleIndex;
+            InterlockedAdd(gDrawArguments[1], 1, activeParticleIndex);
+            gActiveParticleIndices[activeParticleIndex] = particleIndex;
+        }
     }
 }

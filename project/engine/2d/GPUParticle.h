@@ -26,6 +26,22 @@ public:
 	void Finalize();
 
 private:
+	enum ComputeRootParameter : uint32_t
+	{
+		kComputeRootParameterUav,
+		kComputeRootParameterEmitter,
+		kComputeRootParameterPerFrame,
+		kComputeRootParameterCount,
+	};
+
+	enum GraphicsRootParameter : uint32_t
+	{
+		kGraphicsRootParameterPerView,
+		kGraphicsRootParameterParticle,
+		kGraphicsRootParameterTexture,
+		kGraphicsRootParameterCount,
+	};
+
 	struct Particle
 	{
 		Vector3 translate;
@@ -76,12 +92,17 @@ private:
 	DirectXCommon* dxCommon_ = nullptr;
 	SrvManager* srvManager_ = nullptr;
 	uint32_t particleSrvIndex_ = SrvManager::kInvalidSrvIndex;
+	uint32_t activeParticleIndicesSrvIndex_ = SrvManager::kInvalidSrvIndex;
 	uint32_t particleUavIndex_ = SrvManager::kInvalidSrvIndex;
 	uint32_t freeListIndexUavIndex_ = SrvManager::kInvalidSrvIndex;
 	uint32_t freeListUavIndex_ = SrvManager::kInvalidSrvIndex;
+	uint32_t activeParticleIndicesUavIndex_ = SrvManager::kInvalidSrvIndex;
+	uint32_t drawArgumentsUavIndex_ = SrvManager::kInvalidSrvIndex;
 	Microsoft::WRL::ComPtr<ID3D12Resource> particleResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> freeListIndexResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> freeListResource_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> activeParticleIndicesResource_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> drawArgumentsResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> perViewResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> emitterResource_;
@@ -96,4 +117,5 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> updatePipelineState_;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> graphicsRootSignature_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState_;
+	Microsoft::WRL::ComPtr<ID3D12CommandSignature> drawCommandSignature_;
 };

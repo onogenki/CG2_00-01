@@ -50,9 +50,8 @@ class RandomGenerator
 
     float Generate1d()
     {
-        float result = rand3dTo1d(seed, float32_t3(41.731f, 17.903f, 91.147f));
-        seed.x = result;
-        return result;
+        seed = rand3dTo3d(seed + float32_t3(41.731f, 17.903f, 91.147f));
+        return seed.x;
     }
 };
 

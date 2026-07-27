@@ -28,11 +28,13 @@ struct VertexShaderOutput
 };
 
 StructuredBuffer<Particle> gParticles : register(t0);
+StructuredBuffer<uint32_t> gActiveParticleIndices : register(t1);
 ConstantBuffer<PerView> gPerView : register(b0);
 
 VertexShaderOutput main(VertexShaderInput input, uint32_t instanceId : SV_InstanceID)
 {
-    Particle particle = gParticles[instanceId];
+    uint32_t particleIndex = gActiveParticleIndices[instanceId];
+    Particle particle = gParticles[particleIndex];
     float32_t4x4 worldMatrix = gPerView.billboardMatrix;
     worldMatrix[0] *= particle.scale.x;
     worldMatrix[1] *= particle.scale.y;
