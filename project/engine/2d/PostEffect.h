@@ -25,9 +25,11 @@ public:
 	void Draw(uint32_t sourceSrvIndex, bool useEffect);
 	void SetGrayscale(bool isGrayscale) { isGrayscale_ = isGrayscale; }
 	void SetSepia(bool isSepia) { isSepia_ = isSepia; }
+	void SetVignette(bool isVignette) { isVignette_ = isVignette; }
 	bool IsGrayscale() const { return isGrayscale_; }
 	bool IsSepia() const { return isSepia_; }
-	bool IsEnabled() const { return isGrayscale_ || isSepia_; }
+	bool IsVignette() const { return isVignette_; }
+	bool IsEnabled() const { return isGrayscale_ || isSepia_ || isVignette_; }
 
 private:
 	PostEffect() = default;
@@ -39,6 +41,7 @@ private:
 		Fullscreen,
 		Grayscale,
 		Sepia,
+		Vignette,
 		Count
 	};
 
@@ -53,4 +56,5 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineStates_[static_cast<int>(PipelineType::Count)];
 	bool isGrayscale_ = false;
 	bool isSepia_ = false;
+	bool isVignette_ = false;
 };

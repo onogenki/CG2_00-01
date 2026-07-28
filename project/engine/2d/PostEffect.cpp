@@ -27,6 +27,8 @@ void PostEffect::Draw(uint32_t sourceSrvIndex, bool useEffect)
 	commandList->SetGraphicsRootSignature(rootSignature_.Get());
 	const PipelineType pipelineType = !useEffect
 		? PipelineType::Fullscreen
+		: isVignette_
+		? PipelineType::Vignette
 		: isSepia_
 		? PipelineType::Sepia
 		: (isGrayscale_ ? PipelineType::Grayscale : PipelineType::Fullscreen);
@@ -97,6 +99,7 @@ void PostEffect::CreateGraphicsPipeline()
 	CreateGraphicsPipelineState(PipelineType::Fullscreen, L"resources/shaders/Fullscreen.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::Grayscale, L"resources/shaders/Grayscale.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::Sepia, L"resources/shaders/Sepia.PS.hlsl");
+	CreateGraphicsPipelineState(PipelineType::Vignette, L"resources/shaders/Vignette.PS.hlsl");
 }
 
 void PostEffect::CreateGraphicsPipelineState(PipelineType type, const wchar_t* pixelShaderPath)
