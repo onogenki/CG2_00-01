@@ -29,9 +29,7 @@ private:
 	void ScanResourceShelf();
 	void DrawTitleModelShelfImGui();
 	void DrawTitleInspectorImGui();
-	void HandleTitleShelfDropOnEditView();
-	void DrawTitleEditViewport();
-	void DrawTitleSpriteEditViewport();
+	void HandleTitleShelfDropOnGameView();
 	bool AddModelToTitle(const std::string& fileName);
 	bool AddTextureToTitle(const std::string& textureFilePath);
 
@@ -48,14 +46,7 @@ private:
 	//最初からタイトルに置くスプライトの数です。追加したスプライトだけを削除できるようにします。
 	size_t baseSpriteCount_ = 0;
 	size_t selectedTitleSpriteIndex_ = 0;
-	bool hasSelectedTitleSprite_ = false;
 	int inspectorAutoSelectSpriteFrames_ = 0;
-	SceneEditor::ViewportState viewportEditorState_{};
-	SceneEditor::SpriteViewportState spriteViewportEditorState_{};
-	bool hasSelectedTitleObject_ = false;
-	bool selectedTitleObjectIsAnimation_ = false;
-	size_t selectedTitleObjectIndex_ = 0;
-	int inspectorAutoSelectModelFrames_ = 0;
 	Object3d* obj = nullptr;
 	bool isFinished_ = false;
 };

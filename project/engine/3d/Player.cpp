@@ -70,8 +70,11 @@ void Player::Update(float deltaTime, const std::vector<OBB>& solidObbs)
 	isColliding_ = false;
 
 	//solidObbsには、床や鏡などプレイヤーがぶつかる全てのOBBが入っている
-	for (const OBB& solidObb : solidObbs)
-	{
+	// 斜めのOBBや複数のOBBが重なった場面でも、球をすべての箱の外へ安定して押し戻す。
+	constexpr int kCollisionSolveCount = 3;
+	for (int solveIndex = 0; solveIndex < kCollisionSolveCount; ++solveIndex) {
+		for (const OBB& solidObb : solidObbs)
+		{
 		const Sphere playerSphere{ position_,radius_ };
 		const Collision::CollisionInfo collision =
 			Collision::SphereOBB(playerSphere, solidObb);
@@ -101,5 +104,7 @@ void Player::Update(float deltaTime, const std::vector<OBB>& solidObbs)
 	}
 
 	//計算した位置を、画面に描く球モデルへ反映する
+	}
+
 	object_.SetTranslate(position_);
 }

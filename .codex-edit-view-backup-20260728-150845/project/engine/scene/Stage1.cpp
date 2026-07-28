@@ -161,7 +161,6 @@ void Stage1::Initialize()
 	stageMapHotReload_.SetFilePath(kStageMapFilePath);
 	ReloadStageMap();
 	stageMapHotReload_.Synchronize();
-	SceneEditor::ScanResourceShelf(stageShelfState_);
 }
 
 void Stage1::Finalize()
@@ -191,9 +190,7 @@ void Stage1::Update()
 {
 	// ---------- Stage1マップのホットリロード ----------
 	UpdateStageMapHotReload();
-	if (ImGuiManager::GetInstance()->IsGameViewActive()) {
-		UpdateStageMapPaths(DirectXCommon::GetInstance()->GetDeltaTime());
-	}
+	UpdateStageMapPaths(DirectXCommon::GetInstance()->GetDeltaTime());
 
 	// ---------- プレイヤーの移動と重力 ----------
 	if (player_ && floor_ && mirrorVisual_) {
@@ -219,69 +216,56 @@ void Stage1::Update()
 				runtimeObject.colliderLocalHalfSize);
 			solidObbs.push_back(runtimeObject.collider);
 		}
-		if (ImGuiManager::GetInstance()->IsGameViewActive()) {
-			player_->Update(DirectXCommon::GetInstance()->GetDeltaTime(), solidObbs);
-		}
+		player_->Update(DirectXCommon::GetInstance()->GetDeltaTime(), solidObbs);
 	}
 
 	// ---------- カメラとデバッグ UI の更新 ----------
-	if (ImGuiManager::GetInstance()->IsGameViewActive()) {
-		UpdateMainCamera();
-		UpdateStageEvents();
-	} else if (!activeEventCameraName_.empty()) {
-		// Edit Viewではイベントカメラへ自動切替せず、編集用のMainCameraを維持する。
-		cameraManager->SetActiveCamera("MainCamera");
-		activeEventCameraName_.clear();
-	}
+	UpdateMainCamera();
+	UpdateStageEvents();
 	cameraManager->Update();
 	UpdateReflectionCamera();
 	ImGuiManager::GetInstance()->Begin("Stage1");
-	if (ImGuiManager::GetInstance()->IsEditViewActive()) {
-		DrawMirrorDebugUi();
-		DrawCollisionDebugUi();
-		const LevelEditorResult levelEditorResult =
-			ImGuiManager::GetInstance()->LevelHotReloadWindow(
+	DrawMirrorDebugUi();
+	DrawCollisionDebugUi();
+	const LevelEditorResult levelEditorResult =
+		ImGuiManager::GetInstance()->LevelHotReloadWindow(
 		autoStageMapReload_,
 		stageMapHotReload_.GetFilePath(),
 		stageMapReloadStatus_,
 		stageMapData_.get(),
 		selectedStageMapObjectIndex_);
-		if (levelEditorResult.reloadRequested) {
-			ReloadStageMap();
-			stageMapHotReload_.Synchronize();
-		} else {
-			if (levelEditorResult.dataChanged) {
-				if (ApplyStageMapData(false)) {
-					stageMapReloadStatus_ = "Edited in memory. Press Save Map to keep it.";
-				}
+	if (levelEditorResult.reloadRequested) {
+		ReloadStageMap();
+		stageMapHotReload_.Synchronize();
+	} else {
+		if (levelEditorResult.dataChanged) {
+			if (ApplyStageMapData(false)) {
+				stageMapReloadStatus_ = "Edited in memory. Press Save Map to keep it.";
 			}
-			if (levelEditorResult.addSphereRequested) {
-				if (AddStageMapSphere()) {
-					SaveStageMap();
-				}
-			}
-			if (levelEditorResult.addEventPairRequested) {
-				if (AddStageMapEventPair()) {
-					SaveStageMap();
-				}
-			}
-			if (levelEditorResult.addPathSphereRequested) {
-				if (AddStageMapPathSphere()) {
-					SaveStageMap();
-				}
-			}
-			if (levelEditorResult.removeSelectedRequested) {
-				if (RemoveSelectedStageMapObject()) {
-					SaveStageMap();
-				}
-			}
-		if (levelEditorResult.saveRequested) {
+		}
+		if (levelEditorResult.addSphereRequested) {
+			if (AddStageMapSphere()) {
 				SaveStageMap();
 			}
 		}
-		DrawStageEditViewport();
-		DrawStageModelShelf();
-		HandleStageShelfDropOnEditView();
+		if (levelEditorResult.addEventPairRequested) {
+			if (AddStageMapEventPair()) {
+				SaveStageMap();
+			}
+		}
+		if (levelEditorResult.addPathSphereRequested) {
+			if (AddStageMapPathSphere()) {
+				SaveStageMap();
+			}
+		}
+		if (levelEditorResult.removeSelectedRequested) {
+			if (RemoveSelectedStageMapObject()) {
+				SaveStageMap();
+			}
+		}
+		if (levelEditorResult.saveRequested) {
+			SaveStageMap();
+		}
 	}
 	ImGuiManager::GetInstance()->End();
 
@@ -398,17 +382,12 @@ void Stage1::UpdateMainCamera()
 	//右マウスドラッグで高さを調整し、ホイールでプレイヤーとの距離を調整する
 	Input* input = Input::GetInstance();
 	if (input->IsMouseButtonPressed(1)) {
-		// 横方向はPlayerの周囲を回り、縦方向はカメラの高さを変えます。
-		cameraController_->SetOrbitYaw(
-			cameraController_->GetOrbitYaw() -
-			static_cast<float>(input->GetMouseX()) * 0.005f);
 		const float height = std::clamp(
 			cameraController_->GetHeight() - static_cast<float>(input->GetMouseY()) * 0.02f,
 			1.0f,
 			12.0f);
 		cameraController_->SetHeight(height);
 	}
-	// ホイールはPlayerからの距離を調整します。
 	const float distance = std::clamp(
 		cameraController_->GetDistance() - static_cast<float>(input->GetMouseWheel()) * 0.005f,
 		3.0f,
@@ -541,79 +520,6 @@ void Stage1::DrawCollisionDebugUi()
 			cameraManager->GetActiveCamera(),
 			eventCamera.sourceName == activeEventCameraName_);
 	}
-}
-
-void Stage1::DrawStageEditViewport()
-{
-#ifdef USE_IMGUI
-	if (!stageMapData_) {
-		return;
-	}
-
-	SceneEditor::ViewportOptions options{};
-	options.camera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
-	std::vector<std::string> sourceNames;
-	const auto addObject = [&](const std::string& sourceName, Object3d* object) {
-		if (!object) {
-			return;
-		}
-		sourceNames.push_back(sourceName);
-		options.objects.push_back({ sourceName, object });
-	};
-
-	for (const LevelLoader::ObjectData& objectData : stageMapData_->objects) {
-		if (objectData.tag == "Floor") {
-			addObject(objectData.name, floor_);
-		} else if (objectData.tag == "Mirror") {
-			addObject(objectData.name, mirrorVisual_.get());
-		}
-	}
-	for (StageMapRuntimeObject& runtimeObject : stageMapRuntimeObjects_) {
-		addObject(runtimeObject.sourceName, runtimeObject.visual.get());
-	}
-
-	viewportEditorState_.selectedIndex = -1;
-	if (selectedStageMapObjectIndex_ >= 0 &&
-		selectedStageMapObjectIndex_ < static_cast<int>(stageMapData_->objects.size())) {
-		const std::string& selectedName = stageMapData_->objects[selectedStageMapObjectIndex_].name;
-		const auto found = std::find(sourceNames.begin(), sourceNames.end(), selectedName);
-		if (found != sourceNames.end()) {
-			viewportEditorState_.selectedIndex = static_cast<int>(std::distance(sourceNames.begin(), found));
-		}
-	}
-
-	options.onSelectionChanged = [this, &sourceNames](int viewportIndex) {
-		if (viewportIndex < 0 || viewportIndex >= static_cast<int>(sourceNames.size()) || !stageMapData_) {
-			return;
-		}
-		const std::string& selectedName = sourceNames[viewportIndex];
-		for (int objectIndex = 0; objectIndex < static_cast<int>(stageMapData_->objects.size()); ++objectIndex) {
-			if (stageMapData_->objects[objectIndex].name == selectedName) {
-				selectedStageMapObjectIndex_ = objectIndex;
-				return;
-			}
-		}
-	};
-	options.onTransformChanged = [this, &sourceNames](int viewportIndex, const Transform& transform) {
-		if (viewportIndex < 0 || viewportIndex >= static_cast<int>(sourceNames.size()) || !stageMapData_) {
-			return;
-		}
-		const std::string& selectedName = sourceNames[viewportIndex];
-		for (LevelLoader::ObjectData& objectData : stageMapData_->objects) {
-			if (objectData.name != selectedName) {
-				continue;
-			}
-			objectData.translation = transform.translate;
-			objectData.rotation = transform.rotate;
-			objectData.scaling = transform.scale;
-			if (ApplyStageMapData(false)) {
-				stageMapReloadStatus_ = "Edited in Edit View. Press Save Map to keep it.";
-			}
-			return;
-		}
-	};
-	SceneEditor::DrawViewportEditor(viewportEditorState_, options);
-#endif
 }
 
 void Stage1::UpdateStageMapHotReload()
@@ -911,105 +817,6 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 	}
 
 	return true;
-}
-
-void Stage1::DrawStageModelShelf()
-{
-#ifdef USE_IMGUI
-	SceneEditor::ShelfCallbacks callbacks{};
-	callbacks.sceneLabel = "Stage1 Edit View";
-	if (stageMapData_) {
-		callbacks.addedModelCount = static_cast<size_t>(std::count_if(
-			stageMapData_->objects.begin(),
-			stageMapData_->objects.end(),
-			[](const LevelLoader::ObjectData& objectData) { return objectData.tag == "EditorAdded"; }));
-	}
-	callbacks.addModel = [this](const std::string& fileName) {
-		const bool added = AddStageMapModel(fileName);
-		if (added) {
-			SaveStageMap();
-		}
-		return added;
-	};
-	callbacks.addTexture = [](const std::string&) { return false; };
-	callbacks.clearAdded = [this]() { ClearStageMapEditorAddedObjects(); };
-	SceneEditor::DrawModelShelf(stageShelfState_, callbacks);
-#endif
-}
-
-void Stage1::HandleStageShelfDropOnEditView()
-{
-#ifdef USE_IMGUI
-	SceneEditor::ShelfCallbacks callbacks{};
-	callbacks.sceneLabel = "Stage1 Edit View";
-	callbacks.addModel = [this](const std::string& fileName) {
-		const bool added = AddStageMapModel(fileName);
-		if (added) {
-			SaveStageMap();
-		}
-		return added;
-	};
-	callbacks.addTexture = [](const std::string&) { return false; };
-	SceneEditor::HandleShelfDropOnEditView(stageShelfState_, callbacks);
-#endif
-}
-
-bool Stage1::AddStageMapModel(const std::string& fileName)
-{
-	if (!stageMapData_ || fileName.empty()) {
-		stageMapReloadStatus_ = "Add failed. No map data or model name.";
-		return false;
-	}
-
-	int number = 1;
-	std::string objectName;
-	do {
-		objectName = "EditorModel" + std::to_string(number++);
-	} while (std::any_of(
-		stageMapData_->objects.begin(),
-		stageMapData_->objects.end(),
-		[&](const LevelLoader::ObjectData& objectData) { return objectData.name == objectName; }));
-
-	LevelLoader::ObjectData objectData{};
-	objectData.type = "MESH";
-	objectData.name = objectName;
-	objectData.tag = "EditorAdded";
-	objectData.objectType = "STATIC";
-	objectData.fileName = fileName;
-	objectData.translation = player_ ? player_->GetPosition() : Vector3{};
-	objectData.translation.y += 1.0f;
-	objectData.translation.z += 3.0f;
-	objectData.scaling = { 1.0f, 1.0f, 1.0f };
-
-	stageMapData_->objects.push_back(std::move(objectData));
-	selectedStageMapObjectIndex_ = static_cast<int>(stageMapData_->objects.size()) - 1;
-	if (!ApplyStageMapData(true)) {
-		stageMapData_->objects.pop_back();
-		stageMapReloadStatus_ = "Add failed. Model could not be loaded: " + fileName;
-		return false;
-	}
-	stageMapReloadStatus_ = "Added model from Edit View: " + fileName;
-	return true;
-}
-
-void Stage1::ClearStageMapEditorAddedObjects()
-{
-	if (!stageMapData_) {
-		return;
-	}
-	std::vector<LevelLoader::ObjectData>& objects = stageMapData_->objects;
-	objects.erase(
-		std::remove_if(
-			objects.begin(),
-			objects.end(),
-			[](const LevelLoader::ObjectData& objectData) { return objectData.tag == "EditorAdded"; }),
-		objects.end());
-	selectedStageMapObjectIndex_ = objects.empty()
-		? -1
-		: std::clamp(selectedStageMapObjectIndex_, 0, static_cast<int>(objects.size()) - 1);
-	ApplyStageMapData(true);
-	SaveStageMap();
-	stageMapReloadStatus_ = "Cleared models added from Edit View.";
 }
 
 bool Stage1::AddStageMapSphere()

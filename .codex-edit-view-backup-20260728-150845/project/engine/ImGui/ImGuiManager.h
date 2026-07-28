@@ -23,13 +23,6 @@ class Sprite;
 struct Transform;
 class Mirror;
 
-// シーン映像をゲームとして操作するか、編集画面として操作するかを表します。
-enum class SceneViewMode
-{
-	Game,
-	Edit,
-};
-
 // Stage Map Editorで押された操作と、編集中の変更をSceneへ返します。
 struct LevelEditorResult
 {
@@ -101,10 +94,6 @@ public:
 	bool IsMouseOverGameView(float mouseScreenX, float mouseScreenY) const;
 	bool GetGameViewRect(float& x, float& y, float& width, float& height) const;
 	bool GetGameViewScreenRect(int& x, int& y, int& width, int& height) const;
-	// 現在表示中の中央ビューが編集用かを返します。
-	bool IsEditViewActive() const;
-	// 現在表示中の中央ビューがゲーム用かを返します。
-	bool IsGameViewActive() const;
 	unsigned int GetInspectorDockId() const;
 
 	// Game View上へスケルトンを重ねて描画する
@@ -121,14 +110,10 @@ private:
 	void BeginDockSpace(const char* sceneName);
 	void ResetLayoutToDefault();
 	void BuildDefaultDockLayout(ImGuiID dockspaceId);
-	void SceneViewWindow(const char* windowName, SceneViewMode mode, bool& isOpen);
 	void GameViewWindow();
-	void EditViewWindow();
-	void RuntimeMonitorWindow(const char* sceneName);
 	void SceneWindow(const char* sceneName);
 
 	bool showGameView_ = true;
-	bool showEditView_ = true;
 	bool showSceneWindow_ = true;
 	bool showFpsWindow_ = true;
 	bool showSpriteWindow_ = true;
@@ -148,7 +133,6 @@ private:
 	ImVec2 gameViewImageMin_{};
 	ImVec2 gameViewImageSize_{};
 	ImDrawList* gameViewDrawList_ = nullptr;
-	SceneViewMode activeSceneViewMode_ = SceneViewMode::Game;
 	ImGuiID inspectorDockId_ = 0;
 #endif
 };

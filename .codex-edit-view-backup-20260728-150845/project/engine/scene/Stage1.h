@@ -6,7 +6,6 @@
 #include "LevelLoader.h"
 #include "Mirror.h"
 #include "Player.h"
-#include "SceneEditor.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -80,11 +79,6 @@ private:
 	void DrawMirrorDebugUi();
 	//床のOBBを、衝突状態に応じた色のワイヤーで表示します。
 	void DrawCollisionDebugUi();
-	// Edit Viewで床・鏡・追加モデルをクリック編集し、LevelDataへ同期します。
-	void DrawStageEditViewport();
-	// Edit View下部へ共通モデル棚を表示し、Stage1へモデルを追加します。
-	void DrawStageModelShelf();
-	void HandleStageShelfDropOnEditView();
 	// Stage1の外部マップファイルが保存されたかを確認します。
 	void UpdateStageMapHotReload();
 	// Stage1の外部マップファイルを読み、成功した場合だけ床と鏡へ反映します。
@@ -95,8 +89,6 @@ private:
 	bool ApplyStageMapData(bool rebuildRuntimeObjects);
 	// ワンボタン配置用のsphere.objデータをLevelDataへ追加します。
 	bool AddStageMapSphere();
-	bool AddStageMapModel(const std::string& fileName);
-	void ClearStageMapEditorAddedObjects();
 	// 選択中の追加オブジェクトをLevelDataから削除します。
 	bool RemoveSelectedStageMapObject();
 	// イベントトリガーとイベントカメラを一組でLevelDataへ追加します。
@@ -150,8 +142,6 @@ private:
 	std::string activeEventCameraName_;
 	// Hot Reloadウィンドウで選択しているオブジェクト番号です。
 	int selectedStageMapObjectIndex_ = 0;
-	SceneEditor::ViewportState viewportEditorState_{};
-	SceneEditor::ShelfState stageShelfState_{};
 	// ファイル保存時に自動で再読込するかを切り替えます。
 	bool autoStageMapReload_ = true;
 	// ImGuiへ表示する、直近の再読込結果です。

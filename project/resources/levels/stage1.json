@@ -1,0 +1,310 @@
+{
+    "coordinate_system": "engine",
+    "name": "scene",
+    "objects": [
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    20.0,
+                    3.000001907348633,
+                    20.0
+                ],
+                "type": "BOX"
+            },
+            "file_name": "floor.obj",
+            "name": "StageFloor",
+            "object_type": "STATIC",
+            "tag": "Floor",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    0.0,
+                    -3.5000009536743164,
+                    5.0
+                ]
+            },
+            "type": "MESH"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    2.0,
+                    2.0,
+                    0.10000000149011612
+                ],
+                "type": "BOX"
+            },
+            "file_name": "plane.obj",
+            "name": "StageMirror",
+            "object_type": "STATIC",
+            "tag": "Mirror",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    180.0,
+                    0.0
+                ],
+                "scaling": [
+                    3.0,
+                    3.0,
+                    1.0
+                ],
+                "translation": [
+                    0.0,
+                    1.0,
+                    8.0
+                ]
+            },
+            "type": "MESH"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "type": "BOX"
+            },
+            "file_name": "sphere.obj",
+            "name": "MapSphere1",
+            "object_type": "STATIC",
+            "tag": "MapObject",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    3.9000000953674316,
+                    0.7000001072883606,
+                    2.450000047683716
+                ]
+            },
+            "type": "MESH"
+        },
+        {
+            "camera_focus": [
+                0.0,
+                0.2000001072883606,
+                10.605470657348633
+            ],
+            "name": "EventCamera1",
+            "object_type": "EVENT_CAMERA",
+            "tag": "EventCamera",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    7.050000190734863,
+                    -1.0499999523162842,
+                    1.6549999713897705
+                ]
+            },
+            "type": "CAMERA"
+        },
+        {
+            "collider": {
+                "center": [
+                    1.649999976158142,
+                    0.0,
+                    0.25
+                ],
+                "size": [
+                    4.0,
+                    3.0,
+                    4.0
+                ],
+                "type": "BOX"
+            },
+            "event_camera": "EventCamera1",
+            "event_id": "Event1",
+            "name": "EventTrigger1",
+            "object_type": "EVENT_TRIGGER",
+            "tag": "EventTrigger",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    0.05000000074505806,
+                    -0.7999998927116394,
+                    7.454999923706055
+                ]
+            },
+            "type": "EMPTY"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "type": "BOX"
+            },
+            "control_points": [
+                [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                [
+                    2.0,
+                    1.0,
+                    2.0
+                ],
+                [
+                    -2.0,
+                    2.0,
+                    4.0
+                ],
+                [
+                    0.0,
+                    0.0,
+                    6.0
+                ]
+            ],
+            "file_name": "sphere.obj",
+            "name": "PathSphere1",
+            "object_type": "PATH_OBJECT",
+            "path_loop": true,
+            "path_speed": 1.0,
+            "tag": "MapObject",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    -4.0,
+                    0.7000000476837158,
+                    4.920739650726318
+                ]
+            },
+            "type": "MESH"
+        },
+        {
+            "camera_focus": [
+                5.063324451446533,
+                0.19999998807907104,
+                6.544574737548828
+            ],
+            "name": "EventCamera2",
+            "object_type": "EVENT_CAMERA",
+            "tag": "EventCamera",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    11.063323974609375,
+                    3.200000047683716,
+                    -1.4554252624511719
+                ]
+            },
+            "type": "CAMERA"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    4.0,
+                    3.0,
+                    4.0
+                ],
+                "type": "BOX"
+            },
+            "event_camera": "EventCamera2",
+            "event_id": "Event2",
+            "name": "EventTrigger2",
+            "object_type": "EVENT_TRIGGER",
+            "tag": "EventTrigger",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    5.063324451446533,
+                    -0.800000011920929,
+                    6.544574737548828
+                ]
+            },
+            "type": "EMPTY"
+        }
+    ]
+}

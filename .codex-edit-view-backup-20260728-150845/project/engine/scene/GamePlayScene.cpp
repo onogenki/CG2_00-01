@@ -627,6 +627,11 @@ void GamePlayScene::ClearSceneObjectSelection()
 	hasSelectedSceneObject_ = false;
 	selectedSceneObjectIsAnimation_ = false;
 	selectedSceneObjectIndex_ = 0;
+	activeGizmoAxis_ = GizmoAxis::None;
+	isDraggingGizmo_ = false;
+	activeGizmoScreenDirectionX_ = 0.0f;
+	activeGizmoScreenDirectionY_ = 0.0f;
+	activeGizmoWorldDirection_ = { 1.0f, 0.0f, 0.0f };
 	inspectorAutoSelectModelFrames_ = 0;
 }
 
@@ -664,6 +669,8 @@ void GamePlayScene::ClearSceneSpriteSelection()
 {
 	hasSelectedSceneSprite_ = false;
 	selectedSceneSpriteIndex_ = 0;
+	activeSpriteGizmoAxis_ = GizmoAxis::None;
+	isDraggingSpriteGizmo_ = false;
 	inspectorAutoSelectSpriteFrames_ = 0;
 }
 
@@ -883,29 +890,30 @@ void GamePlayScene::UpdateGameViewCameraControl()
 	if (!activeCamera) {
 		return;
 	}
-	const bool isEditView = ImGuiManager::GetInstance()->IsEditViewActive();
-	if (isEditView && !isModelPreviewMode_) {
-		// Edit Viewのカメラは共通SceneEditorが担当し、二重操作を防ぐ。
+	if (isDraggingGizmo_ || isDraggingSpriteGizmo_) {
 		isGameViewCameraDragging_ = false;
 		return;
 	}
+
 	Input* input = Input::GetInstance();
 	const Vector2 mouseScreen = input->GetMouseScreen();
 	const bool isMouseOverGameView = ImGuiManager::GetInstance()->IsMouseOverGameView(mouseScreen.x, mouseScreen.y);
 	const bool isMouseButtonDown =
-		(!isEditView && input->IsMouseButtonPressed(0)) ||
+		input->IsMouseButtonPressed(0) ||
 		input->IsMouseButtonPressed(1) ||
 		input->IsMouseButtonPressed(2);
 
 	if (!isMouseButtonDown) {
 		isGameViewCameraDragging_ = false;
 	}
-	const bool startedAllowedCameraButton =
-		(!isEditView && input->TriggerMouseButton(0)) ||
-		input->TriggerMouseButton(1) ||
-		input->TriggerMouseButton(2);
+	const bool isLeftMouseOnGizmo =
+		input->TriggerMouseButton(0) &&
+		(IsMouseOverSelectedObjectGizmo(mouseScreen.x, mouseScreen.y) ||
+			IsMouseOverSelectedSpriteGizmo(mouseScreen.x, mouseScreen.y));
+
 	if (isMouseOverGameView &&
-		startedAllowedCameraButton) {
+		!isLeftMouseOnGizmo &&
+		(input->TriggerMouseButton(0) || input->TriggerMouseButton(1) || input->TriggerMouseButton(2))) {
 		isGameViewCameraDragging_ = true;
 	}
 
@@ -997,7 +1005,7 @@ void GamePlayScene::UpdateGameViewCameraControl()
 	Vector3 cameraTranslate = activeCamera->GetTranslate();
 	Vector3 cameraRotate = activeCamera->GetRotate();
 
-	if (!isEditView && isGameViewCameraDragging_ && input->IsMouseButtonPressed(0)) {
+	if (isGameViewCameraDragging_ && input->IsMouseButtonPressed(0)) {
 		cameraTranslate.x -= static_cast<float>(input->GetMouseX()) * moveSpeed;
 		cameraTranslate.y += static_cast<float>(input->GetMouseY()) * moveSpeed;
 	}
@@ -1589,9 +1597,6 @@ bool GamePlayScene::SaveReplayClip()
 void GamePlayScene::DrawInspectorImGui()
 {
 #ifdef USE_IMGUI
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
 	const bool autoSelectSpriteInspector = hasSelectedSceneSprite_ && inspectorAutoSelectSpriteFrames_ > 0;
 	const bool autoSelectModelInspector = hasSelectedSceneObject_ && inspectorAutoSelectModelFrames_ > 0;
 	SceneEditor::InspectorOptions options{};
@@ -1641,80 +1646,6 @@ void GamePlayScene::DrawInspectorImGui()
 	if (inspectorAutoSelectModelFrames_ > 0) {
 		--inspectorAutoSelectModelFrames_;
 	}
-#endif
-}
-
-void GamePlayScene::DrawEditViewportImGui()
-{
-#ifdef USE_IMGUI
-	if (!ImGuiManager::GetInstance()->IsEditViewActive() || isModelPreviewMode_) {
-		return;
-	}
-	SceneEditor::ViewportOptions options{};
-	options.camera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
-	for (size_t index = 0; index < normalObjects.size(); ++index) {
-		Object3d* object = normalObjects[index].get();
-		const std::string modelName = object && !object->GetModelName().empty()
-			? object->GetModelName()
-			: "Model";
-		options.objects.push_back({ modelName + " [" + std::to_string(index) + "]", object });
-	}
-	const size_t animationOffset = options.objects.size();
-	for (size_t index = 0; index < animationObjects.size(); ++index) {
-		Object3d* object = animationObjects[index].get();
-		const std::string modelName = object && !object->GetModelName().empty()
-			? object->GetModelName()
-			: "Animation Model";
-		options.objects.push_back({ modelName + " [Animation " + std::to_string(index) + "]", object });
-	}
-
-	if (hasSelectedSceneObject_) {
-		viewportEditorState_.selectedIndex = selectedSceneObjectIsAnimation_
-			? static_cast<int>(animationOffset + selectedSceneObjectIndex_)
-			: static_cast<int>(selectedSceneObjectIndex_);
-	} else {
-		viewportEditorState_.selectedIndex = -1;
-	}
-	options.onSelectionChanged = [this, animationOffset](int index) {
-		if (index < 0) {
-			ClearSceneObjectSelection();
-			return;
-		}
-		if (static_cast<size_t>(index) < animationOffset) {
-			SelectSceneObject(false, static_cast<size_t>(index));
-		} else {
-			SelectSceneObject(true, static_cast<size_t>(index) - animationOffset);
-		}
-	};
-	SceneEditor::DrawViewportEditor(viewportEditorState_, options);
-#endif
-}
-
-void GamePlayScene::DrawSpriteEditViewportImGui()
-{
-#ifdef USE_IMGUI
-	if (!ImGuiManager::GetInstance()->IsEditViewActive() || isModelPreviewMode_) {
-		return;
-	}
-	SceneEditor::SpriteViewportOptions options{};
-	for (size_t index = 0; index < sprites.size(); ++index) {
-		options.sprites.push_back({
-			"2D Texture [" + std::to_string(index) + "]",
-			sprites[index].get(),
-		});
-	}
-	spriteViewportEditorState_.selectedIndex =
-		hasSelectedSceneSprite_ && selectedSceneSpriteIndex_ < sprites.size()
-		? static_cast<int>(selectedSceneSpriteIndex_)
-		: -1;
-	options.onSelectionChanged = [this](int index) {
-		if (index < 0) {
-			ClearSceneSpriteSelection();
-			return;
-		}
-		SelectSceneSprite(static_cast<size_t>(index));
-	};
-	SceneEditor::DrawSpriteViewportEditor(spriteViewportEditorState_, options);
 #endif
 }
 
@@ -1865,9 +1796,6 @@ void GamePlayScene::DrawEcsInspectorImGui()
 void GamePlayScene::DrawModelShelfImGui()
 {
 #ifdef USE_IMGUI
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
 	SceneEditor::ShelfState state{};
 	state.entries = std::move(modelLibrary_);
 	state.selectedEntry = selectedLibraryModel_;
@@ -1879,7 +1807,7 @@ void GamePlayScene::DrawModelShelfImGui()
 	const std::filesystem::path resourceDirectory = std::filesystem::absolute("resources");
 
 	SceneEditor::ShelfCallbacks callbacks{};
-	callbacks.sceneLabel = "Edit View";
+	callbacks.sceneLabel = "Game View";
 	callbacks.addedModelCount = addedNormalCount + addedAnimationCount;
 	callbacks.addedTextureCount = addedTextureCount;
 	callbacks.addModel = [this](const std::string& fileName) { return AddModelToScene(fileName); };
@@ -1906,7 +1834,7 @@ void GamePlayScene::DrawModelShelfImGui()
 		}
 		ImGui::TextDisabled("Preview: %s", previewModelFile_.c_str());
 		ImGui::SameLine();
-		if (ImGui::SmallButton("Back to Scene")) {
+		if (ImGui::SmallButton("Back to Game")) {
 			ExitModelPreview();
 		}
 		ImGui::SameLine();
@@ -1926,13 +1854,9 @@ void GamePlayScene::DrawModelShelfImGui()
 	lastModelShelfMessage_ = state.message;
 #endif
 }
-void GamePlayScene::HandleModelDropOnEditView()
+void GamePlayScene::HandleModelDropOnGameView()
 {
 #ifdef USE_IMGUI
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
-
 	float x = 0.0f;
 	float y = 0.0f;
 	float width = 0.0f;
@@ -1942,7 +1866,7 @@ void GamePlayScene::HandleModelDropOnEditView()
 	}
 
 	const ImRect gameViewRect(ImVec2(x, y), ImVec2(x + width, y + height));
-	if (ImGui::BeginDragDropTargetCustom(gameViewRect, ImGui::GetID("EditViewModelDropTarget"))) {
+	if (ImGui::BeginDragDropTargetCustom(gameViewRect, ImGui::GetID("GameViewModelDropTarget"))) {
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("MODEL_FILE")) {
 			std::string fileName(static_cast<const char*>(payload->Data), payload->DataSize);
 			if (!fileName.empty() && fileName.back() == '\0') {
@@ -1952,12 +1876,12 @@ void GamePlayScene::HandleModelDropOnEditView()
 			const ImVec2 mousePosition = ImGui::GetMousePos();
 			if (TryGetGameViewWorldPosition(mousePosition.x, mousePosition.y, spawnPosition)) {
 				lastModelShelfMessage_ = AddModelToScene(fileName, spawnPosition)
-					? "Added model to Edit View: " + fileName
-					: "Could not add model to Edit View: " + fileName;
+					? "Added model to Game View: " + fileName
+					: "Could not add model to Game View: " + fileName;
 			} else {
 				lastModelShelfMessage_ = AddModelToScene(fileName)
-					? "Added model to Edit View: " + fileName
-					: "Could not add model to Edit View: " + fileName;
+					? "Added model to Game View: " + fileName
+					: "Could not add model to Game View: " + fileName;
 			}
 			ExitModelPreview();
 		}
@@ -1970,12 +1894,12 @@ void GamePlayScene::HandleModelDropOnEditView()
 			const ImVec2 mousePosition = ImGui::GetMousePos();
 			if (TryGetGameViewSpritePosition(mousePosition.x, mousePosition.y, spritePosition)) {
 				lastModelShelfMessage_ = AddTextureToScene(textureFilePath, spritePosition)
-					? "Added 2D Texture to Edit View: " + textureFilePath
-					: "Could not add 2D Texture to Edit View: " + textureFilePath;
+					? "Added 2D Texture to Game View: " + textureFilePath
+					: "Could not add 2D Texture to Game View: " + textureFilePath;
 			} else {
 				lastModelShelfMessage_ = AddTextureToScene(textureFilePath)
-					? "Added 2D Texture to Edit View: " + textureFilePath
-					: "Could not add 2D Texture to Edit View: " + textureFilePath;
+					? "Added 2D Texture to Game View: " + textureFilePath
+					: "Could not add 2D Texture to Game View: " + textureFilePath;
 			}
 			ExitModelPreview();
 		}
@@ -1985,7 +1909,7 @@ void GamePlayScene::HandleModelDropOnEditView()
 	if (ImGui::IsDragDropActive() && gameViewRect.Contains(ImGui::GetMousePos())) {
 		ImDrawList* drawList = ImGui::GetForegroundDrawList();
 		drawList->AddRect(gameViewRect.Min, gameViewRect.Max, IM_COL32(80, 180, 255, 255), 0.0f, 0, 4.0f);
-		drawList->AddText(ImVec2(gameViewRect.Min.x + 16.0f, gameViewRect.Min.y + 16.0f), IM_COL32(180, 230, 255, 255), "Drop into Edit View");
+		drawList->AddText(ImVec2(gameViewRect.Min.x + 16.0f, gameViewRect.Min.y + 16.0f), IM_COL32(180, 230, 255, 255), "Drop model here");
 	}
 #endif
 }
@@ -1993,10 +1917,6 @@ void GamePlayScene::HandleModelDropOnEditView()
 void GamePlayScene::HandleGameViewSpriteSelection()
 {
 #ifdef USE_IMGUI
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
-
 	if (isModelPreviewMode_ || ImGui::IsDragDropActive() || isDraggingSpriteGizmo_) {
 		return;
 	}
@@ -2046,10 +1966,6 @@ void GamePlayScene::HandleGameViewSpriteSelection()
 void GamePlayScene::HandleGameViewObjectSelection()
 {
 #ifdef USE_IMGUI
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
-
 	if (isModelPreviewMode_ || ImGui::IsDragDropActive() || isDraggingGizmo_) {
 		return;
 	}
@@ -2153,13 +2069,9 @@ void GamePlayScene::HandleGameViewObjectSelection()
 #endif
 }
 
-void GamePlayScene::DrawEditViewModelToolsOverlay()
+void GamePlayScene::DrawGameViewModelToolsOverlay()
 {
 #ifdef USE_IMGUI
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
-
 	float x = 0.0f;
 	float y = 0.0f;
 	float width = 0.0f;
@@ -2193,16 +2105,16 @@ void GamePlayScene::DrawEditViewModelToolsOverlay()
 			drawList->AddText(textPos, IM_COL32(190, 220, 255, 255), "Left drag: pan / Right drag: orbit / Wheel: zoom / R: reset");
 		}
 		textPos.y += 20.0f;
-		drawList->AddText(textPos, IM_COL32(190, 220, 255, 255), "Click outside Edit View or selected shelf card to return.");
+		drawList->AddText(textPos, IM_COL32(190, 220, 255, 255), "Click outside Game View or selected shelf card to return.");
 		textPos.y += 20.0f;
 		drawList->AddText(textPos, IM_COL32(255, 220, 120, 255), isTexturePreviewMode_
-			? "Drag this texture card to Edit View, or use Add Selected, to place it."
-			: "Drag this shelf card to Edit View to add it to the scene.");
+			? "Drag this texture card to Game View, or use Add Selected, to place it."
+			: "Drag this shelf card to Game View to add it to the scene.");
 	}
 	else if (ImGui::IsDragDropActive()) {
 		drawList->AddText(textPos, IM_COL32(235, 245, 255, 255), "Drop model here");
 		textPos.y += 20.0f;
-		drawList->AddText(textPos, IM_COL32(190, 220, 255, 255), "Release on Edit View to add the model at the cursor.");
+		drawList->AddText(textPos, IM_COL32(190, 220, 255, 255), "Release on Game View to add the model at the cursor.");
 		drawList->AddRect(gameViewMin, gameViewMax, IM_COL32(80, 180, 255, 240), 0.0f, 0, 3.0f);
 	}
 
@@ -2213,10 +2125,6 @@ void GamePlayScene::DrawEditViewModelToolsOverlay()
 bool GamePlayScene::IsMouseOverSelectedObjectGizmo(float mouseScreenX, float mouseScreenY) const
 {
 #ifdef USE_IMGUI
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return false;
-	}
-
 	const Object3d* selectedObject = GetSelectedSceneObject();
 	if (!selectedObject || isModelPreviewMode_) {
 		return false;
@@ -2300,10 +2208,6 @@ bool GamePlayScene::IsMouseOverSelectedObjectGizmo(float mouseScreenX, float mou
 bool GamePlayScene::IsMouseOverSelectedSpriteGizmo(float mouseScreenX, float mouseScreenY) const
 {
 #ifdef USE_IMGUI
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return false;
-	}
-
 	const Sprite* selectedSprite = GetSelectedSceneSprite();
 	if (!selectedSprite || isModelPreviewMode_) {
 		return false;
@@ -2343,10 +2247,6 @@ bool GamePlayScene::IsMouseOverSelectedSpriteGizmo(float mouseScreenX, float mou
 void GamePlayScene::DrawSelectedSpriteGizmo()
 {
 #ifdef USE_IMGUI
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
-
 	Sprite* selectedSprite = GetSelectedSceneSprite();
 	if (!selectedSprite || isModelPreviewMode_) {
 		return;
@@ -2452,10 +2352,6 @@ void GamePlayScene::DrawSelectedSpriteGizmo()
 void GamePlayScene::DrawSelectedObjectGizmo()
 {
 #ifdef USE_IMGUI
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
-
 	Object3d* selectedObject = GetSelectedSceneObject();
 	if (!selectedObject || isModelPreviewMode_) {
 		return;
@@ -3535,17 +3431,16 @@ void GamePlayScene::Update()
 	// アニメーションの時間確認
 	Vector3 moveDirection{};
 	Input* input = Input::GetInstance();
-	const bool acceptsGameInput = ImGuiManager::GetInstance()->IsGameViewActive();
-	if (acceptsGameInput && input->PushKey(DIK_W)) {
+	if (input->PushKey(DIK_W)) {
 		moveDirection.z += 1.0f;
 	}
-	if (acceptsGameInput && input->PushKey(DIK_S)) {
+	if (input->PushKey(DIK_S)) {
 		moveDirection.z -= 1.0f;
 	}
-	if (acceptsGameInput && input->PushKey(DIK_A)) {
+	if (input->PushKey(DIK_A)) {
 		moveDirection.x -= 1.0f;
 	}
-	if (acceptsGameInput && input->PushKey(DIK_D)) {
+	if (input->PushKey(DIK_D)) {
 		moveDirection.x += 1.0f;
 	}
 	if (walkObject_)
@@ -3634,17 +3529,15 @@ void GamePlayScene::Update()
 	//ゲームの処理
 
 	ImGuiManager::GetInstance()->Begin("GamePlay");
-	// プレビューはEdit View専用とし、Game Viewへ戻った時は通常のシーン表示へ復帰する。
-	if (ImGuiManager::GetInstance()->IsGameViewActive() && isModelPreviewMode_) {
-		ExitModelPreview();
-	}
 	DrawInspectorImGui();
 	DrawModelShelfImGui();
-	HandleModelDropOnEditView();
-	DrawEditViewportImGui();
-	DrawSpriteEditViewportImGui();
+	HandleModelDropOnGameView();
+	HandleGameViewObjectSelection();
+	HandleGameViewSpriteSelection();
 	DrawCollisionDebugOverlay();
-	DrawEditViewModelToolsOverlay();
+	DrawSelectedObjectGizmo();
+	DrawSelectedSpriteGizmo();
+	DrawGameViewModelToolsOverlay();
 #ifdef USE_IMGUI
 	if (isModelPreviewMode_) {
 		if (suppressPreviewExitUntilMouseRelease_) {

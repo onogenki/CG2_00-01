@@ -1,6 +1,7 @@
 #include "ImGuiManager.h"
 #include "SrvManager.h"
 #include "Sprite.h"
+#include "ImGuiManager.h"
 #include "Object3d.h"
 #include "ParticleEmitter.h"
 #include "CameraManager.h"
@@ -153,7 +154,6 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 		}
 		if (ImGui::BeginMenu("Windows")) {
 			ImGui::MenuItem("Game View", nullptr, &showGameView_);
-			ImGui::MenuItem("Edit View", nullptr, &showEditView_);
 			ImGui::MenuItem("Scene", nullptr, &showSceneWindow_);
 			ImGui::TextDisabled("Top Tools contains FPS / Capture / Post Effect");
 			ImGui::Separator();
@@ -185,27 +185,8 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 	}
 	ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
 
-	if (showGameView_) {
-		GameViewWindow();
-	}
-	if (showEditView_) {
-		EditViewWindow();
-	}
-
 	const std::string currentSceneName = sceneName ? sceneName : "";
-	if (showModelWindow_ && IsGameViewActive()) {
-		if (inspectorDockId_ != 0) {
-			ImGui::SetNextWindowDockID(inspectorDockId_, ImGuiCond_Always);
-		}
-		ImGui::Begin("Inspector", &showModelWindow_);
-		ImGui::TextUnformatted("Game View");
-		ImGui::Separator();
-		ImGui::TextWrapped("Scene editing is locked. Switch to Edit View to select or transform objects.");
-		ImGui::End();
-	} else if (showModelWindow_ &&
-		currentSceneName != "GamePlay" &&
-		currentSceneName != "Stage1" &&
-		currentSceneName != "Title") {
+	if (showModelWindow_ && currentSceneName != "GamePlay" && currentSceneName != "Stage1") {
 		if (inspectorDockId_ != 0) {
 			ImGui::SetNextWindowDockID(inspectorDockId_, ImGuiCond_Always);
 		}
@@ -213,6 +194,10 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 		ImGui::TextDisabled("Scene-specific controls are shown below when available.");
 		ImGui::Separator();
 		ImGui::End();
+	}
+
+	if (showGameView_) {
+		GameViewWindow();
 	}
 	if (showSceneWindow_) {
 		SceneWindow(sceneName);
@@ -272,15 +257,13 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 	}
 	ImGui::End();
 
-	if (IsGameViewActive()) {
-		RuntimeMonitorWindow(sceneName);
-	} else if (currentSceneName != "GamePlay" &&
-		currentSceneName != "Title" &&
-		currentSceneName != "Stage1") {
+	if (currentSceneName != "GamePlay") {
 		if (ImGui::Begin("Model Shelf")) {
-			ImGui::TextUnformatted("Edit View Model Shelf");
+			ImGui::TextUnformatted("Common Dock Model Shelf");
 			ImGui::Separator();
-			ImGui::TextWrapped("This scene has not registered a resource shelf yet.");
+			ImGui::TextWrapped("This bottom area is reserved in every scene so the layout stays consistent.");
+			ImGui::BulletText("GamePlay: model / 2D Texture cards, preview, drag placement.");
+			ImGui::BulletText("Title: shared dock placeholder and scene navigation.");
 			if (SceneManager::GetInstance()->GetCurrentSceneName() != "GAMEPLAY") {
 				if (ImGui::Button("Go to GamePlay")) {
 					SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
@@ -301,7 +284,6 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 void ImGuiManager::ResetLayoutToDefault()
 {
 	showGameView_ = true;
-	showEditView_ = true;
 	showSceneWindow_ = true;
 	showFpsWindow_ = true;
 	showSpriteWindow_ = true;
@@ -327,39 +309,26 @@ void ImGuiManager::BuildDefaultDockLayout(ImGuiID dockspaceId)
 	const ImGuiID rightId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Right, 0.40f, nullptr, &centerId);
 	inspectorDockId_ = rightId;
 
-	ImGui::DockBuilderDockWindow("Edit View", centerId);
 	ImGui::DockBuilderDockWindow("Game View", centerId);
 	ImGui::DockBuilderDockWindow("Scene", leftId);
 	ImGui::DockBuilderDockWindow("Top Tools", topId);
 	ImGui::DockBuilderDockWindow("Inspector", rightId);
 	ImGui::DockBuilderDockWindow("Model Shelf", bottomId);
-	ImGui::DockBuilderDockWindow("Runtime Monitor", bottomId);
 	ImGui::DockBuilderFinish(dockspaceId);
 }
 
-void ImGuiManager::SceneViewWindow(const char* windowName, SceneViewMode mode, bool& isOpen)
+void ImGuiManager::GameViewWindow()
 {
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 	ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.015f, 0.015f, 0.015f, 1.0f));
 	const bool isVisible = ImGui::Begin(
-		windowName,
-		&isOpen,
+		"Game View",
+		&showGameView_,
 		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 	ImGui::PopStyleColor();
 	ImGui::PopStyleVar();
 
 	if (isVisible) {
-		const bool isOnlyOpenSceneView =
-			(mode == SceneViewMode::Game && !showEditView_) ||
-			(mode == SceneViewMode::Edit && !showGameView_);
-		const bool shouldActivate =
-			ImGui::GetWindowDockID() != 0 ||
-			isOnlyOpenSceneView ||
-			ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) ||
-			ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
-		if (shouldActivate) {
-			activeSceneViewMode_ = mode;
-		}
 		const ImVec2 available = ImGui::GetContentRegionAvail();
 		const float textureWidth = static_cast<float>(dxCommon_->GetClientWidth());
 		const float textureHeight = static_cast<float>(dxCommon_->GetClientHeight());
@@ -367,54 +336,21 @@ void ImGuiManager::SceneViewWindow(const char* windowName, SceneViewMode mode, b
 			const float scale = (available.x / textureWidth < available.y / textureHeight)
 				? available.x / textureWidth
 				: available.y / textureHeight;
-			const ImVec2 imageSize(textureWidth * scale, textureHeight * scale);
+			gameViewImageSize_ = ImVec2(textureWidth * scale, textureHeight * scale);
 			const ImVec2 contentStart = ImGui::GetCursorScreenPos();
-			const ImVec2 imageMin(
-				contentStart.x + (available.x - imageSize.x) * 0.5f,
-				contentStart.y + (available.y - imageSize.y) * 0.5f);
-			if (activeSceneViewMode_ == mode) {
-				gameViewImageSize_ = imageSize;
-				gameViewImageMin_ = imageMin;
-				gameViewDrawList_ = ImGui::GetWindowDrawList();
-			}
+			gameViewImageMin_ = ImVec2(
+				contentStart.x + (available.x - gameViewImageSize_.x) * 0.5f,
+				contentStart.y + (available.y - gameViewImageSize_.y) * 0.5f);
+			gameViewDrawList_ = ImGui::GetWindowDrawList();
 
 			const uint32_t textureSrvIndex = PostEffect::GetInstance()->IsEnabled()
 				? dxCommon_->GetPostEffectTextureSrvIndex()
 				: dxCommon_->GetRenderTextureSrvIndex();
 			const D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = srvManager_->GetGPUDescriptorHandle(textureSrvIndex);
-			ImGui::SetCursorScreenPos(imageMin);
-			ImGui::Image(ImTextureRef(static_cast<ImTextureID>(textureHandle.ptr)), imageSize);
+			ImGui::SetCursorScreenPos(gameViewImageMin_);
+			ImGui::Image(ImTextureRef(static_cast<ImTextureID>(textureHandle.ptr)), gameViewImageSize_);
 		}
 	}
-	ImGui::End();
-}
-
-void ImGuiManager::GameViewWindow()
-{
-	SceneViewWindow("Game View", SceneViewMode::Game, showGameView_);
-}
-
-void ImGuiManager::EditViewWindow()
-{
-	SceneViewWindow("Edit View", SceneViewMode::Edit, showEditView_);
-}
-
-void ImGuiManager::RuntimeMonitorWindow(const char* sceneName)
-{
-	if (!ImGui::Begin("Runtime Monitor")) {
-		ImGui::End();
-		return;
-	}
-
-	ImGui::TextUnformatted("Game View Runtime Monitor");
-	ImGui::Separator();
-	ImGui::Text("Scene: %s", sceneName ? sceneName : "Unknown");
-	ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-	ImGui::Text("Frame Time: %.2f ms", ImGui::GetIO().DeltaTime * 1000.0f);
-	ImGui::Text("Render Size: %u x %u", dxCommon_->GetClientWidth(), dxCommon_->GetClientHeight());
-	ImGui::Text("Post Effect: %s", PostEffect::GetInstance()->IsEnabled() ? "Enabled" : "Disabled");
-	ImGui::Spacing();
-	ImGui::TextWrapped("Object selection and transform editing are disabled in Game View. Use this mode to test gameplay without accidental edits.");
 	ImGui::End();
 }
 
@@ -542,24 +478,6 @@ bool ImGuiManager::GetGameViewScreenRect(int& x, int& y, int& width, int& height
 	(void)width;
 	(void)height;
 	return false;
-#endif
-}
-
-bool ImGuiManager::IsEditViewActive() const
-{
-#ifdef USE_IMGUI
-	return activeSceneViewMode_ == SceneViewMode::Edit;
-#else
-	return false;
-#endif
-}
-
-bool ImGuiManager::IsGameViewActive() const
-{
-#ifdef USE_IMGUI
-	return activeSceneViewMode_ == SceneViewMode::Game;
-#else
-	return true;
 #endif
 }
 

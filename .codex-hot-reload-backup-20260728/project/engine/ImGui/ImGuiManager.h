@@ -2,7 +2,6 @@
 
 #include "CameraManager.h"
 #include "DirectXCommon.h"
-#include "LevelLoader.h"
 #include "Object3d.h"
 #include "ParticleEmitter.h"
 #include "SrvManager.h"
@@ -22,25 +21,6 @@
 class Sprite;
 struct Transform;
 class Mirror;
-
-// シーン映像をゲームとして操作するか、編集画面として操作するかを表します。
-enum class SceneViewMode
-{
-	Game,
-	Edit,
-};
-
-// Stage Map Editorで押された操作と、編集中の変更をSceneへ返します。
-struct LevelEditorResult
-{
-	bool reloadRequested = false;
-	bool saveRequested = false;
-	bool dataChanged = false;
-	bool addSphereRequested = false;
-	bool addEventPairRequested = false;
-	bool addPathSphereRequested = false;
-	bool removeSelectedRequested = false;
-};
 
 class ImGuiManager
 {
@@ -80,31 +60,15 @@ public:
 	void CameraWindow(CameraManager* cameraManager, bool embedded = false);
 	std::string ParticleWindow(Transform& emitterTransform, bool embedded = false);
 	void PostEffectWindow();
-	// レベルファイルの再読込と、マップ内オブジェクトの編集UIを表示します。
-	LevelEditorResult LevelHotReloadWindow(
-		bool& autoReload,
-		const std::string& filePath,
-		const std::string& status,
-		LevelLoader::LevelData* levelData,
-		int& selectedObjectIndex);
 	// 鏡の中心・大きさ・回転を編集するデバッグ用ウィンドウを表示します。
 	// 値が変更されたフレームだけ true を返します。
 	bool MirrorDebugWindow(Mirror& mirror, float& mirrorYaw, const Camera& reflectionCamera);
 	//OBBをゲーム画面へワイヤー表示し、衝突中は赤、非衝突時は青で描画する
 	void DrawObbCollisionDebug(const MyMath::OBB& obb, const MyMath::Sphere& sphere, const Camera* camera, bool isColliding);
-	// 制御点をGame Viewへ線と番号で重ねて表示します。
-	void DrawControlPointPathDebug(
-		const Vector3& basePosition,
-		const std::vector<Vector3>& controlPoints,
-		const Camera* camera);
 	bool IsSkeletonDebugDrawEnabled() const;
 	bool IsMouseOverGameView(float mouseScreenX, float mouseScreenY) const;
 	bool GetGameViewRect(float& x, float& y, float& width, float& height) const;
 	bool GetGameViewScreenRect(int& x, int& y, int& width, int& height) const;
-	// 現在表示中の中央ビューが編集用かを返します。
-	bool IsEditViewActive() const;
-	// 現在表示中の中央ビューがゲーム用かを返します。
-	bool IsGameViewActive() const;
 	unsigned int GetInspectorDockId() const;
 
 	// Game View上へスケルトンを重ねて描画する
@@ -121,14 +85,10 @@ private:
 	void BeginDockSpace(const char* sceneName);
 	void ResetLayoutToDefault();
 	void BuildDefaultDockLayout(ImGuiID dockspaceId);
-	void SceneViewWindow(const char* windowName, SceneViewMode mode, bool& isOpen);
 	void GameViewWindow();
-	void EditViewWindow();
-	void RuntimeMonitorWindow(const char* sceneName);
 	void SceneWindow(const char* sceneName);
 
 	bool showGameView_ = true;
-	bool showEditView_ = true;
 	bool showSceneWindow_ = true;
 	bool showFpsWindow_ = true;
 	bool showSpriteWindow_ = true;
@@ -148,7 +108,6 @@ private:
 	ImVec2 gameViewImageMin_{};
 	ImVec2 gameViewImageSize_{};
 	ImDrawList* gameViewDrawList_ = nullptr;
-	SceneViewMode activeSceneViewMode_ = SceneViewMode::Game;
 	ImGuiID inspectorDockId_ = 0;
 #endif
 };
