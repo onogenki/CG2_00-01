@@ -69,7 +69,7 @@
                     1.0
                 ],
                 "translation": [
-                    0.0,
+                    0.025751762092113495,
                     1.0,
                     8.0
                 ]
@@ -134,50 +134,12 @@
                     1.0
                 ],
                 "translation": [
-                    7.050000190734863,
-                    -1.0499999523162842,
+                    7.349999904632568,
+                    4.099999904632568,
                     1.6549999713897705
                 ]
             },
             "type": "CAMERA"
-        },
-        {
-            "collider": {
-                "center": [
-                    1.649999976158142,
-                    0.0,
-                    0.25
-                ],
-                "size": [
-                    4.0,
-                    3.0,
-                    4.0
-                ],
-                "type": "BOX"
-            },
-            "event_camera": "EventCamera1",
-            "event_id": "Event1",
-            "name": "EventTrigger1",
-            "object_type": "EVENT_TRIGGER",
-            "tag": "EventTrigger",
-            "transform": {
-                "rotation": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "scaling": [
-                    1.0,
-                    1.0,
-                    1.0
-                ],
-                "translation": [
-                    0.05000000074505806,
-                    -0.7999998927116394,
-                    7.454999923706055
-                ]
-            },
-            "type": "EMPTY"
         },
         {
             "collider": {

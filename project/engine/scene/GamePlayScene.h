@@ -8,6 +8,7 @@
 #include "Sprite.h"
 #include "ParticleEmitter.h"
 #include "Audio.h"
+#include "FileHotReload.h"
 #include "../ecs/EcsWorld.h"
 #include"BaseScene.h"
 #include "SceneEditor.h"
@@ -32,6 +33,10 @@ public:
 
 private:
     void UpdateGameViewCameraControl();
+    // Blenderから出力したscene.jsonを読み直し、JSON由来のモデルだけを再配置します。
+    bool ReloadLevelData();
+    // scene.jsonの保存を検出したフレームだけ、レベルデータを再読込します。
+    void UpdateLevelHotReload();
     void DrawInspectorImGui();
     void DrawGamePlayInspectorTabs();
     void DrawCaptureImGui();
@@ -156,6 +161,16 @@ private:
     bool isTexturePreviewMode_ = false;
     bool suppressPreviewExitUntilMouseRelease_ = false;
     bool showCollisionDebug_ = true;
+    // GamePlayが最初から作成する通常モデルの個数です。
+    size_t levelNormalObjectBaseCount_ = 0;
+    // scene.jsonから追加した通常モデルの個数です。
+    size_t levelNormalObjectCount_ = 0;
+    // scene.jsonの保存時刻を監視し、保存後の再読込に使用します。
+    FileHotReload levelHotReload_;
+    // Top Toolsへ表示する、scene.jsonの読込結果です。
+    std::string levelReloadStatus_ = "Waiting for scene.json changes.";
+    // ECS登録まで終わった後の再読込かを判定します。
+    bool isLevelHotReloadReady_ = false;
     size_t baseNormalObjectCount_ = 0;
     size_t baseAnimationObjectCount_ = 0;
     size_t baseSpriteCount_ = 0;
