@@ -34,6 +34,9 @@
 using namespace MyMath;
 
 namespace {
+constexpr const char* kGamePlayLevelFileName = "scene";
+constexpr const char* kGamePlayLevelFilePath = "resources/levels/scene.json";
+
 Vector3 TransformPoint(const Vector3& point, const Matrix4x4& matrix)
 {
 	return {
@@ -291,40 +294,11 @@ void GamePlayScene::Initialize()
 	walkObject_ = objWalk.get();
 	animationObjects.push_back(std::move(objWalk));
 
-	// レベルデータからオブジェクトを生成、配置
-	std::unique_ptr<LevelLoader::LevelData> levelData = LevelLoader::Load("scene");
-	auto createLevelObjects = [&](auto&& self, const std::vector<LevelLoader::ObjectData>& objects) -> void
-	{
-		for (const LevelLoader::ObjectData& objectData : objects)
-		{
-			if (objectData.type == "MESH" && !objectData.fileName.empty())
-			{
-				const std::string modelPath = "resources/" + objectData.fileName;
-				std::ifstream modelFile(modelPath);
-				if (!modelFile.fail())
-				{
-					if (!ModelManager::GetInstance()->LoadModel(objectData.fileName)) {
-						self(self, objectData.children);
-						continue;
-					}
-
-					auto newObject = std::make_unique<Object3d>();
-					newObject->Initialize(object3dCommon);
-					newObject->SetModel(objectData.fileName);
-					newObject->SetTranslate(objectData.translation);
-					newObject->SetRotate(objectData.rotation);
-					newObject->SetScale(objectData.scaling);
-
-					normalObjects.push_back(std::move(newObject));
-				}
-			}
-
-			self(self, objectData.children);
-		}
-	};
-	if (levelData) {
-		createLevelObjects(createLevelObjects, levelData->objects);
-	}
+	// GamePlayが最初から作成するモデルの直後へ、scene.jsonのモデルを追加します。
+	levelNormalObjectBaseCount_ = normalObjects.size();
+	levelHotReload_.SetFilePath(kGamePlayLevelFilePath);
+	ReloadLevelData();
+	levelHotReload_.Synchronize();
 	
 	for (uint32_t i = 0; i < 1; ++i)
 	{
@@ -398,12 +372,87 @@ void GamePlayScene::Initialize()
 			ecsWorld_.CreateSpriteEntity(sprite.get(), "Initial Sprite");
 		}
 	}
+	isLevelHotReloadReady_ = true;
 	selectedEcsEntity_ = Ecs::kInvalidEntity;
 	ScanResourceModels();
 	CreateCaptureDirectories();
 	InitializeUiSmokeFromEnvironment();
 	InitializeTimePlaybackSmokeFromEnvironment();
 
+}
+
+bool GamePlayScene::ReloadLevelData()
+{
+	std::unique_ptr<LevelLoader::LevelData> levelData =
+		LevelLoader::Load(kGamePlayLevelFileName);
+	if (!levelData) {
+		levelReloadStatus_ = "Reload failed. Current scene was kept.";
+		return false;
+	}
+
+	std::vector<std::unique_ptr<Object3d>> loadedObjects;
+	auto createLevelObjects = [&](auto&& self, const std::vector<LevelLoader::ObjectData>& objects) -> void
+	{
+		for (const LevelLoader::ObjectData& objectData : objects)
+		{
+			if (objectData.type == "MESH" && !objectData.fileName.empty())
+			{
+				const std::string modelPath = "resources/" + objectData.fileName;
+				std::ifstream modelFile(modelPath);
+				if (!modelFile.fail() && ModelManager::GetInstance()->LoadModel(objectData.fileName)) {
+					auto newObject = std::make_unique<Object3d>();
+					newObject->Initialize(object3dCommon);
+					newObject->SetModel(objectData.fileName);
+					newObject->SetTranslate(objectData.translation);
+					newObject->SetRotate(objectData.rotation);
+					newObject->SetScale(objectData.scaling);
+					loadedObjects.push_back(std::move(newObject));
+				}
+			}
+
+			self(self, objectData.children);
+		}
+	};
+	createLevelObjects(createLevelObjects, levelData->objects);
+
+	const size_t previousLevelEnd = (std::min)(
+		levelNormalObjectBaseCount_ + levelNormalObjectCount_, normalObjects.size());
+	std::vector<std::unique_ptr<Object3d>> editorAddedObjects;
+	for (size_t index = previousLevelEnd; index < normalObjects.size(); ++index) {
+		editorAddedObjects.push_back(std::move(normalObjects[index]));
+	}
+	normalObjects.resize(levelNormalObjectBaseCount_);
+
+	for (auto& object : loadedObjects) {
+		normalObjects.push_back(std::move(object));
+	}
+	levelNormalObjectCount_ = normalObjects.size() - levelNormalObjectBaseCount_;
+	baseNormalObjectCount_ = normalObjects.size();
+
+	for (auto& object : editorAddedObjects) {
+		normalObjects.push_back(std::move(object));
+	}
+
+	if (isLevelHotReloadReady_) {
+		for (size_t index = levelNormalObjectBaseCount_;
+			index < levelNormalObjectBaseCount_ + levelNormalObjectCount_; ++index) {
+			ecsWorld_.CreateModelEntity(normalObjects[index].get(), normalObjects[index]->GetModelName(), false);
+		}
+		UpdateEcsWorld();
+		ClearSceneObjectSelection();
+	}
+	levelReloadStatus_ = "Reloaded scene.json: " +
+		std::to_string(levelNormalObjectCount_) + " model(s).";
+
+	return true;
+}
+
+void GamePlayScene::UpdateLevelHotReload()
+{
+	if (levelHotReload_.ConsumeChange()) {
+		levelReloadStatus_ = "scene.json change detected. Reloading...";
+		ReloadLevelData();
+	}
 }
 
 void GamePlayScene::ScanResourceModels()
@@ -1436,6 +1485,7 @@ void GamePlayScene::DrawTopToolsImGui()
 		snprintf(fpsOverlay, sizeof(fpsOverlay), "%.1f FPS", ImGui::GetIO().Framerate);
 		const float fpsGraphWidth = (std::max)(120.0f, ImGui::GetContentRegionAvail().x);
 		ImGui::PlotLines("##TopToolsFPS", fpsValues, 90, fpsValueOffset, fpsOverlay, 0.0f, 120.0f, ImVec2(fpsGraphWidth, 58.0f));
+		ImGui::TextWrapped("%s", levelReloadStatus_.c_str());
 
 		ImGui::TableSetColumnIndex(1);
 		DrawCaptureImGui();
@@ -3497,6 +3547,8 @@ void GamePlayScene::UpdateParticleEffectEmission()
 
 void GamePlayScene::Update()
 {
+	// Blenderからscene.jsonが保存された時だけ、配置済みモデルを再読込します。
+	UpdateLevelHotReload();
 	UpdateGameViewCameraControl();
 
 	//カメラの更新
@@ -3820,6 +3872,9 @@ void GamePlayScene::Finalize()
 	lastCaptureMessage_.clear();
 	lastModelShelfMessage_.clear();
 	baseNormalObjectCount_ = 0;
+	levelNormalObjectBaseCount_ = 0;
+	levelNormalObjectCount_ = 0;
+	isLevelHotReloadReady_ = false;
 	baseAnimationObjectCount_ = 0;
 	baseSpriteCount_ = 0;
 	ClearSceneObjectSelection();
