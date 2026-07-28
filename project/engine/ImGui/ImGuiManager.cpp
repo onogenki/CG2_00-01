@@ -252,15 +252,24 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 			ImGui::TextUnformatted("Post Effect");
 			bool isGrayscale = PostEffect::GetInstance()->IsGrayscale();
 			bool isSepia = PostEffect::GetInstance()->IsSepia();
+			bool isVignette = PostEffect::GetInstance()->IsVignette();
 			if (ImGui::Checkbox("Gray", &isGrayscale) && isGrayscale) {
 				isSepia = false;
+				isVignette = false;
 			}
 			ImGui::SameLine();
 			if (ImGui::Checkbox("Sepia", &isSepia) && isSepia) {
 				isGrayscale = false;
+				isVignette = false;
+			}
+			ImGui::SameLine();
+			if (ImGui::Checkbox("Vignette", &isVignette) && isVignette) {
+				isGrayscale = false;
+				isSepia = false;
 			}
 			PostEffect::GetInstance()->SetGrayscale(isGrayscale);
 			PostEffect::GetInstance()->SetSepia(isSepia);
+			PostEffect::GetInstance()->SetVignette(isVignette);
 			ParticleManager* particleManager = ParticleManager::GetInstance();
 			bool particlesReturning = particleManager->IsReturning();
 			if (ImGui::Checkbox("Particle return##TopTools", &particlesReturning)) {
@@ -1162,14 +1171,22 @@ void ImGuiManager::PostEffectWindow()
 	}
 	bool isGrayscale = PostEffect::GetInstance()->IsGrayscale();
 	bool isSepia = PostEffect::GetInstance()->IsSepia();
+	bool isVignette = PostEffect::GetInstance()->IsVignette();
 	if (ImGui::Checkbox("Grayscale", &isGrayscale) && isGrayscale) {
 		isSepia = false;
+		isVignette = false;
 	}
 	if (ImGui::Checkbox("Sepia", &isSepia) && isSepia) {
 		isGrayscale = false;
+		isVignette = false;
+	}
+	if (ImGui::Checkbox("Vignette", &isVignette) && isVignette) {
+		isGrayscale = false;
+		isSepia = false;
 	}
 	PostEffect::GetInstance()->SetGrayscale(isGrayscale);
 	PostEffect::GetInstance()->SetSepia(isSepia);
+	PostEffect::GetInstance()->SetVignette(isVignette);
 	ImGui::End();
 #else
 #endif
