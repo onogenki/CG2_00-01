@@ -80,35 +80,12 @@ namespace
 
 MyMath::OBB Collision::MakeOBB(const Transform& transform, const Vector3& localHalfSize)
 {
-	return MakeOBB(transform, { 0.0f, 0.0f, 0.0f }, localHalfSize);
-}
-
-MyMath::OBB Collision::MakeOBB(
-	const Transform& transform,
-	const Vector3& localCenter,
-	const Vector3& localHalfSize)
-{
 	//拡大率を除いた回転行列から、OBBの3本の軸を取り出す
 	const Matrix4x4 rotationMatrix = MakeAffineMatrix(
 		{ 1.0f, 1.0f, 1.0f }, transform.rotate, { 0.0f, 0.0f, 0.0f });
-	const Matrix4x4 worldMatrix = MakeAffineMatrix(
-		transform.scale, transform.rotate, transform.translate);
 
 	OBB obb{};
-	obb.center = {
-		localCenter.x * worldMatrix.m[0][0] +
-			localCenter.y * worldMatrix.m[1][0] +
-			localCenter.z * worldMatrix.m[2][0] +
-			worldMatrix.m[3][0],
-		localCenter.x * worldMatrix.m[0][1] +
-			localCenter.y * worldMatrix.m[1][1] +
-			localCenter.z * worldMatrix.m[2][1] +
-			worldMatrix.m[3][1],
-		localCenter.x * worldMatrix.m[0][2] +
-			localCenter.y * worldMatrix.m[1][2] +
-			localCenter.z * worldMatrix.m[2][2] +
-			worldMatrix.m[3][2],
-	};
+	obb.center = transform.translate;
 	for (int axisIndex = 0; axisIndex < 3; ++axisIndex) {
 		obb.orientations[axisIndex] = Normalize({
 			rotationMatrix.m[axisIndex][0],

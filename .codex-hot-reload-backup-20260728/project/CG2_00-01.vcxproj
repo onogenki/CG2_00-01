@@ -198,7 +198,6 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="engine\base\WinApp.cpp" />
     <ClCompile Include="engine\ImGui\ImGuiManager.cpp" />
     <ClCompile Include="engine\ImGui\SceneEditor.cpp" />
-    <ClCompile Include="engine\level\FileHotReload.cpp" />
     <ClCompile Include="engine\level\LevelLoader.cpp" />
     <ClCompile Include="engine\math\MyMath.cpp" />
 	<ClCompile Include="engine\math\Collision.cpp" />
@@ -374,7 +373,6 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="engine\base\WinApp.h" />
     <ClInclude Include="engine\ImGui\ImGuiManager.h" />
     <ClInclude Include="engine\ImGui\SceneEditor.h" />
-    <ClInclude Include="engine\level\FileHotReload.h" />
     <ClInclude Include="engine\level\LevelLoader.h" />
     <ClInclude Include="engine\math\Matrix4x4.h" />
 	<ClInclude Include="engine\math\Collision.h" />

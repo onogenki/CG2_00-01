@@ -38,12 +38,10 @@ private:
     void DrawTopToolsImGui();
     void ScanResourceModels();
     void DrawModelShelfImGui();
-	void HandleModelDropOnEditView();
+    void HandleModelDropOnGameView();
     void HandleGameViewSpriteSelection();
     void HandleGameViewObjectSelection();
-	void DrawEditViewModelToolsOverlay();
-	void DrawEditViewportImGui();
-	void DrawSpriteEditViewportImGui();
+    void DrawGameViewModelToolsOverlay();
 	void RegisterEcsModel(Object3d* object, const std::string& sourceFile, bool isAnimated);
 	void RegisterEcsSprite(Sprite* sprite, const std::string& sourceFile);
 	void UpdateEcsWorld();
@@ -111,7 +109,7 @@ private:
         bool overlaps = false;
     };
 
-    struct ReplayFrame {
+	struct ReplayFrame {
 		std::vector<unsigned char> pixels;
 		int width = 0;
 		int height = 0;
@@ -230,8 +228,6 @@ private:
     bool lastCylinderEffectBillboard_ = false;
     bool refreshCylinderEffect_ = false;
     bool isGameViewCameraDragging_ = false;
-	SceneEditor::ViewportState viewportEditorState_{};
-	SceneEditor::SpriteViewportState spriteViewportEditorState_{};
     bool uiSmokeEnabled_ = false;
     bool uiSmokeFinished_ = false;
     bool uiSmokePendingCapture_ = false;

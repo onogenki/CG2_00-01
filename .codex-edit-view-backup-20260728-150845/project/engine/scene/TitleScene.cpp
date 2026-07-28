@@ -64,16 +64,12 @@ bool TitleScene::AddTextureToTitle(const std::string& textureFilePath)
 	sprite->SetPosition({ x, y });
 	addedSprites_.push_back(std::move(sprite));
 	selectedTitleSpriteIndex_ = addedSprites_.size() - 1;
-	hasSelectedTitleSprite_ = true;
 	inspectorAutoSelectSpriteFrames_ = 2;
 	return true;
 }
 
 void TitleScene::DrawTitleModelShelfImGui()
 {
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
 	SceneEditor::ShelfCallbacks callbacks{};
 	callbacks.sceneLabel = "Title";
 	callbacks.addedModelCount =
@@ -91,7 +87,6 @@ void TitleScene::DrawTitleModelShelfImGui()
 		//最初からあるタイトル用スプライトは残し、後から追加したものだけを消す
 		addedSprites_.resize(baseSpriteCount_);
 		selectedTitleSpriteIndex_ = 0;
-		hasSelectedTitleSprite_ = false;
 		inspectorAutoSelectSpriteFrames_ = 0;
 	};
 	SceneEditor::DrawModelShelf(shelfState_, callbacks);
@@ -99,12 +94,7 @@ void TitleScene::DrawTitleModelShelfImGui()
 
 void TitleScene::DrawTitleInspectorImGui()
 {
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
-	const int forcedSpriteIndex = hasSelectedTitleSprite_ &&
-		inspectorAutoSelectSpriteFrames_ > 0 &&
-		selectedTitleSpriteIndex_ < addedSprites_.size()
+	const int forcedSpriteIndex = inspectorAutoSelectSpriteFrames_ > 0 && selectedTitleSpriteIndex_ < addedSprites_.size()
 		? static_cast<int>(selectedTitleSpriteIndex_)
 		: -1;
 	if (inspectorAutoSelectSpriteFrames_ > 0) {
@@ -122,16 +112,7 @@ void TitleScene::DrawTitleInspectorImGui()
 	options.protectedSpriteCount = baseSpriteCount_;
 	options.protectedNormalObjectCount = baseNormalObjectCount_;
 	options.forcedSpriteIndex = forcedSpriteIndex;
-	options.forcedNormalIndex =
-		hasSelectedTitleObject_ && !selectedTitleObjectIsAnimation_ && inspectorAutoSelectModelFrames_ > 0
-		? static_cast<int>(selectedTitleObjectIndex_)
-		: -1;
-	options.forcedAnimationIndex =
-		hasSelectedTitleObject_ && selectedTitleObjectIsAnimation_ && inspectorAutoSelectModelFrames_ > 0
-		? static_cast<int>(selectedTitleObjectIndex_)
-		: -1;
 	options.selectSpriteTab = forcedSpriteIndex >= 0;
-	options.selectModelTab = options.forcedNormalIndex >= 0 || options.forcedAnimationIndex >= 0;
 	options.removeSprite = [this](size_t index) {
 		if (index >= addedSprites_.size()) {
 			return;
@@ -139,102 +120,18 @@ void TitleScene::DrawTitleInspectorImGui()
 		DirectXCommon::GetInstance()->WaitForGPU();
 		addedSprites_.erase(addedSprites_.begin() + static_cast<std::ptrdiff_t>(index));
 		selectedTitleSpriteIndex_ = addedSprites_.empty() ? 0 : (std::min)(index, addedSprites_.size() - 1);
-		hasSelectedTitleSprite_ = !addedSprites_.empty();
 		inspectorAutoSelectSpriteFrames_ = addedSprites_.empty() ? 0 : 2;
 	};
 	SceneEditor::DrawInspector(options);
-	if (inspectorAutoSelectModelFrames_ > 0) {
-		--inspectorAutoSelectModelFrames_;
-	}
 }
 
-void TitleScene::DrawTitleEditViewport()
-{
-#ifdef USE_IMGUI
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
-	SceneEditor::ViewportOptions options{};
-	options.camera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
-	for (size_t index = 0; index < normalObjects.size(); ++index) {
-		Object3d* object = normalObjects[index].get();
-		const std::string name = object && !object->GetModelName().empty()
-			? object->GetModelName()
-			: "Title Model";
-		options.objects.push_back({ name + " [" + std::to_string(index) + "]", object });
-	}
-	const size_t animationOffset = options.objects.size();
-	for (size_t index = 0; index < animationObjects_.size(); ++index) {
-		Object3d* object = animationObjects_[index].get();
-		const std::string name = object && !object->GetModelName().empty()
-			? object->GetModelName()
-			: "Title Animation";
-		options.objects.push_back({ name + " [Animation " + std::to_string(index) + "]", object });
-	}
-
-	if (hasSelectedTitleObject_) {
-		viewportEditorState_.selectedIndex = selectedTitleObjectIsAnimation_
-			? static_cast<int>(animationOffset + selectedTitleObjectIndex_)
-			: static_cast<int>(selectedTitleObjectIndex_);
-	} else {
-		viewportEditorState_.selectedIndex = -1;
-	}
-	options.onSelectionChanged = [this, animationOffset](int index) {
-		if (index < 0) {
-			hasSelectedTitleObject_ = false;
-			return;
-		}
-		hasSelectedTitleObject_ = true;
-		hasSelectedTitleSprite_ = false;
-		selectedTitleObjectIsAnimation_ = static_cast<size_t>(index) >= animationOffset;
-		selectedTitleObjectIndex_ = selectedTitleObjectIsAnimation_
-			? static_cast<size_t>(index) - animationOffset
-			: static_cast<size_t>(index);
-		inspectorAutoSelectModelFrames_ = 2;
-	};
-	SceneEditor::DrawViewportEditor(viewportEditorState_, options);
-#endif
-}
-
-void TitleScene::DrawTitleSpriteEditViewport()
-{
-#ifdef USE_IMGUI
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
-	SceneEditor::SpriteViewportOptions options{};
-	for (size_t index = 0; index < addedSprites_.size(); ++index) {
-		options.sprites.push_back({
-			"Title Sprite [" + std::to_string(index) + "]",
-			addedSprites_[index].get(),
-		});
-	}
-	spriteViewportEditorState_.selectedIndex =
-		hasSelectedTitleSprite_ && selectedTitleSpriteIndex_ < addedSprites_.size()
-		? static_cast<int>(selectedTitleSpriteIndex_)
-		: -1;
-	options.onSelectionChanged = [this](int index) {
-		if (index < 0) {
-			hasSelectedTitleSprite_ = false;
-			return;
-		}
-		hasSelectedTitleSprite_ = true;
-		selectedTitleSpriteIndex_ = static_cast<size_t>(index);
-		hasSelectedTitleObject_ = false;
-		inspectorAutoSelectSpriteFrames_ = 2;
-		inspectorAutoSelectModelFrames_ = 0;
-	};
-	SceneEditor::DrawSpriteViewportEditor(spriteViewportEditorState_, options);
-#endif
-}
-
-void TitleScene::HandleTitleShelfDropOnEditView()
+void TitleScene::HandleTitleShelfDropOnGameView()
 {
 	SceneEditor::ShelfCallbacks callbacks{};
 	callbacks.sceneLabel = "Title";
 	callbacks.addModel = [this](const std::string& fileName) { return AddModelToTitle(fileName); };
 	callbacks.addTexture = [this](const std::string& textureFilePath) { return AddTextureToTitle(textureFilePath); };
-	SceneEditor::HandleShelfDropOnEditView(shelfState_, callbacks);
+	SceneEditor::HandleShelfDropOnGameView(shelfState_, callbacks);
 }
 
 void TitleScene::Initialize()
@@ -299,7 +196,6 @@ void TitleScene::Initialize()
 	addedSprites_.push_back(std::move(titleSprite));
 	baseSpriteCount_ = addedSprites_.size();
 	selectedTitleSpriteIndex_ = 0;
-	hasSelectedTitleSprite_ = true;
 
 	// skyBoxの背景
 	TextureManager::GetInstance()->LoadTexture("Resources/qwantani_moonrise_puresky_1k.dds");
@@ -358,25 +254,18 @@ void TitleScene::Update()
 	ImGuiManager::GetInstance()->Begin("Title");
 	DrawTitleModelShelfImGui();
 	DrawTitleInspectorImGui();
-	HandleTitleShelfDropOnEditView();
-	DrawTitleEditViewport();
-	DrawTitleSpriteEditViewport();
-	if (ImGuiManager::GetInstance()->IsGameViewActive()) {
-		SceneEditor::UpdateViewportCamera(cameraManager ? cameraManager->GetActiveCamera() : nullptr);
-	}
+	HandleTitleShelfDropOnGameView();
 	ImGuiManager::GetInstance()->End();
 
 	//sapceキーが押されていたら
-	if (ImGuiManager::GetInstance()->IsGameViewActive() &&
-		(Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->IsPadButtonPressed(0, 1)))
+	if (Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->IsPadButtonPressed(0, 1))
 	{
 		//シーン切り替え
 		SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
 	}
 
 	//ステージシーンへ
-	if (ImGuiManager::GetInstance()->IsGameViewActive() &&
-		(Input::GetInstance()->TriggerKey(DIK_RETURN) || Input::GetInstance()->IsPadButtonPressed(0, 3)))
+	if (Input::GetInstance()->TriggerKey(DIK_RETURN) || Input::GetInstance()->IsPadButtonPressed(0, 3))
 	{
 		SceneManager::GetInstance()->ChangeScene("STAGE1");
 	}

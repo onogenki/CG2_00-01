@@ -8,61 +8,11 @@
 #include <utility>
 #include <vector>
 
-class Camera;
-
 // ImGui上でリソース棚とシーン内オブジェクトの編集UIを構築する。
 // 実データの追加・削除はコールバックでGamePlaySceneへ委譲する。
 class SceneEditor
 {
 public:
-	enum class TransformTool
-	{
-		Move,
-		Rotate,
-		Scale,
-	};
-
-	struct ViewportObject {
-		std::string label;
-		Object3d* object = nullptr;
-	};
-
-	struct ViewportState {
-		int selectedIndex = -1;
-		TransformTool tool = TransformTool::Move;
-		int activeAxis = -1;
-		bool isDragging = false;
-		float dragScreenDirectionX = 0.0f;
-		float dragScreenDirectionY = 0.0f;
-		Vector3 dragWorldDirection{};
-	};
-
-	struct ViewportOptions {
-		Camera* camera = nullptr;
-		std::vector<ViewportObject> objects;
-		std::function<void(int)> onSelectionChanged;
-		std::function<void(int, const Transform&)> onTransformChanged;
-	};
-
-	struct SpriteViewportObject {
-		std::string label;
-		Sprite* sprite = nullptr;
-	};
-
-	struct SpriteViewportState {
-		int selectedIndex = -1;
-		TransformTool tool = TransformTool::Move;
-		int activeAxis = -1;
-		bool isDragging = false;
-		float previousMouseAngle = 0.0f;
-	};
-
-	struct SpriteViewportOptions {
-		std::vector<SpriteViewportObject> sprites;
-		std::function<void(int)> onSelectionChanged;
-		std::function<void(int, const Vector2&, float, const Vector2&)> onTransformChanged;
-	};
-
 	struct ShelfEntry {
 		// resources配下で見つけたモデルまたはテクスチャ1件の表示情報。
 		std::string fileName;
@@ -132,13 +82,7 @@ public:
 	// モデル棚を描画し、追加・プレビュー操作をコールバックへ渡す。
 	static void DrawModelShelf(ShelfState& state, const ShelfCallbacks& callbacks);
 	// Game View上へのドラッグ&ドロップを処理する。
-	static void HandleShelfDropOnEditView(ShelfState& state, const ShelfCallbacks& callbacks);
-	// Edit View上で3Dオブジェクトを選択し、移動・回転・拡縮ギズモを操作する。
-	static void DrawViewportEditor(ViewportState& state, const ViewportOptions& options);
+	static void HandleShelfDropOnGameView(ShelfState& state, const ShelfCallbacks& callbacks);
 	// 選択済みスプライト、モデル、ライトを編集するインスペクターを描画する。
-	// Edit View上で2Dスプライトを選択し、移動・回転・サイズを編集します。
-	static void DrawSpriteViewportEditor(SpriteViewportState& state, const SpriteViewportOptions& options);
-	// 表示中のScene View上で、右・中ボタンとホイールによる安全なカメラ操作を行います。
-	static void UpdateViewportCamera(Camera* camera, bool inputBlocked = false);
 	static void DrawInspector(const InspectorOptions& options);
 };

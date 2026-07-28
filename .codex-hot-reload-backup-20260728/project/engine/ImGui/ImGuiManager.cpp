@@ -1,6 +1,7 @@
 #include "ImGuiManager.h"
 #include "SrvManager.h"
 #include "Sprite.h"
+#include "ImGuiManager.h"
 #include "Object3d.h"
 #include "ParticleEmitter.h"
 #include "CameraManager.h"
@@ -11,7 +12,6 @@
 #include "CaptureManager.h"
 #include "Mirror.h"
 #include <cmath>
-#include <numbers>
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui_internal.h"
 #endif
@@ -153,7 +153,6 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 		}
 		if (ImGui::BeginMenu("Windows")) {
 			ImGui::MenuItem("Game View", nullptr, &showGameView_);
-			ImGui::MenuItem("Edit View", nullptr, &showEditView_);
 			ImGui::MenuItem("Scene", nullptr, &showSceneWindow_);
 			ImGui::TextDisabled("Top Tools contains FPS / Capture / Post Effect");
 			ImGui::Separator();
@@ -185,27 +184,8 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 	}
 	ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
 
-	if (showGameView_) {
-		GameViewWindow();
-	}
-	if (showEditView_) {
-		EditViewWindow();
-	}
-
 	const std::string currentSceneName = sceneName ? sceneName : "";
-	if (showModelWindow_ && IsGameViewActive()) {
-		if (inspectorDockId_ != 0) {
-			ImGui::SetNextWindowDockID(inspectorDockId_, ImGuiCond_Always);
-		}
-		ImGui::Begin("Inspector", &showModelWindow_);
-		ImGui::TextUnformatted("Game View");
-		ImGui::Separator();
-		ImGui::TextWrapped("Scene editing is locked. Switch to Edit View to select or transform objects.");
-		ImGui::End();
-	} else if (showModelWindow_ &&
-		currentSceneName != "GamePlay" &&
-		currentSceneName != "Stage1" &&
-		currentSceneName != "Title") {
+	if (showModelWindow_ && currentSceneName != "GamePlay" && currentSceneName != "Stage1") {
 		if (inspectorDockId_ != 0) {
 			ImGui::SetNextWindowDockID(inspectorDockId_, ImGuiCond_Always);
 		}
@@ -213,6 +193,10 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 		ImGui::TextDisabled("Scene-specific controls are shown below when available.");
 		ImGui::Separator();
 		ImGui::End();
+	}
+
+	if (showGameView_) {
+		GameViewWindow();
 	}
 	if (showSceneWindow_) {
 		SceneWindow(sceneName);
@@ -272,15 +256,13 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 	}
 	ImGui::End();
 
-	if (IsGameViewActive()) {
-		RuntimeMonitorWindow(sceneName);
-	} else if (currentSceneName != "GamePlay" &&
-		currentSceneName != "Title" &&
-		currentSceneName != "Stage1") {
+	if (currentSceneName != "GamePlay") {
 		if (ImGui::Begin("Model Shelf")) {
-			ImGui::TextUnformatted("Edit View Model Shelf");
+			ImGui::TextUnformatted("Common Dock Model Shelf");
 			ImGui::Separator();
-			ImGui::TextWrapped("This scene has not registered a resource shelf yet.");
+			ImGui::TextWrapped("This bottom area is reserved in every scene so the layout stays consistent.");
+			ImGui::BulletText("GamePlay: model / 2D Texture cards, preview, drag placement.");
+			ImGui::BulletText("Title: shared dock placeholder and scene navigation.");
 			if (SceneManager::GetInstance()->GetCurrentSceneName() != "GAMEPLAY") {
 				if (ImGui::Button("Go to GamePlay")) {
 					SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
@@ -301,7 +283,6 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 void ImGuiManager::ResetLayoutToDefault()
 {
 	showGameView_ = true;
-	showEditView_ = true;
 	showSceneWindow_ = true;
 	showFpsWindow_ = true;
 	showSpriteWindow_ = true;
@@ -327,39 +308,26 @@ void ImGuiManager::BuildDefaultDockLayout(ImGuiID dockspaceId)
 	const ImGuiID rightId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Right, 0.40f, nullptr, &centerId);
 	inspectorDockId_ = rightId;
 
-	ImGui::DockBuilderDockWindow("Edit View", centerId);
 	ImGui::DockBuilderDockWindow("Game View", centerId);
 	ImGui::DockBuilderDockWindow("Scene", leftId);
 	ImGui::DockBuilderDockWindow("Top Tools", topId);
 	ImGui::DockBuilderDockWindow("Inspector", rightId);
 	ImGui::DockBuilderDockWindow("Model Shelf", bottomId);
-	ImGui::DockBuilderDockWindow("Runtime Monitor", bottomId);
 	ImGui::DockBuilderFinish(dockspaceId);
 }
 
-void ImGuiManager::SceneViewWindow(const char* windowName, SceneViewMode mode, bool& isOpen)
+void ImGuiManager::GameViewWindow()
 {
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 	ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.015f, 0.015f, 0.015f, 1.0f));
 	const bool isVisible = ImGui::Begin(
-		windowName,
-		&isOpen,
+		"Game View",
+		&showGameView_,
 		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 	ImGui::PopStyleColor();
 	ImGui::PopStyleVar();
 
 	if (isVisible) {
-		const bool isOnlyOpenSceneView =
-			(mode == SceneViewMode::Game && !showEditView_) ||
-			(mode == SceneViewMode::Edit && !showGameView_);
-		const bool shouldActivate =
-			ImGui::GetWindowDockID() != 0 ||
-			isOnlyOpenSceneView ||
-			ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) ||
-			ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
-		if (shouldActivate) {
-			activeSceneViewMode_ = mode;
-		}
 		const ImVec2 available = ImGui::GetContentRegionAvail();
 		const float textureWidth = static_cast<float>(dxCommon_->GetClientWidth());
 		const float textureHeight = static_cast<float>(dxCommon_->GetClientHeight());
@@ -367,54 +335,21 @@ void ImGuiManager::SceneViewWindow(const char* windowName, SceneViewMode mode, b
 			const float scale = (available.x / textureWidth < available.y / textureHeight)
 				? available.x / textureWidth
 				: available.y / textureHeight;
-			const ImVec2 imageSize(textureWidth * scale, textureHeight * scale);
+			gameViewImageSize_ = ImVec2(textureWidth * scale, textureHeight * scale);
 			const ImVec2 contentStart = ImGui::GetCursorScreenPos();
-			const ImVec2 imageMin(
-				contentStart.x + (available.x - imageSize.x) * 0.5f,
-				contentStart.y + (available.y - imageSize.y) * 0.5f);
-			if (activeSceneViewMode_ == mode) {
-				gameViewImageSize_ = imageSize;
-				gameViewImageMin_ = imageMin;
-				gameViewDrawList_ = ImGui::GetWindowDrawList();
-			}
+			gameViewImageMin_ = ImVec2(
+				contentStart.x + (available.x - gameViewImageSize_.x) * 0.5f,
+				contentStart.y + (available.y - gameViewImageSize_.y) * 0.5f);
+			gameViewDrawList_ = ImGui::GetWindowDrawList();
 
 			const uint32_t textureSrvIndex = PostEffect::GetInstance()->IsEnabled()
 				? dxCommon_->GetPostEffectTextureSrvIndex()
 				: dxCommon_->GetRenderTextureSrvIndex();
 			const D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = srvManager_->GetGPUDescriptorHandle(textureSrvIndex);
-			ImGui::SetCursorScreenPos(imageMin);
-			ImGui::Image(ImTextureRef(static_cast<ImTextureID>(textureHandle.ptr)), imageSize);
+			ImGui::SetCursorScreenPos(gameViewImageMin_);
+			ImGui::Image(ImTextureRef(static_cast<ImTextureID>(textureHandle.ptr)), gameViewImageSize_);
 		}
 	}
-	ImGui::End();
-}
-
-void ImGuiManager::GameViewWindow()
-{
-	SceneViewWindow("Game View", SceneViewMode::Game, showGameView_);
-}
-
-void ImGuiManager::EditViewWindow()
-{
-	SceneViewWindow("Edit View", SceneViewMode::Edit, showEditView_);
-}
-
-void ImGuiManager::RuntimeMonitorWindow(const char* sceneName)
-{
-	if (!ImGui::Begin("Runtime Monitor")) {
-		ImGui::End();
-		return;
-	}
-
-	ImGui::TextUnformatted("Game View Runtime Monitor");
-	ImGui::Separator();
-	ImGui::Text("Scene: %s", sceneName ? sceneName : "Unknown");
-	ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-	ImGui::Text("Frame Time: %.2f ms", ImGui::GetIO().DeltaTime * 1000.0f);
-	ImGui::Text("Render Size: %u x %u", dxCommon_->GetClientWidth(), dxCommon_->GetClientHeight());
-	ImGui::Text("Post Effect: %s", PostEffect::GetInstance()->IsEnabled() ? "Enabled" : "Disabled");
-	ImGui::Spacing();
-	ImGui::TextWrapped("Object selection and transform editing are disabled in Game View. Use this mode to test gameplay without accidental edits.");
 	ImGui::End();
 }
 
@@ -542,24 +477,6 @@ bool ImGuiManager::GetGameViewScreenRect(int& x, int& y, int& width, int& height
 	(void)width;
 	(void)height;
 	return false;
-#endif
-}
-
-bool ImGuiManager::IsEditViewActive() const
-{
-#ifdef USE_IMGUI
-	return activeSceneViewMode_ == SceneViewMode::Edit;
-#else
-	return false;
-#endif
-}
-
-bool ImGuiManager::IsGameViewActive() const
-{
-#ifdef USE_IMGUI
-	return activeSceneViewMode_ == SceneViewMode::Game;
-#else
-	return true;
 #endif
 }
 
@@ -1250,373 +1167,6 @@ void ImGuiManager::DrawObbCollisionDebug(const MyMath::OBB& obb, const MyMath::S
 	(void)camera;
 	(void)isColliding;
 #endif
-}
-
-void ImGuiManager::DrawControlPointPathDebug(
-	const Vector3& basePosition,
-	const std::vector<Vector3>& controlPoints,
-	const Camera* camera)
-{
-#ifdef USE_IMGUI
-	if (!camera || controlPoints.empty()) {
-		return;
-	}
-
-	float rectX = 0.0f;
-	float rectY = 0.0f;
-	float rectWidth = 0.0f;
-	float rectHeight = 0.0f;
-	if (!GetGameViewRect(rectX, rectY, rectWidth, rectHeight)) {
-		return;
-	}
-
-	const Matrix4x4& viewProjectionMatrix = camera->GetViewProjectionMatrix();
-	const ImVec2 imageMin(rectX, rectY);
-	const ImVec2 imageMax(rectX + rectWidth, rectY + rectHeight);
-	ImDrawList* drawList = ImGui::GetForegroundDrawList();
-	drawList->PushClipRect(imageMin, imageMax, true);
-
-	const auto projectToGameView = [&](const Vector3& position, ImVec2& screenPosition) {
-		const float x = position.x * viewProjectionMatrix.m[0][0] + position.y * viewProjectionMatrix.m[1][0] + position.z * viewProjectionMatrix.m[2][0] + viewProjectionMatrix.m[3][0];
-		const float y = position.x * viewProjectionMatrix.m[0][1] + position.y * viewProjectionMatrix.m[1][1] + position.z * viewProjectionMatrix.m[2][1] + viewProjectionMatrix.m[3][1];
-		const float w = position.x * viewProjectionMatrix.m[0][3] + position.y * viewProjectionMatrix.m[1][3] + position.z * viewProjectionMatrix.m[2][3] + viewProjectionMatrix.m[3][3];
-		if (w <= 0.0f) {
-			return false;
-		}
-		screenPosition = ImVec2(
-			imageMin.x + (x / w + 1.0f) * 0.5f * rectWidth,
-			imageMin.y + (1.0f - y / w) * 0.5f * rectHeight);
-		return true;
-	};
-
-	std::vector<ImVec2> projected(controlPoints.size());
-	std::vector<bool> visible(controlPoints.size(), false);
-	for (size_t index = 0; index < controlPoints.size(); ++index) {
-		const Vector3 worldPoint{
-			basePosition.x + controlPoints[index].x,
-			basePosition.y + controlPoints[index].y,
-			basePosition.z + controlPoints[index].z,
-		};
-		visible[index] = projectToGameView(worldPoint, projected[index]);
-	}
-
-	const ImU32 lineColor = IM_COL32(80, 255, 140, 255);
-	const ImU32 pointColor = IM_COL32(255, 220, 70, 255);
-	for (size_t index = 1; index < projected.size(); ++index) {
-		if (visible[index - 1] && visible[index]) {
-			drawList->AddLine(projected[index - 1], projected[index], lineColor, 2.0f);
-		}
-	}
-	for (size_t index = 0; index < projected.size(); ++index) {
-		if (!visible[index]) {
-			continue;
-		}
-		drawList->AddCircleFilled(projected[index], 5.0f, pointColor);
-		const std::string label = std::to_string(index);
-		drawList->AddText(
-			ImVec2(projected[index].x + 7.0f, projected[index].y - 7.0f),
-			pointColor,
-			label.c_str());
-	}
-
-	drawList->PopClipRect();
-#else
-	(void)basePosition;
-	(void)controlPoints;
-	(void)camera;
-#endif
-}
-
-LevelEditorResult ImGuiManager::LevelHotReloadWindow(
-	bool& autoReload,
-	const std::string& filePath,
-	const std::string& status,
-	LevelLoader::LevelData* levelData,
-	int& selectedObjectIndex)
-{
-	LevelEditorResult result{};
-#ifdef USE_IMGUI
-	if (inspectorDockId_ != 0) {
-		ImGui::SetNextWindowDockID(inspectorDockId_, ImGuiCond_Always);
-	}
-	// 既存の Inspector に続けて表示し、マップ編集画面を見つけやすくする
-	if (!ImGui::Begin("Inspector", &showModelWindow_)) {
-		ImGui::End();
-		return result;
-	}
-
-	// 実行中にレベルファイルを保存すると、自動でStageへ反映します。
-	ImGui::Separator();
-	ImGui::TextUnformatted("Stage Map Editor / Hot Reload");
-	ImGui::Separator();
-	ImGui::TextWrapped("Edit an object here, then press Save Map. Editing the JSON file outside the game also reloads it.");
-	ImGui::TextWrapped("File: %s", filePath.c_str());
-	ImGui::Checkbox("Auto Reload", &autoReload);
-	ImGui::TextDisabled("Auto Reload: use after saving stage1.json in an external editor.");
-	result.reloadRequested = ImGui::Button("Reload Now");
-	ImGui::SameLine();
-	result.saveRequested = ImGui::Button("Save Map");
-	ImGui::TextDisabled("Reload Now discards unsaved editor changes and reads the JSON file again.");
-	ImGui::Separator();
-	ImGui::TextWrapped("Status: %s", status.c_str());
-
-	// ---------- マップオブジェクトの選択 ----------
-	ImGui::SeparatorText("Map Objects");
-	if (!levelData || levelData->objects.empty()) {
-		ImGui::TextDisabled("No editable map objects.");
-	} else {
-		std::vector<LevelLoader::ObjectData>& objects = levelData->objects;
-		if (selectedObjectIndex < 0 ||
-			selectedObjectIndex >= static_cast<int>(objects.size())) {
-			selectedObjectIndex = 0;
-		}
-
-		// Event Cameraは接続済みのTriggerへまとめ、1件のイベントとして編集する。
-		auto findTriggerIndexForCamera = [&](const std::string& cameraName) {
-			for (int index = 0; index < static_cast<int>(objects.size()); ++index) {
-				if (objects[index].objectType == "EVENT_TRIGGER" &&
-					objects[index].eventCameraName == cameraName) {
-					return index;
-				}
-			}
-			return -1;
-		};
-		if (objects[selectedObjectIndex].objectType == "EVENT_CAMERA") {
-			const int triggerIndex = findTriggerIndexForCamera(objects[selectedObjectIndex].name);
-			if (triggerIndex >= 0) {
-				selectedObjectIndex = triggerIndex;
-			}
-		}
-
-		auto makeObjectDisplayName = [&](int index) {
-			const LevelLoader::ObjectData& data = objects[index];
-			if (data.objectType == "EVENT_TRIGGER") {
-				return std::string("Event Camera + Trigger: ") + data.name;
-			}
-			return data.name;
-		};
-
-		const std::string selectedName = makeObjectDisplayName(selectedObjectIndex);
-		if (ImGui::BeginCombo("Selected Object", selectedName.c_str())) {
-			for (int index = 0; index < static_cast<int>(objects.size()); ++index) {
-				if (objects[index].objectType == "EVENT_CAMERA" &&
-					findTriggerIndexForCamera(objects[index].name) >= 0) {
-					continue;
-				}
-
-				const bool isSelected = index == selectedObjectIndex;
-				const std::string displayName = makeObjectDisplayName(index);
-				if (ImGui::Selectable(displayName.c_str(), isSelected)) {
-					selectedObjectIndex = index;
-				}
-				if (isSelected) {
-					ImGui::SetItemDefaultFocus();
-				}
-			}
-			ImGui::EndCombo();
-		}
-
-		LevelLoader::ObjectData& objectData = objects[selectedObjectIndex];
-		ImGui::Text("Model: %s", objectData.fileName.empty() ? "(none)" : objectData.fileName.c_str());
-		ImGui::Text("Tag: %s", objectData.tag.empty() ? "(none)" : objectData.tag.c_str());
-
-		// 保存データのTransformを直接編集し、変更フレームだけSceneへ通知する
-		const char* positionLabel = objectData.objectType == "EVENT_TRIGGER"
-			? "Trigger Position"
-			: "Position";
-		result.dataChanged |= ImGui::DragFloat3(
-			positionLabel,
-			&objectData.translation.x,
-			0.05f);
-
-		constexpr float kRadianToDegree = 180.0f / std::numbers::pi_v<float>;
-		constexpr float kDegreeToRadian = std::numbers::pi_v<float> / 180.0f;
-		float rotationDegrees[3]{
-			objectData.rotation.x * kRadianToDegree,
-			objectData.rotation.y * kRadianToDegree,
-			objectData.rotation.z * kRadianToDegree,
-		};
-		const char* rotationLabel = objectData.objectType == "EVENT_TRIGGER"
-			? "Trigger Rotation (deg)"
-			: "Rotation (deg)";
-		if (ImGui::DragFloat3(rotationLabel, rotationDegrees, 1.0f)) {
-			objectData.rotation = {
-				rotationDegrees[0] * kDegreeToRadian,
-				rotationDegrees[1] * kDegreeToRadian,
-				rotationDegrees[2] * kDegreeToRadian,
-			};
-			result.dataChanged = true;
-		}
-
-		const char* scaleLabel = objectData.objectType == "EVENT_TRIGGER"
-			? "Trigger Scale"
-			: "Scale";
-		result.dataChanged |= ImGui::DragFloat3(
-			scaleLabel,
-			&objectData.scaling.x,
-			0.05f,
-			0.01f,
-			100.0f);
-
-		if (objectData.hasCollider) {
-			ImGui::SeparatorText("Box Collider");
-			ImGui::TextDisabled("The box follows this object's Position, Rotation, and Scale.");
-			result.dataChanged |= ImGui::DragFloat3(
-				"Collider Center",
-				&objectData.collider.center.x,
-				0.05f);
-			result.dataChanged |= ImGui::DragFloat3(
-				"Collider Size",
-				&objectData.collider.size.x,
-				0.05f,
-				0.01f,
-				100.0f);
-		}
-
-		// ---------- イベントトリガー固有の設定 ----------
-		if (objectData.objectType == "EVENT_TRIGGER") {
-			ImGui::SeparatorText("Event Trigger");
-			ImGui::TextDisabled("This box changes the camera. It is not a solid wall.");
-			ImGui::Text(
-				"Event ID: %s",
-				objectData.eventId.empty() ? "(none)" : objectData.eventId.c_str());
-
-			const char* currentCameraName = objectData.eventCameraName.empty()
-				? "(none)"
-				: objectData.eventCameraName.c_str();
-			if (ImGui::BeginCombo("Event Camera", currentCameraName)) {
-				for (const LevelLoader::ObjectData& cameraData : objects) {
-					if (cameraData.objectType != "EVENT_CAMERA") {
-						continue;
-					}
-					const bool isSelected =
-						cameraData.name == objectData.eventCameraName;
-					if (ImGui::Selectable(cameraData.name.c_str(), isSelected)) {
-						objectData.eventCameraName = cameraData.name;
-						result.dataChanged = true;
-					}
-					if (isSelected) {
-						ImGui::SetItemDefaultFocus();
-					}
-				}
-				ImGui::EndCombo();
-			}
-
-			const auto cameraFound = std::find_if(
-				objects.begin(),
-				objects.end(),
-				[&](const LevelLoader::ObjectData& cameraData)
-				{
-					return cameraData.objectType == "EVENT_CAMERA" &&
-						cameraData.name == objectData.eventCameraName;
-				});
-			if (cameraFound != objects.end()) {
-				LevelLoader::ObjectData& cameraData = *cameraFound;
-				ImGui::SeparatorText("Event Camera View");
-				ImGui::TextDisabled("Camera Position is where the camera is placed. Camera Focus is what it looks at.");
-				result.dataChanged |= ImGui::DragFloat3(
-					"Camera Position",
-					&cameraData.translation.x,
-					0.05f);
-				if (!cameraData.hasCameraFocus) {
-					cameraData.hasCameraFocus = true;
-					cameraData.cameraFocus = cameraData.translation;
-					result.dataChanged = true;
-				}
-				result.dataChanged |= ImGui::DragFloat3(
-					"Camera Focus",
-					&cameraData.cameraFocus.x,
-					0.05f);
-			}
-		}
-
-		// ---------- イベントカメラ固有の設定 ----------
-		if (objectData.objectType == "EVENT_CAMERA") {
-			ImGui::SeparatorText("Event Camera");
-			ImGui::TextDisabled("Position is the camera location. Camera Focus is the point it looks at.");
-			if (!objectData.hasCameraFocus) {
-				objectData.hasCameraFocus = true;
-				objectData.cameraFocus = objectData.translation;
-				result.dataChanged = true;
-			}
-			result.dataChanged |= ImGui::DragFloat3(
-				"Camera Focus",
-				&objectData.cameraFocus.x,
-				0.05f);
-		}
-
-		// ---------- 制御点移動オブジェクト固有の設定 ----------
-		if (objectData.objectType == "PATH_OBJECT") {
-			ImGui::SeparatorText("Control Point Path");
-			result.dataChanged |= ImGui::DragFloat(
-				"Path Speed",
-				&objectData.pathSpeed,
-				0.05f,
-				0.0f,
-				20.0f);
-			result.dataChanged |= ImGui::Checkbox(
-				"Loop Path",
-				&objectData.pathLoop);
-
-			int removeControlPointIndex = -1;
-			for (int pointIndex = 0;
-				pointIndex < static_cast<int>(objectData.controlPoints.size());
-				++pointIndex) {
-				ImGui::PushID(pointIndex);
-				ImGui::Text("Point %d", pointIndex);
-				ImGui::SameLine();
-				if (ImGui::SmallButton("Remove")) {
-					removeControlPointIndex = pointIndex;
-				}
-				result.dataChanged |= ImGui::DragFloat3(
-					"Offset",
-					&objectData.controlPoints[pointIndex].x,
-					0.05f);
-				ImGui::PopID();
-			}
-			if (removeControlPointIndex >= 0 &&
-				objectData.controlPoints.size() > 2) {
-				objectData.controlPoints.erase(
-					objectData.controlPoints.begin() + removeControlPointIndex);
-				result.dataChanged = true;
-			}
-			if (ImGui::Button("Add Control Point")) {
-				Vector3 newPoint{};
-				if (!objectData.controlPoints.empty()) {
-					newPoint = objectData.controlPoints.back();
-					newPoint.z += 2.0f;
-				}
-				objectData.controlPoints.push_back(newPoint);
-				result.dataChanged = true;
-			}
-		}
-
-		ImGui::Separator();
-		result.addSphereRequested = ImGui::Button("Add Sphere Object");
-		ImGui::SameLine();
-		result.addEventPairRequested = ImGui::Button("Add Event Camera + Trigger");
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("Adds a camera and its detection box. The new camera is selected for editing.");
-		}
-		result.addPathSphereRequested = ImGui::Button("Add Path Sphere");
-		const bool protectedObject =
-			objectData.tag == "Floor" || objectData.tag == "Mirror";
-		ImGui::BeginDisabled(protectedObject);
-		result.removeSelectedRequested = ImGui::Button("Remove Selected");
-		ImGui::EndDisabled();
-		if (protectedObject && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-			ImGui::SetTooltip("Floor and Mirror cannot be removed.");
-		}
-	}
-	ImGui::End();
-#else
-	(void)autoReload;
-	(void)filePath;
-	(void)status;
-	(void)levelData;
-	(void)selectedObjectIndex;
-#endif
-	return result;
 }
 
 bool ImGuiManager::MirrorDebugWindow(Mirror& mirror, float& mirrorYaw, const Camera& reflectionCamera)

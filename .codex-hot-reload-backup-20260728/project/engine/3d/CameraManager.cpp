@@ -12,20 +12,6 @@ void CameraManager::AddCamera(const std::string& name, Camera* camera)
 
 }
 
-void CameraManager::RemoveCamera(const std::string& name)
-{
-	const auto found = cameras_.find(name);
-	if (found == cameras_.end()) {
-		return;
-	}
-
-	// 使用中のCameraを削除する場合は、無効なポインタを残さない
-	if (activeCamera_ == found->second) {
-		activeCamera_ = nullptr;
-	}
-	cameras_.erase(found);
-}
-
 void CameraManager::SetActiveCamera(const std::string& name)
 {
 	//カメラの中から指定された名前を探す

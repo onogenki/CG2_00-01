@@ -10,12 +10,126 @@
 #include <cmath>
 #include <filesystem>
 #include <limits>
+#include <numbers>
+#include <unordered_map>
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui.h"
 #include "externals/imgui/imgui_internal.h"
 #endif
 
 namespace {
+	struct CachedModelBounds
+	{
+		Vector3 minimum{};
+		Vector3 maximum{};
+	};
+
+	Vector3 TransformEditorPoint(const Vector3& point, const Matrix4x4& matrix)
+	{
+		return {
+			point.x * matrix.m[0][0] + point.y * matrix.m[1][0] + point.z * matrix.m[2][0] + matrix.m[3][0],
+			point.x * matrix.m[0][1] + point.y * matrix.m[1][1] + point.z * matrix.m[2][1] + matrix.m[3][1],
+			point.x * matrix.m[0][2] + point.y * matrix.m[1][2] + point.z * matrix.m[2][2] + matrix.m[3][2],
+		};
+	}
+
+	bool ProjectEditorPoint(const Vector3& point, const Matrix4x4& viewProjection, const ImVec2& imageMin, const ImVec2& imageSize, ImVec2& screen)
+	{
+		const float x = point.x * viewProjection.m[0][0] + point.y * viewProjection.m[1][0] + point.z * viewProjection.m[2][0] + viewProjection.m[3][0];
+		const float y = point.x * viewProjection.m[0][1] + point.y * viewProjection.m[1][1] + point.z * viewProjection.m[2][1] + viewProjection.m[3][1];
+		const float w = point.x * viewProjection.m[0][3] + point.y * viewProjection.m[1][3] + point.z * viewProjection.m[2][3] + viewProjection.m[3][3];
+		if (w <= 0.0001f) {
+			return false;
+		}
+		screen = {
+			imageMin.x + (x / w + 1.0f) * 0.5f * imageSize.x,
+			imageMin.y + (1.0f - y / w) * 0.5f * imageSize.y,
+		};
+		return true;
+	}
+
+	float EditorDistanceToSegment(const ImVec2& point, const ImVec2& start, const ImVec2& end)
+	{
+		const ImVec2 segment(end.x - start.x, end.y - start.y);
+		const ImVec2 fromStart(point.x - start.x, point.y - start.y);
+		const float lengthSquared = segment.x * segment.x + segment.y * segment.y;
+		const float amount = lengthSquared > 0.0001f
+			? std::clamp((fromStart.x * segment.x + fromStart.y * segment.y) / lengthSquared, 0.0f, 1.0f)
+			: 0.0f;
+		const float dx = point.x - (start.x + segment.x * amount);
+		const float dy = point.y - (start.y + segment.y * amount);
+		return std::sqrt(dx * dx + dy * dy);
+	}
+
+	bool BuildEditorWorldBounds(const Object3d& object, Vector3& minimum, Vector3& maximum)
+	{
+		Model* model = object.GetModel();
+		if (!model || model->GetModelData().vertices.empty()) {
+			return false;
+		}
+
+		static std::unordered_map<const Model*, CachedModelBounds> cachedBounds;
+		auto cached = cachedBounds.find(model);
+		if (cached == cachedBounds.end()) {
+			CachedModelBounds bounds{};
+			bounds.minimum = {
+				(std::numeric_limits<float>::max)(),
+				(std::numeric_limits<float>::max)(),
+				(std::numeric_limits<float>::max)(),
+			};
+			bounds.maximum = {
+				std::numeric_limits<float>::lowest(),
+				std::numeric_limits<float>::lowest(),
+				std::numeric_limits<float>::lowest(),
+			};
+			for (const Model::VertexData& vertex : model->GetModelData().vertices) {
+				const Vector3 point{ vertex.position.x, vertex.position.y, vertex.position.z };
+				bounds.minimum.x = (std::min)(bounds.minimum.x, point.x);
+				bounds.minimum.y = (std::min)(bounds.minimum.y, point.y);
+				bounds.minimum.z = (std::min)(bounds.minimum.z, point.z);
+				bounds.maximum.x = (std::max)(bounds.maximum.x, point.x);
+				bounds.maximum.y = (std::max)(bounds.maximum.y, point.y);
+				bounds.maximum.z = (std::max)(bounds.maximum.z, point.z);
+			}
+			cached = cachedBounds.emplace(model, bounds).first;
+		}
+
+		const CachedModelBounds& local = cached->second;
+		const Transform& transform = object.GetTransform();
+		const Matrix4x4 world = MyMath::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+		const std::array<Vector3, 8> corners{ {
+			{ local.minimum.x, local.minimum.y, local.minimum.z },
+			{ local.maximum.x, local.minimum.y, local.minimum.z },
+			{ local.minimum.x, local.maximum.y, local.minimum.z },
+			{ local.maximum.x, local.maximum.y, local.minimum.z },
+			{ local.minimum.x, local.minimum.y, local.maximum.z },
+			{ local.maximum.x, local.minimum.y, local.maximum.z },
+			{ local.minimum.x, local.maximum.y, local.maximum.z },
+			{ local.maximum.x, local.maximum.y, local.maximum.z },
+		} };
+
+		minimum = {
+			(std::numeric_limits<float>::max)(),
+			(std::numeric_limits<float>::max)(),
+			(std::numeric_limits<float>::max)(),
+		};
+		maximum = {
+			std::numeric_limits<float>::lowest(),
+			std::numeric_limits<float>::lowest(),
+			std::numeric_limits<float>::lowest(),
+		};
+		for (const Vector3& corner : corners) {
+			const Vector3 point = TransformEditorPoint(corner, world);
+			minimum.x = (std::min)(minimum.x, point.x);
+			minimum.y = (std::min)(minimum.y, point.y);
+			minimum.z = (std::min)(minimum.z, point.z);
+			maximum.x = (std::max)(maximum.x, point.x);
+			maximum.y = (std::max)(maximum.y, point.y);
+			maximum.z = (std::max)(maximum.z, point.z);
+		}
+		return true;
+	}
+
 bool IsShelfModelFile(const std::filesystem::path& path)
 {
 	std::string extension = path.extension().string();
@@ -218,6 +332,11 @@ void SceneEditor::ScanResourceShelf(ShelfState& state)
 void SceneEditor::DrawModelShelf(ShelfState& state, const ShelfCallbacks& callbacks)
 {
 #ifdef USE_IMGUI
+	// リソース棚は配置作業専用なので、Game Viewでは生成しない。
+	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
+		return;
+	}
+
 	if (!ImGui::Begin("Model Shelf")) {
 		ImGui::End();
 		return;
@@ -498,9 +617,14 @@ void SceneEditor::DrawModelShelf(ShelfState& state, const ShelfCallbacks& callba
 #endif
 }
 
-void SceneEditor::HandleShelfDropOnGameView(ShelfState& state, const ShelfCallbacks& callbacks)
+void SceneEditor::HandleShelfDropOnEditView(ShelfState& state, const ShelfCallbacks& callbacks)
 {
 #ifdef USE_IMGUI
+	// Game Viewへの誤配置を防ぎ、Edit Viewだけをドロップ先として扱う。
+	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
+		return;
+	}
+
 	float x = 0.0f;
 	float y = 0.0f;
 	float width = 0.0f;
@@ -510,7 +634,7 @@ void SceneEditor::HandleShelfDropOnGameView(ShelfState& state, const ShelfCallba
 	}
 
 	const ImRect gameViewRect(ImVec2(x, y), ImVec2(x + width, y + height));
-	const std::string dropTargetId = callbacks.sceneLabel + "GameViewShelfDropTarget";
+	const std::string dropTargetId = callbacks.sceneLabel + "EditViewShelfDropTarget";
 	if (ImGui::BeginDragDropTargetCustom(gameViewRect, ImGui::GetID(dropTargetId.c_str()))) {
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("MODEL_FILE")) {
 			std::string fileName(static_cast<const char*>(payload->Data), payload->DataSize);
@@ -549,9 +673,635 @@ void SceneEditor::HandleShelfDropOnGameView(ShelfState& state, const ShelfCallba
 #endif
 }
 
+void SceneEditor::DrawViewportEditor(ViewportState& state, const ViewportOptions& options)
+{
+#ifdef USE_IMGUI
+	if (!ImGuiManager::GetInstance()->IsEditViewActive() || !options.camera) {
+		return;
+	}
+
+	float rectX = 0.0f;
+	float rectY = 0.0f;
+	float rectWidth = 0.0f;
+	float rectHeight = 0.0f;
+	if (!ImGuiManager::GetInstance()->GetGameViewRect(rectX, rectY, rectWidth, rectHeight)) {
+		return;
+	}
+	const ImVec2 imageMin(rectX, rectY);
+	const ImVec2 imageSize(rectWidth, rectHeight);
+	const ImRect imageRect(imageMin, ImVec2(rectX + rectWidth, rectY + rectHeight));
+	const Matrix4x4& viewProjection = options.camera->GetViewProjectionMatrix();
+
+	if (state.selectedIndex >= static_cast<int>(options.objects.size()) ||
+		(state.selectedIndex >= 0 && !options.objects[state.selectedIndex].object)) {
+		state.selectedIndex = -1;
+		state.isDragging = false;
+		state.activeAxis = -1;
+	}
+
+	// Edit View左上へ、Blenderのツール切替に相当する小さな操作パネルを重ねる。
+	ImGui::SetNextWindowPos(ImVec2(rectX + 10.0f, rectY + 10.0f), ImGuiCond_Always);
+	ImGui::SetNextWindowBgAlpha(0.88f);
+	const ImGuiWindowFlags toolbarFlags =
+		ImGuiWindowFlags_NoDecoration |
+		ImGuiWindowFlags_AlwaysAutoResize |
+		ImGuiWindowFlags_NoSavedSettings |
+		ImGuiWindowFlags_NoDocking;
+	ImGui::Begin("Edit View Tools", nullptr, toolbarFlags);
+	const auto drawToolButton = [&](const char* label, TransformTool tool) {
+		if (state.tool == tool) {
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.48f, 0.82f, 1.0f));
+		}
+		if (ImGui::Button(label)) {
+			state.tool = tool;
+			state.isDragging = false;
+			state.activeAxis = -1;
+		}
+		if (state.tool == tool) {
+			ImGui::PopStyleColor();
+		}
+	};
+	drawToolButton("Move", TransformTool::Move);
+	ImGui::SameLine();
+	drawToolButton("Rotate", TransformTool::Rotate);
+	ImGui::SameLine();
+	drawToolButton("Scale", TransformTool::Scale);
+	if (state.selectedIndex >= 0) {
+		ImGui::Text("Selected: %s", options.objects[state.selectedIndex].label.c_str());
+	} else {
+		ImGui::TextDisabled("Left click an object to select it.");
+	}
+	ImGui::TextDisabled("RMB: rotate camera | MMB: pan | Wheel: zoom");
+	if (ImGui::TreeNode("Camera Transform")) {
+		Vector3 cameraPosition = options.camera->GetTranslate();
+		if (ImGui::DragFloat3("Camera Position", &cameraPosition.x, 0.05f)) {
+			options.camera->SetTranslate(cameraPosition);
+		}
+		constexpr float kRadianToDegree = 180.0f / std::numbers::pi_v<float>;
+		constexpr float kDegreeToRadian = std::numbers::pi_v<float> / 180.0f;
+		const Vector3 cameraRotation = options.camera->GetRotate();
+		float cameraRotationDegrees[3]{
+			cameraRotation.x * kRadianToDegree,
+			cameraRotation.y * kRadianToDegree,
+			cameraRotation.z * kRadianToDegree,
+		};
+		if (ImGui::DragFloat3("Camera Rotation (deg)", cameraRotationDegrees, 1.0f)) {
+			options.camera->SetRotate({
+				cameraRotationDegrees[0] * kDegreeToRadian,
+				cameraRotationDegrees[1] * kDegreeToRadian,
+				cameraRotationDegrees[2] * kDegreeToRadian,
+			});
+		}
+		ImGui::TreePop();
+	}
+	const bool toolbarHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
+	ImGui::End();
+
+	Object3d* selectedObject = state.selectedIndex >= 0
+		? options.objects[state.selectedIndex].object
+		: nullptr;
+	bool gizmoHovered = false;
+	if (selectedObject) {
+		Vector3 boundsMin{};
+		Vector3 boundsMax{};
+		if (BuildEditorWorldBounds(*selectedObject, boundsMin, boundsMax)) {
+			const Vector3 center{
+				(boundsMin.x + boundsMax.x) * 0.5f,
+				(boundsMin.y + boundsMax.y) * 0.5f,
+				(boundsMin.z + boundsMax.z) * 0.5f,
+			};
+			const Vector3 boundsSize{
+				boundsMax.x - boundsMin.x,
+				boundsMax.y - boundsMin.y,
+				boundsMax.z - boundsMin.z,
+			};
+			const float axisLength = (std::max)({ boundsSize.x, boundsSize.y, boundsSize.z, 1.0f }) * 0.85f;
+			const std::array<Vector3, 6> axisEnds{ {
+				{ center.x + axisLength, center.y, center.z },
+				{ center.x - axisLength, center.y, center.z },
+				{ center.x, center.y + axisLength, center.z },
+				{ center.x, center.y - axisLength, center.z },
+				{ center.x, center.y, center.z + axisLength },
+				{ center.x, center.y, center.z - axisLength },
+			} };
+			const std::array<Vector3, 6> worldDirections{ {
+				{ 1.0f, 0.0f, 0.0f }, { -1.0f, 0.0f, 0.0f },
+				{ 0.0f, 1.0f, 0.0f }, { 0.0f, -1.0f, 0.0f },
+				{ 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, -1.0f },
+			} };
+			ImVec2 centerScreen{};
+			std::array<ImVec2, 6> endScreens{};
+			if (ProjectEditorPoint(center, viewProjection, imageMin, imageSize, centerScreen)) {
+				const ImVec2 mouse = ImGui::GetMousePos();
+				int hoveredAxisEnd = -1;
+				float bestDistance = 11.0f;
+				for (int axisEndIndex = 0; axisEndIndex < 6; ++axisEndIndex) {
+					if (!ProjectEditorPoint(axisEnds[axisEndIndex], viewProjection, imageMin, imageSize, endScreens[axisEndIndex])) {
+						continue;
+					}
+					const float distance = EditorDistanceToSegment(mouse, centerScreen, endScreens[axisEndIndex]);
+					if (distance <= bestDistance) {
+						bestDistance = distance;
+						hoveredAxisEnd = axisEndIndex;
+					}
+				}
+				gizmoHovered = hoveredAxisEnd >= 0;
+
+				if (gizmoHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+					const ImVec2 direction(
+						endScreens[hoveredAxisEnd].x - centerScreen.x,
+						endScreens[hoveredAxisEnd].y - centerScreen.y);
+					const float length = std::sqrt(direction.x * direction.x + direction.y * direction.y);
+					state.dragScreenDirectionX = length > 0.0001f ? direction.x / length : 0.0f;
+					state.dragScreenDirectionY = length > 0.0001f ? direction.y / length : 0.0f;
+					state.dragWorldDirection = worldDirections[hoveredAxisEnd];
+					state.activeAxis = hoveredAxisEnd / 2;
+					state.isDragging = true;
+				}
+				if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+					state.isDragging = false;
+					state.activeAxis = -1;
+				}
+
+				if (state.isDragging && state.activeAxis >= 0) {
+					const ImVec2 mouseDelta = ImGui::GetIO().MouseDelta;
+					const float dragAmount =
+						mouseDelta.x * state.dragScreenDirectionX +
+						mouseDelta.y * state.dragScreenDirectionY;
+					if (std::abs(dragAmount) > 0.0001f) {
+						Transform& transform = selectedObject->GetTransform();
+						const Transform beforeEdit = transform;
+						if (state.tool == TransformTool::Move) {
+							const float amount = dragAmount * (std::max)(axisLength, 1.0f) * 0.006f;
+							transform.translate.x += state.dragWorldDirection.x * amount;
+							transform.translate.y += state.dragWorldDirection.y * amount;
+							transform.translate.z += state.dragWorldDirection.z * amount;
+						} else if (state.tool == TransformTool::Rotate) {
+							const float directionSign = state.dragWorldDirection.x + state.dragWorldDirection.y + state.dragWorldDirection.z;
+							if (state.activeAxis == 0) transform.rotate.x += dragAmount * directionSign * 0.01f;
+							if (state.activeAxis == 1) transform.rotate.y += dragAmount * directionSign * 0.01f;
+							if (state.activeAxis == 2) transform.rotate.z += dragAmount * directionSign * 0.01f;
+						} else {
+							if (state.activeAxis == 0) transform.scale.x = (std::max)(0.01f, transform.scale.x + dragAmount * 0.01f);
+							if (state.activeAxis == 1) transform.scale.y = (std::max)(0.01f, transform.scale.y + dragAmount * 0.01f);
+							if (state.activeAxis == 2) transform.scale.z = (std::max)(0.01f, transform.scale.z + dragAmount * 0.01f);
+						}
+						selectedObject->SetTranslate(transform.translate);
+						selectedObject->SetRotate(transform.rotate);
+						selectedObject->SetScale(transform.scale);
+						selectedObject->RecordTransformEdit(beforeEdit);
+						if (options.onTransformChanged) {
+							options.onTransformChanged(state.selectedIndex, transform);
+						}
+					}
+				}
+
+				ImDrawList* drawList = ImGui::GetForegroundDrawList();
+				drawList->PushClipRect(imageRect.Min, imageRect.Max, true);
+				const std::array<ImU32, 3> axisColors{
+					IM_COL32(255, 75, 75, 255),
+					IM_COL32(70, 235, 110, 255),
+					IM_COL32(70, 145, 255, 255),
+				};
+				for (int axisEndIndex = 0; axisEndIndex < 6; ++axisEndIndex) {
+					const int axis = axisEndIndex / 2;
+					ImU32 color = axisColors[axis];
+					if (state.isDragging && state.activeAxis == axis) color = IM_COL32(255, 255, 255, 255);
+					if (!state.isDragging && hoveredAxisEnd == axisEndIndex) color = IM_COL32(255, 225, 90, 255);
+					drawList->AddLine(centerScreen, endScreens[axisEndIndex], color, axisEndIndex % 2 == 0 ? 4.0f : 2.0f);
+					if (state.tool == TransformTool::Scale) {
+						drawList->AddRectFilled(
+							ImVec2(endScreens[axisEndIndex].x - 5.0f, endScreens[axisEndIndex].y - 5.0f),
+							ImVec2(endScreens[axisEndIndex].x + 5.0f, endScreens[axisEndIndex].y + 5.0f),
+							color);
+					} else {
+						drawList->AddCircleFilled(endScreens[axisEndIndex], 6.0f, color);
+					}
+				}
+				const char* toolLabel = state.tool == TransformTool::Move
+					? "Move XYZ"
+					: (state.tool == TransformTool::Rotate ? "Rotate XYZ" : "Scale XYZ");
+				drawList->AddText(ImVec2(centerScreen.x + 10.0f, centerScreen.y + 10.0f), IM_COL32(255, 255, 255, 240), toolLabel);
+				drawList->PopClipRect();
+			}
+		}
+	}
+
+	// ギズモ以外を左クリックした時だけ、新しいオブジェクトを選択する。
+	if (!state.isDragging && !gizmoHovered && !toolbarHovered &&
+		imageRect.Contains(ImGui::GetMousePos()) &&
+		ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+		const ImVec2 mouse = ImGui::GetMousePos();
+		float bestScore = (std::numeric_limits<float>::max)();
+		int bestIndex = -1;
+		for (int index = 0; index < static_cast<int>(options.objects.size()); ++index) {
+			Object3d* object = options.objects[index].object;
+			Vector3 boundsMin{};
+			Vector3 boundsMax{};
+			if (!object || !BuildEditorWorldBounds(*object, boundsMin, boundsMax)) {
+				continue;
+			}
+			const std::array<Vector3, 8> corners{ {
+				{ boundsMin.x, boundsMin.y, boundsMin.z }, { boundsMax.x, boundsMin.y, boundsMin.z },
+				{ boundsMin.x, boundsMax.y, boundsMin.z }, { boundsMax.x, boundsMax.y, boundsMin.z },
+				{ boundsMin.x, boundsMin.y, boundsMax.z }, { boundsMax.x, boundsMin.y, boundsMax.z },
+				{ boundsMin.x, boundsMax.y, boundsMax.z }, { boundsMax.x, boundsMax.y, boundsMax.z },
+			} };
+			ImVec2 screenMin((std::numeric_limits<float>::max)(), (std::numeric_limits<float>::max)());
+			ImVec2 screenMax(std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest());
+			int visibleCount = 0;
+			for (const Vector3& corner : corners) {
+				ImVec2 screen{};
+				if (!ProjectEditorPoint(corner, viewProjection, imageMin, imageSize, screen)) continue;
+				screenMin.x = (std::min)(screenMin.x, screen.x);
+				screenMin.y = (std::min)(screenMin.y, screen.y);
+				screenMax.x = (std::max)(screenMax.x, screen.x);
+				screenMax.y = (std::max)(screenMax.y, screen.y);
+				++visibleCount;
+			}
+			if (visibleCount == 0 || !ImRect(screenMin, screenMax).Contains(mouse)) continue;
+			const float centerX = (screenMin.x + screenMax.x) * 0.5f;
+			const float centerY = (screenMin.y + screenMax.y) * 0.5f;
+			const float dx = mouse.x - centerX;
+			const float dy = mouse.y - centerY;
+			const float area = (std::max)(1.0f, (screenMax.x - screenMin.x) * (screenMax.y - screenMin.y));
+			const float score = dx * dx + dy * dy + area * 0.01f;
+			if (score < bestScore) {
+				bestScore = score;
+				bestIndex = index;
+			}
+		}
+		if (state.selectedIndex != bestIndex) {
+			state.selectedIndex = bestIndex;
+			if (options.onSelectionChanged) {
+				options.onSelectionChanged(bestIndex);
+			}
+		}
+	}
+
+	// 左クリックは選択・ギズモ専用とし、カメラは右・中ボタンへ分離して誤操作を防ぐ。
+	UpdateViewportCamera(options.camera, state.isDragging || toolbarHovered);
+#else
+	(void)state;
+	(void)options;
+#endif
+}
+
+void SceneEditor::DrawSpriteViewportEditor(SpriteViewportState& state, const SpriteViewportOptions& options)
+{
+#ifdef USE_IMGUI
+	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
+		return;
+	}
+
+	float rectX = 0.0f;
+	float rectY = 0.0f;
+	float rectWidth = 0.0f;
+	float rectHeight = 0.0f;
+	if (!ImGuiManager::GetInstance()->GetGameViewRect(rectX, rectY, rectWidth, rectHeight)) {
+		return;
+	}
+	const float clientWidth = static_cast<float>(DirectXCommon::GetInstance()->GetClientWidth());
+	const float clientHeight = static_cast<float>(DirectXCommon::GetInstance()->GetClientHeight());
+	if (clientWidth <= 0.0f || clientHeight <= 0.0f) {
+		return;
+	}
+
+	if (state.selectedIndex >= static_cast<int>(options.sprites.size()) ||
+		(state.selectedIndex >= 0 && !options.sprites[state.selectedIndex].sprite)) {
+		state.selectedIndex = -1;
+		state.isDragging = false;
+		state.activeAxis = -1;
+	}
+
+	const ImRect imageRect(
+		ImVec2(rectX, rectY),
+		ImVec2(rectX + rectWidth, rectY + rectHeight));
+	const float screenScaleX = rectWidth / clientWidth;
+	const float screenScaleY = rectHeight / clientHeight;
+	const auto toScreen = [&](const Vector2& point) {
+		return ImVec2(
+			rectX + point.x * screenScaleX,
+			rectY + point.y * screenScaleY);
+	};
+
+	// 3Dツールと重ならない位置に、2D専用の小さな操作パネルを表示します。
+	ImGui::SetNextWindowPos(ImVec2(rectX + 10.0f, rectY + 135.0f), ImGuiCond_Always);
+	ImGui::SetNextWindowBgAlpha(0.88f);
+	const ImGuiWindowFlags toolbarFlags =
+		ImGuiWindowFlags_NoDecoration |
+		ImGuiWindowFlags_AlwaysAutoResize |
+		ImGuiWindowFlags_NoSavedSettings |
+		ImGuiWindowFlags_NoDocking;
+	ImGui::Begin("2D Edit Tools", nullptr, toolbarFlags);
+	const auto drawToolButton = [&](const char* label, TransformTool tool) {
+		if (state.tool == tool) {
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.48f, 0.82f, 1.0f));
+		}
+		if (ImGui::Button(label)) {
+			state.tool = tool;
+			state.isDragging = false;
+			state.activeAxis = -1;
+		}
+		if (state.tool == tool) {
+			ImGui::PopStyleColor();
+		}
+	};
+	ImGui::TextUnformatted("2D Sprite");
+	drawToolButton("Move##Sprite", TransformTool::Move);
+	ImGui::SameLine();
+	drawToolButton("Rotate##Sprite", TransformTool::Rotate);
+	ImGui::SameLine();
+	drawToolButton("Size##Sprite", TransformTool::Scale);
+	if (state.selectedIndex >= 0) {
+		ImGui::Text("Selected: %s", options.sprites[state.selectedIndex].label.c_str());
+	} else {
+		ImGui::TextDisabled("Left click a 2D texture to select it.");
+	}
+	const bool toolbarHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
+	ImGui::End();
+
+	Sprite* selectedSprite = state.selectedIndex >= 0
+		? options.sprites[state.selectedIndex].sprite
+		: nullptr;
+	bool gizmoHovered = false;
+	if (selectedSprite) {
+		const Vector2 position = selectedSprite->GetPosition();
+		const Vector2 size = selectedSprite->GetSize();
+		const Vector2 anchor = selectedSprite->GetAnchorPoint();
+		const float rotation = selectedSprite->GetRotation();
+		const float cosine = std::cos(rotation);
+		const float sine = std::sin(rotation);
+		const auto rotatePoint = [&](const Vector2& local) {
+			return Vector2{
+				position.x + local.x * cosine - local.y * sine,
+				position.y + local.x * sine + local.y * cosine,
+			};
+		};
+		const std::array<Vector2, 4> localCorners{ {
+			{ -size.x * anchor.x, -size.y * anchor.y },
+			{ size.x * (1.0f - anchor.x), -size.y * anchor.y },
+			{ size.x * (1.0f - anchor.x), size.y * (1.0f - anchor.y) },
+			{ -size.x * anchor.x, size.y * (1.0f - anchor.y) },
+		} };
+		std::array<ImVec2, 4> corners{};
+		for (size_t index = 0; index < corners.size(); ++index) {
+			corners[index] = toScreen(rotatePoint(localCorners[index]));
+		}
+
+		const Vector2 worldCenter = rotatePoint({
+			size.x * (0.5f - anchor.x),
+			size.y * (0.5f - anchor.y),
+		});
+		const ImVec2 center = toScreen(worldCenter);
+		const ImVec2 mouse = ImGui::GetMousePos();
+		constexpr float axisLength = 58.0f;
+		const ImVec2 xHandle(center.x + axisLength, center.y);
+		const ImVec2 yHandle(center.x, center.y - axisLength);
+		const float halfScreenWidth = std::abs(size.x * screenScaleX) * 0.5f;
+		const float halfScreenHeight = std::abs(size.y * screenScaleY) * 0.5f;
+		const float rotationRadius = (std::max)({ halfScreenWidth, halfScreenHeight, 34.0f }) + 18.0f;
+		const float centerDistance = std::sqrt(
+			(mouse.x - center.x) * (mouse.x - center.x) +
+			(mouse.y - center.y) * (mouse.y - center.y));
+
+		int hoveredAxis = -1;
+		if (state.tool == TransformTool::Rotate) {
+			if (std::abs(centerDistance - rotationRadius) <= 10.0f) {
+				hoveredAxis = 2;
+			}
+		} else {
+			float bestDistance = 11.0f;
+			const float xDistance = EditorDistanceToSegment(mouse, center, xHandle);
+			if (xDistance <= bestDistance) {
+				bestDistance = xDistance;
+				hoveredAxis = 0;
+			}
+			const float yDistance = EditorDistanceToSegment(mouse, center, yHandle);
+			if (yDistance <= bestDistance) {
+				hoveredAxis = 1;
+			}
+		}
+		gizmoHovered = hoveredAxis >= 0;
+
+		if (gizmoHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+			state.activeAxis = hoveredAxis;
+			state.isDragging = true;
+			state.previousMouseAngle = std::atan2(mouse.y - center.y, mouse.x - center.x);
+		}
+		if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+			state.activeAxis = -1;
+			state.isDragging = false;
+		}
+
+		if (state.isDragging && state.activeAxis >= 0) {
+			const ImVec2 mouseDelta = ImGui::GetIO().MouseDelta;
+			Vector2 editedPosition = selectedSprite->GetPosition();
+			Vector2 editedSize = selectedSprite->GetSize();
+			float editedRotation = selectedSprite->GetRotation();
+			if (state.tool == TransformTool::Move) {
+				if (state.activeAxis == 0) {
+					editedPosition.x += mouseDelta.x / screenScaleX;
+				}
+				if (state.activeAxis == 1) {
+					editedPosition.y += mouseDelta.y / screenScaleY;
+				}
+				selectedSprite->SetPosition(editedPosition);
+			} else if (state.tool == TransformTool::Rotate) {
+				const float mouseAngle = std::atan2(mouse.y - center.y, mouse.x - center.x);
+				float angleDelta = mouseAngle - state.previousMouseAngle;
+				if (angleDelta > std::numbers::pi_v<float>) angleDelta -= std::numbers::pi_v<float> * 2.0f;
+				if (angleDelta < -std::numbers::pi_v<float>) angleDelta += std::numbers::pi_v<float> * 2.0f;
+				editedRotation += angleDelta;
+				state.previousMouseAngle = mouseAngle;
+				selectedSprite->SetRotation(editedRotation);
+			} else {
+				if (state.activeAxis == 0) {
+					editedSize.x = (std::max)(1.0f, editedSize.x + mouseDelta.x / screenScaleX);
+				}
+				if (state.activeAxis == 1) {
+					editedSize.y = (std::max)(1.0f, editedSize.y - mouseDelta.y / screenScaleY);
+				}
+				selectedSprite->SetSize(editedSize);
+			}
+			if (options.onTransformChanged) {
+				options.onTransformChanged(
+					state.selectedIndex,
+					selectedSprite->GetPosition(),
+					selectedSprite->GetRotation(),
+					selectedSprite->GetSize());
+			}
+		}
+
+		ImDrawList* drawList = ImGui::GetForegroundDrawList();
+		drawList->PushClipRect(imageRect.Min, imageRect.Max, true);
+		for (size_t index = 0; index < corners.size(); ++index) {
+			drawList->AddLine(
+				corners[index],
+				corners[(index + 1) % corners.size()],
+				IM_COL32(255, 225, 95, 255),
+				2.0f);
+		}
+		if (state.tool == TransformTool::Rotate) {
+			drawList->AddCircle(
+				center,
+				rotationRadius,
+				gizmoHovered ? IM_COL32(255, 255, 255, 255) : IM_COL32(255, 190, 70, 255),
+				48,
+				3.0f);
+			drawList->AddText(
+				ImVec2(center.x + rotationRadius + 8.0f, center.y - 8.0f),
+				IM_COL32(255, 220, 120, 255),
+				"Rotate");
+		} else {
+			const ImU32 xColor = state.activeAxis == 0
+				? IM_COL32(255, 255, 255, 255)
+				: IM_COL32(255, 75, 75, 255);
+			const ImU32 yColor = state.activeAxis == 1
+				? IM_COL32(255, 255, 255, 255)
+				: IM_COL32(70, 235, 110, 255);
+			drawList->AddLine(center, xHandle, xColor, 4.0f);
+			drawList->AddLine(center, yHandle, yColor, 4.0f);
+			if (state.tool == TransformTool::Scale) {
+				drawList->AddRectFilled(
+					ImVec2(xHandle.x - 6.0f, xHandle.y - 6.0f),
+					ImVec2(xHandle.x + 6.0f, xHandle.y + 6.0f),
+					xColor);
+				drawList->AddRectFilled(
+					ImVec2(yHandle.x - 6.0f, yHandle.y - 6.0f),
+					ImVec2(yHandle.x + 6.0f, yHandle.y + 6.0f),
+					yColor);
+			} else {
+				drawList->AddCircleFilled(xHandle, 7.0f, xColor);
+				drawList->AddCircleFilled(yHandle, 7.0f, yColor);
+			}
+			drawList->AddText(ImVec2(xHandle.x + 8.0f, xHandle.y - 8.0f), xColor, "X");
+			drawList->AddText(ImVec2(yHandle.x + 8.0f, yHandle.y - 8.0f), yColor, "Y");
+		}
+		drawList->PopClipRect();
+	}
+
+	// ギズモ以外を左クリックした時だけ、手前に描かれたスプライトから順に選択します。
+	if (!state.isDragging &&
+		!gizmoHovered &&
+		!toolbarHovered &&
+		imageRect.Contains(ImGui::GetMousePos()) &&
+		ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+		const ImVec2 mouse = ImGui::GetMousePos();
+		const Vector2 mouseInClient{
+			(mouse.x - rectX) / screenScaleX,
+			(mouse.y - rectY) / screenScaleY,
+		};
+		int selectedIndex = -1;
+		for (int index = static_cast<int>(options.sprites.size()) - 1; index >= 0; --index) {
+			Sprite* sprite = options.sprites[index].sprite;
+			if (!sprite) {
+				continue;
+			}
+			const Vector2 position = sprite->GetPosition();
+			const Vector2 size = sprite->GetSize();
+			const Vector2 anchor = sprite->GetAnchorPoint();
+			const float rotation = sprite->GetRotation();
+			const float cosine = std::cos(-rotation);
+			const float sine = std::sin(-rotation);
+			const Vector2 delta{
+				mouseInClient.x - position.x,
+				mouseInClient.y - position.y,
+			};
+			const Vector2 local{
+				delta.x * cosine - delta.y * sine,
+				delta.x * sine + delta.y * cosine,
+			};
+			const float minimumX = -size.x * anchor.x;
+			const float minimumY = -size.y * anchor.y;
+			if (local.x >= minimumX &&
+				local.x <= minimumX + size.x &&
+				local.y >= minimumY &&
+				local.y <= minimumY + size.y) {
+				selectedIndex = index;
+				break;
+			}
+		}
+		if (state.selectedIndex != selectedIndex) {
+			state.selectedIndex = selectedIndex;
+			if (options.onSelectionChanged) {
+				options.onSelectionChanged(selectedIndex);
+			}
+		}
+	}
+#else
+	(void)state;
+	(void)options;
+#endif
+}
+
+void SceneEditor::UpdateViewportCamera(Camera* camera, bool inputBlocked)
+{
+#ifdef USE_IMGUI
+	if (!camera || inputBlocked) {
+		return;
+	}
+	float rectX = 0.0f;
+	float rectY = 0.0f;
+	float rectWidth = 0.0f;
+	float rectHeight = 0.0f;
+	if (!ImGuiManager::GetInstance()->GetGameViewRect(rectX, rectY, rectWidth, rectHeight)) {
+		return;
+	}
+	const ImRect imageRect(
+		ImVec2(rectX, rectY),
+		ImVec2(rectX + rectWidth, rectY + rectHeight));
+	if (!imageRect.Contains(ImGui::GetMousePos()) || ImGui::IsAnyItemActive()) {
+		return;
+	}
+
+	Vector3 cameraPosition = camera->GetTranslate();
+	Vector3 cameraRotation = camera->GetRotate();
+	const ImVec2 mouseDelta = ImGui::GetIO().MouseDelta;
+	bool cameraChanged = false;
+	if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+		cameraRotation.y += mouseDelta.x * 0.005f;
+		cameraRotation.x = std::clamp(cameraRotation.x + mouseDelta.y * 0.005f, -1.45f, 1.45f);
+		cameraChanged = true;
+	}
+	if (ImGui::IsMouseDown(ImGuiMouseButton_Middle)) {
+		const Vector3 right{ std::cos(cameraRotation.y), 0.0f, -std::sin(cameraRotation.y) };
+		cameraPosition.x -= right.x * mouseDelta.x * 0.01f;
+		cameraPosition.z -= right.z * mouseDelta.x * 0.01f;
+		cameraPosition.y += mouseDelta.y * 0.01f;
+		cameraChanged = true;
+	}
+	if (std::abs(ImGui::GetIO().MouseWheel) > 0.0001f) {
+		const float cosinePitch = std::cos(cameraRotation.x);
+		const Vector3 forward{
+			std::sin(cameraRotation.y) * cosinePitch,
+			-std::sin(cameraRotation.x),
+			std::cos(cameraRotation.y) * cosinePitch,
+		};
+		const float zoomAmount = ImGui::GetIO().MouseWheel * 0.6f;
+		cameraPosition.x += forward.x * zoomAmount;
+		cameraPosition.y += forward.y * zoomAmount;
+		cameraPosition.z += forward.z * zoomAmount;
+		cameraChanged = true;
+	}
+	if (cameraChanged) {
+		camera->SetTranslate(cameraPosition);
+		camera->SetRotate(cameraRotation);
+	}
+#else
+	(void)camera;
+	(void)inputBlocked;
+#endif
+}
+
 void SceneEditor::DrawInspector(const InspectorOptions& options)
 {
 #ifdef USE_IMGUI
+	// Transformを変更できるInspectorはEdit Viewだけで表示する。
+	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
+		return;
+	}
+
 	if (!options.normalObjects || !options.animationObjects || !options.directionalLight || !options.pointLight || !options.spotLight) {
 		return;
 	}
