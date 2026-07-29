@@ -30,6 +30,7 @@ public:
 	void Draw();
 	// 指定SRVを描画する。useEffectがfalseなら通常の転送だけを行う。
 	void Draw(uint32_t sourceSrvIndex, bool useEffect);
+	void Update(float deltaTime);
 	// GaussianFilterの縦方向のぼかしを描画する。
 	void DrawGaussianVertical(uint32_t sourceSrvIndex);
 	void SetGrayscale(bool isGrayscale) { isGrayscale_ = isGrayscale; }
@@ -41,6 +42,8 @@ public:
 	void SetDissolve(bool isDissolve) { isDissolve_ = isDissolve; }
 	void SetDissolveMask(DissolveMask dissolveMask) { dissolveMask_ = dissolveMask; }
 	void SetDissolveEdge(bool isDissolveEdge) { isDissolveEdge_ = isDissolveEdge; }
+	void SetRandomNoise(bool isRandomNoise) { isRandomNoise_ = isRandomNoise; }
+	void SetRandomNoiseIntensity(float intensity);
 	void SetLuminanceBasedOutline(bool isLuminanceBasedOutline) { isLuminanceBasedOutline_ = isLuminanceBasedOutline; }
 	void SetDepthBasedOutline(bool isDepthBasedOutline) { isDepthBasedOutline_ = isDepthBasedOutline; }
 	void SetDissolveThreshold(float threshold);
@@ -56,12 +59,14 @@ public:
 	bool IsDissolve() const { return isDissolve_; }
 	DissolveMask GetDissolveMask() const { return dissolveMask_; }
 	bool IsDissolveEdge() const { return isDissolveEdge_; }
+	bool IsRandomNoise() const { return isRandomNoise_; }
 	bool IsLuminanceBasedOutline() const { return isLuminanceBasedOutline_; }
 	bool IsDepthBasedOutline() const { return isDepthBasedOutline_; }
 	float GetDissolveThreshold() const { return dissolveData_->threshold; }
 	float GetDissolveEdgeWidth() const { return dissolveData_->edgeWidth; }
+	float GetRandomNoiseIntensity() const { return randomNoiseData_->intensity; }
 	void GetDissolveEdgeColor(float& red, float& green, float& blue) const;
-	bool IsEnabled() const { return isGrayscale_ || isSepia_ || isVignette_ || isSmoothing_ || isGaussianFilter_ || isRadialBlur_ || isDissolve_ || isLuminanceBasedOutline_ || isDepthBasedOutline_; }
+	bool IsEnabled() const { return isGrayscale_ || isSepia_ || isVignette_ || isSmoothing_ || isGaussianFilter_ || isRadialBlur_ || isDissolve_ || isRandomNoise_ || isLuminanceBasedOutline_ || isDepthBasedOutline_; }
 
 private:
 	PostEffect() = default;
@@ -77,6 +82,7 @@ private:
 		RadialBlur,
 		Dissolve,
 		DissolveEdge,
+		RandomNoise,
 		LuminanceBasedOutline,
 		DepthBasedOutline,
 		GaussianFilterHorizontal,
@@ -104,6 +110,13 @@ private:
 		float edgeColor[4];
 	};
 
+	struct RandomNoiseData
+	{
+		float time;
+		float intensity;
+		float padding[2];
+	};
+
 	DirectXCommon* dxCommon_ = nullptr;
 	SrvManager* srvManager_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;
@@ -112,6 +125,8 @@ private:
 	DepthBasedOutlineData* depthBasedOutlineData_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> dissolveResource_;
 	DissolveData* dissolveData_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> randomNoiseResource_;
+	RandomNoiseData* randomNoiseData_ = nullptr;
 	uint32_t dissolveMaskSrvIndex_ = SrvManager::kInvalidSrvIndex;
 	uint32_t dissolveMaskNoise1SrvIndex_ = SrvManager::kInvalidSrvIndex;
 	bool isGrayscale_ = false;
@@ -123,6 +138,7 @@ private:
 	bool isDissolve_ = false;
 	DissolveMask dissolveMask_ = DissolveMask::Noise0;
 	bool isDissolveEdge_ = false;
+	bool isRandomNoise_ = false;
 	bool isLuminanceBasedOutline_ = false;
 	bool isDepthBasedOutline_ = false;
 };
