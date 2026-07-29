@@ -3824,8 +3824,15 @@ void GamePlayScene::Draw()
 	// SceneはRenderTextureへ描画済みなので、ImGuiの直前にSwapChainへ切り替える
 	}
 	if (PostEffect::GetInstance()->IsEnabled()) {
-		DirectXCommon::GetInstance()->PreDrawForPostEffectTexture();
-		PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), true);
+		if (PostEffect::GetInstance()->IsGaussianFilter()) {
+			DirectXCommon::GetInstance()->PreDrawForGaussianHorizontalTexture();
+			PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), true);
+			DirectXCommon::GetInstance()->PreDrawForGaussianVerticalTexture();
+			PostEffect::GetInstance()->DrawGaussianVertical(DirectXCommon::GetInstance()->GetGaussianBlurTextureSrvIndex());
+		} else {
+			DirectXCommon::GetInstance()->PreDrawForPostEffectTexture();
+			PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), true);
+		}
 	}
 	DirectXCommon::GetInstance()->PreDrawForSwapChain(PostEffect::GetInstance()->IsEnabled());
 #ifndef USE_IMGUI

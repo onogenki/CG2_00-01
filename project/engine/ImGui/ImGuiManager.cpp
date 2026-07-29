@@ -253,23 +253,47 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 			bool isGrayscale = PostEffect::GetInstance()->IsGrayscale();
 			bool isSepia = PostEffect::GetInstance()->IsSepia();
 			bool isVignette = PostEffect::GetInstance()->IsVignette();
+			bool isGaussianFilter = PostEffect::GetInstance()->IsGaussianFilter();
+			bool isBoxFilter = PostEffect::GetInstance()->IsBoxFilter();
 			if (ImGui::Checkbox("Gray", &isGrayscale) && isGrayscale) {
 				isSepia = false;
 				isVignette = false;
+				isGaussianFilter = false;
+				isBoxFilter = false;
 			}
 			ImGui::SameLine();
 			if (ImGui::Checkbox("Sepia", &isSepia) && isSepia) {
 				isGrayscale = false;
 				isVignette = false;
+				isGaussianFilter = false;
+				isBoxFilter = false;
 			}
 			ImGui::SameLine();
 			if (ImGui::Checkbox("Vignette", &isVignette) && isVignette) {
 				isGrayscale = false;
 				isSepia = false;
+				isGaussianFilter = false;
+				isBoxFilter = false;
+			}
+			ImGui::SameLine();
+			if (ImGui::Checkbox("Gaussian", &isGaussianFilter) && isGaussianFilter) {
+				isGrayscale = false;
+				isSepia = false;
+				isVignette = false;
+				isBoxFilter = false;
+			}
+			ImGui::SameLine();
+			if (ImGui::Checkbox("Box Filter", &isBoxFilter) && isBoxFilter) {
+				isGrayscale = false;
+				isSepia = false;
+				isVignette = false;
+				isGaussianFilter = false;
 			}
 			PostEffect::GetInstance()->SetGrayscale(isGrayscale);
 			PostEffect::GetInstance()->SetSepia(isSepia);
 			PostEffect::GetInstance()->SetVignette(isVignette);
+			PostEffect::GetInstance()->SetGaussianFilter(isGaussianFilter);
+			PostEffect::GetInstance()->SetBoxFilter(isBoxFilter);
 			ParticleManager* particleManager = ParticleManager::GetInstance();
 			bool particlesReturning = particleManager->IsReturning();
 			if (ImGui::Checkbox("Particle return##TopTools", &particlesReturning)) {
@@ -1172,21 +1196,43 @@ void ImGuiManager::PostEffectWindow()
 	bool isGrayscale = PostEffect::GetInstance()->IsGrayscale();
 	bool isSepia = PostEffect::GetInstance()->IsSepia();
 	bool isVignette = PostEffect::GetInstance()->IsVignette();
+	bool isGaussianFilter = PostEffect::GetInstance()->IsGaussianFilter();
+	bool isBoxFilter = PostEffect::GetInstance()->IsBoxFilter();
 	if (ImGui::Checkbox("Grayscale", &isGrayscale) && isGrayscale) {
 		isSepia = false;
 		isVignette = false;
+		isGaussianFilter = false;
+		isBoxFilter = false;
 	}
 	if (ImGui::Checkbox("Sepia", &isSepia) && isSepia) {
 		isGrayscale = false;
 		isVignette = false;
+		isGaussianFilter = false;
+		isBoxFilter = false;
 	}
 	if (ImGui::Checkbox("Vignette", &isVignette) && isVignette) {
 		isGrayscale = false;
 		isSepia = false;
+		isGaussianFilter = false;
+		isBoxFilter = false;
+	}
+	if (ImGui::Checkbox("Gaussian", &isGaussianFilter) && isGaussianFilter) {
+		isGrayscale = false;
+		isSepia = false;
+		isVignette = false;
+		isBoxFilter = false;
+	}
+	if (ImGui::Checkbox("Box Filter", &isBoxFilter) && isBoxFilter) {
+		isGrayscale = false;
+		isSepia = false;
+		isVignette = false;
+		isGaussianFilter = false;
 	}
 	PostEffect::GetInstance()->SetGrayscale(isGrayscale);
 	PostEffect::GetInstance()->SetSepia(isSepia);
 	PostEffect::GetInstance()->SetVignette(isVignette);
+	PostEffect::GetInstance()->SetGaussianFilter(isGaussianFilter);
+	PostEffect::GetInstance()->SetBoxFilter(isBoxFilter);
 	ImGui::End();
 #else
 #endif

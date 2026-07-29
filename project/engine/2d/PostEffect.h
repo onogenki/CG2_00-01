@@ -23,13 +23,19 @@ public:
 	void Draw();
 	// 指定SRVを描画する。useEffectがfalseなら通常の転送だけを行う。
 	void Draw(uint32_t sourceSrvIndex, bool useEffect);
+	// GaussianFilterの縦方向のぼかしを描画する。
+	void DrawGaussianVertical(uint32_t sourceSrvIndex);
 	void SetGrayscale(bool isGrayscale) { isGrayscale_ = isGrayscale; }
 	void SetSepia(bool isSepia) { isSepia_ = isSepia; }
 	void SetVignette(bool isVignette) { isVignette_ = isVignette; }
+	void SetGaussianFilter(bool isGaussianFilter) { isGaussianFilter_ = isGaussianFilter; }
+	void SetBoxFilter(bool isBoxFilter) { isBoxFilter_ = isBoxFilter; }
 	bool IsGrayscale() const { return isGrayscale_; }
 	bool IsSepia() const { return isSepia_; }
 	bool IsVignette() const { return isVignette_; }
-	bool IsEnabled() const { return isGrayscale_ || isSepia_ || isVignette_; }
+	bool IsGaussianFilter() const { return isGaussianFilter_; }
+	bool IsBoxFilter() const { return isBoxFilter_; }
+	bool IsEnabled() const { return isGrayscale_ || isSepia_ || isVignette_ || isGaussianFilter_ || isBoxFilter_; }
 
 private:
 	PostEffect() = default;
@@ -42,6 +48,9 @@ private:
 		Grayscale,
 		Sepia,
 		Vignette,
+		GaussianFilterHorizontal,
+		GaussianFilterVertical,
+		BoxFilter,
 		Count
 	};
 
@@ -49,6 +58,7 @@ private:
 	void CreateGraphicsPipeline();
 	// 指定ピクセルシェーダーをコンパイルして、対応するPSOを作成する。
 	void CreateGraphicsPipelineState(PipelineType type, const wchar_t* pixelShaderPath);
+	void DrawWithPipeline(uint32_t sourceSrvIndex, PipelineType pipelineType);
 
 	DirectXCommon* dxCommon_ = nullptr;
 	SrvManager* srvManager_ = nullptr;
@@ -57,4 +67,6 @@ private:
 	bool isGrayscale_ = false;
 	bool isSepia_ = false;
 	bool isVignette_ = false;
+	bool isGaussianFilter_ = false;
+	bool isBoxFilter_ = false;
 };

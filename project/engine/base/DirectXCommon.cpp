@@ -69,6 +69,7 @@ void DirectXCommon::ResizeIfNeeded()
 	}
 	renderTextureResource_.Reset();
 	postEffectTextureResource_.Reset();
+	gaussianBlurTextureResource_.Reset();
 	depthStencilResource.Reset();
 	resource.Reset();
 
@@ -92,6 +93,7 @@ void DirectXCommon::ResizeIfNeeded()
 	CreateRenderTextureSRV(SrvManager::GetInstance());
 	isRenderTextureShaderResource_ = false;
 	isPostEffectTextureShaderResource_ = false;
+	isGaussianBlurTextureShaderResource_ = false;
 }
 
 void DirectXCommon::InitializeDevice()//デバイスの初期化
@@ -284,8 +286,8 @@ void DirectXCommon::DescriptorHeap()
 
 	//ディスクリプタヒープの生成
 	//RTV用のヒープでディスクリプタの数は2。RTVはShader内で触るものではないので、ShaderVisibleはfalse
-	// SwapChainの2枚にRenderTextureの1枚を加え、RTVを3個確保する
-	rtvDescriptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 4, false);
+	// SwapChainの2枚にRenderTextureとPostEffect用の2枚を加え、RTVを5個確保する
+	rtvDescriptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 5, false);
 	//SRV用のヒープでディスクリプタのの数は128。SRVはShader内で触るものなので、ShaderVisibleはtrue
 	srvDescriptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSRVCount, true);
 	//DSV用のヒープでディスクリプタの数は1。DSVはShader内で触れるものではないので、ShaderVisibleはfalse
@@ -349,6 +351,20 @@ void DirectXCommon::RenderTargetView()
 		postEffectTextureResource_.Get(),
 		&rtvDesc_,
 		postEffectTextureRtvHandle_);
+
+	handle.ptr += increment;
+
+	gaussianBlurTextureResource_ = CreateRenderTextureResource(
+		width,
+		height,
+		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+		renderTextureClearColor_);
+
+	gaussianBlurTextureRtvHandle_ = handle;
+	device_->CreateRenderTargetView(
+		gaussianBlurTextureResource_.Get(),
+		&rtvDesc_,
+		gaussianBlurTextureRtvHandle_);
 }
 
 void DirectXCommon::DepthStencilView()
@@ -473,6 +489,90 @@ void DirectXCommon::PreDrawForPostEffectTexture()
 		renderTextureBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 		commandList_->ResourceBarrier(1, &renderTextureBarrier);
 		isRenderTextureShaderResource_ = true;
+	}
+
+	if (isPostEffectTextureShaderResource_)
+	{
+		D3D12_RESOURCE_BARRIER postEffectTextureBarrier{};
+		postEffectTextureBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		postEffectTextureBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		postEffectTextureBarrier.Transition.pResource = postEffectTextureResource_.Get();
+		postEffectTextureBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		postEffectTextureBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		postEffectTextureBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		commandList_->ResourceBarrier(1, &postEffectTextureBarrier);
+		isPostEffectTextureShaderResource_ = false;
+	}
+
+	commandList_->OMSetRenderTargets(1, &postEffectTextureRtvHandle_, false, nullptr);
+
+	const float clearColor[] = {
+		renderTextureClearColor_.x,
+		renderTextureClearColor_.y,
+		renderTextureClearColor_.z,
+		renderTextureClearColor_.w
+	};
+	commandList_->ClearRenderTargetView(postEffectTextureRtvHandle_, clearColor, 0, nullptr);
+
+	commandList_->RSSetViewports(1, &viewport_);
+	commandList_->RSSetScissorRects(1, &scissorRect_);
+}
+
+void DirectXCommon::PreDrawForGaussianHorizontalTexture()
+{
+	if (!isRenderTextureShaderResource_)
+	{
+		D3D12_RESOURCE_BARRIER renderTextureBarrier{};
+		renderTextureBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		renderTextureBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		renderTextureBarrier.Transition.pResource = renderTextureResource_.Get();
+		renderTextureBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		renderTextureBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		renderTextureBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		commandList_->ResourceBarrier(1, &renderTextureBarrier);
+		isRenderTextureShaderResource_ = true;
+	}
+
+	if (isGaussianBlurTextureShaderResource_)
+	{
+		D3D12_RESOURCE_BARRIER gaussianBlurTextureBarrier{};
+		gaussianBlurTextureBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		gaussianBlurTextureBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		gaussianBlurTextureBarrier.Transition.pResource = gaussianBlurTextureResource_.Get();
+		gaussianBlurTextureBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		gaussianBlurTextureBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		gaussianBlurTextureBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		commandList_->ResourceBarrier(1, &gaussianBlurTextureBarrier);
+		isGaussianBlurTextureShaderResource_ = false;
+	}
+
+	commandList_->OMSetRenderTargets(1, &gaussianBlurTextureRtvHandle_, false, nullptr);
+
+	const float clearColor[] = {
+		renderTextureClearColor_.x,
+		renderTextureClearColor_.y,
+		renderTextureClearColor_.z,
+		renderTextureClearColor_.w
+	};
+	commandList_->ClearRenderTargetView(gaussianBlurTextureRtvHandle_, clearColor, 0, nullptr);
+
+	commandList_->RSSetViewports(1, &viewport_);
+	commandList_->RSSetScissorRects(1, &scissorRect_);
+}
+
+void DirectXCommon::PreDrawForGaussianVerticalTexture()
+{
+	if (!isGaussianBlurTextureShaderResource_)
+	{
+		D3D12_RESOURCE_BARRIER gaussianBlurTextureBarrier{};
+		gaussianBlurTextureBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		gaussianBlurTextureBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		gaussianBlurTextureBarrier.Transition.pResource = gaussianBlurTextureResource_.Get();
+		gaussianBlurTextureBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		gaussianBlurTextureBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		gaussianBlurTextureBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		commandList_->ResourceBarrier(1, &gaussianBlurTextureBarrier);
+		isGaussianBlurTextureShaderResource_ = true;
 	}
 
 	if (isPostEffectTextureShaderResource_)
@@ -1204,6 +1304,7 @@ void DirectXCommon::CreateRenderTextureSRV(SrvManager* srvManager)
 	assert(srvManager);
 	assert(renderTextureResource_);
 	assert(postEffectTextureResource_);
+	assert(gaussianBlurTextureResource_);
 
 	// RenderTextureの描画結果をShaderから読めるよう、SRVの場所を1個確保する
 	if (renderTextureSrvIndex_ == UINT32_MAX) {
@@ -1211,6 +1312,9 @@ void DirectXCommon::CreateRenderTextureSRV(SrvManager* srvManager)
 	}
 	if (postEffectTextureSrvIndex_ == UINT32_MAX) {
 		postEffectTextureSrvIndex_ = srvManager->Allocate();
+	}
+	if (gaussianBlurTextureSrvIndex_ == UINT32_MAX) {
+		gaussianBlurTextureSrvIndex_ = srvManager->Allocate();
 	}
 
 	// Resourceと同じFormat、ミップレベル1でTexture2D用SRVを生成する
@@ -1224,6 +1328,13 @@ void DirectXCommon::CreateRenderTextureSRV(SrvManager* srvManager)
 	srvManager->CreateSRVforTexture2D(
 		postEffectTextureSrvIndex_,
 		postEffectTextureResource_.Get(),
+		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+		1,
+		true);
+
+	srvManager->CreateSRVforTexture2D(
+		gaussianBlurTextureSrvIndex_,
+		gaussianBlurTextureResource_.Get(),
 		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
 		1,
 		true);
