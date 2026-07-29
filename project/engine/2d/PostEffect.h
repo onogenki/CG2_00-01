@@ -26,10 +26,12 @@ public:
 	void SetGrayscale(bool isGrayscale) { isGrayscale_ = isGrayscale; }
 	void SetSepia(bool isSepia) { isSepia_ = isSepia; }
 	void SetVignette(bool isVignette) { isVignette_ = isVignette; }
+	void SetSmoothing(bool isSmoothing) { isSmoothing_ = isSmoothing; }
 	bool IsGrayscale() const { return isGrayscale_; }
 	bool IsSepia() const { return isSepia_; }
 	bool IsVignette() const { return isVignette_; }
-	bool IsEnabled() const { return isGrayscale_ || isSepia_ || isVignette_; }
+	bool IsSmoothing() const { return isSmoothing_; }
+	bool IsEnabled() const { return isGrayscale_ || isSepia_ || isVignette_ || isSmoothing_; }
 
 private:
 	PostEffect() = default;
@@ -42,6 +44,7 @@ private:
 		Grayscale,
 		Sepia,
 		Vignette,
+		Smoothing,
 		Count
 	};
 
@@ -57,4 +60,5 @@ private:
 	bool isGrayscale_ = false;
 	bool isSepia_ = false;
 	bool isVignette_ = false;
+	bool isSmoothing_ = false;
 };

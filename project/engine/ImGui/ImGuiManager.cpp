@@ -253,23 +253,34 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 			bool isGrayscale = PostEffect::GetInstance()->IsGrayscale();
 			bool isSepia = PostEffect::GetInstance()->IsSepia();
 			bool isVignette = PostEffect::GetInstance()->IsVignette();
+			bool isSmoothing = PostEffect::GetInstance()->IsSmoothing();
 			if (ImGui::Checkbox("Gray", &isGrayscale) && isGrayscale) {
 				isSepia = false;
 				isVignette = false;
+				isSmoothing = false;
 			}
 			ImGui::SameLine();
 			if (ImGui::Checkbox("Sepia", &isSepia) && isSepia) {
 				isGrayscale = false;
 				isVignette = false;
+				isSmoothing = false;
 			}
 			ImGui::SameLine();
 			if (ImGui::Checkbox("Vignette", &isVignette) && isVignette) {
 				isGrayscale = false;
 				isSepia = false;
+				isSmoothing = false;
+			}
+			ImGui::SameLine();
+			if (ImGui::Checkbox("Smoothing", &isSmoothing) && isSmoothing) {
+				isGrayscale = false;
+				isSepia = false;
+				isVignette = false;
 			}
 			PostEffect::GetInstance()->SetGrayscale(isGrayscale);
 			PostEffect::GetInstance()->SetSepia(isSepia);
 			PostEffect::GetInstance()->SetVignette(isVignette);
+			PostEffect::GetInstance()->SetSmoothing(isSmoothing);
 			ParticleManager* particleManager = ParticleManager::GetInstance();
 			bool particlesReturning = particleManager->IsReturning();
 			if (ImGui::Checkbox("Particle return##TopTools", &particlesReturning)) {
@@ -1172,21 +1183,31 @@ void ImGuiManager::PostEffectWindow()
 	bool isGrayscale = PostEffect::GetInstance()->IsGrayscale();
 	bool isSepia = PostEffect::GetInstance()->IsSepia();
 	bool isVignette = PostEffect::GetInstance()->IsVignette();
+	bool isSmoothing = PostEffect::GetInstance()->IsSmoothing();
 	if (ImGui::Checkbox("Grayscale", &isGrayscale) && isGrayscale) {
 		isSepia = false;
 		isVignette = false;
+		isSmoothing = false;
 	}
 	if (ImGui::Checkbox("Sepia", &isSepia) && isSepia) {
 		isGrayscale = false;
 		isVignette = false;
+		isSmoothing = false;
 	}
 	if (ImGui::Checkbox("Vignette", &isVignette) && isVignette) {
 		isGrayscale = false;
 		isSepia = false;
+		isSmoothing = false;
+	}
+	if (ImGui::Checkbox("Smoothing", &isSmoothing) && isSmoothing) {
+		isGrayscale = false;
+		isSepia = false;
+		isVignette = false;
 	}
 	PostEffect::GetInstance()->SetGrayscale(isGrayscale);
 	PostEffect::GetInstance()->SetSepia(isSepia);
 	PostEffect::GetInstance()->SetVignette(isVignette);
+	PostEffect::GetInstance()->SetSmoothing(isSmoothing);
 	ImGui::End();
 #else
 #endif
