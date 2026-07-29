@@ -24,6 +24,10 @@ void PostEffect::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 	dissolveData_->edgeColor[1] = 0.4f;
 	dissolveData_->edgeColor[2] = 0.3f;
 	dissolveData_->edgeColor[3] = 1.0f;
+	randomNoiseResource_ = dxCommon_->CreateBufferResource(sizeof(RandomNoiseData));
+	randomNoiseResource_->Map(0, nullptr, reinterpret_cast<void**>(&randomNoiseData_));
+	randomNoiseData_->time = 0.0f;
+	randomNoiseData_->intensity = 1.0f;
 
 	const std::string dissolveMaskFilePath = "Resources/noise0.png";
 	const bool isLoaded = TextureManager::GetInstance()->LoadTexture(dissolveMaskFilePath);
@@ -39,6 +43,16 @@ void PostEffect::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 void PostEffect::SetDissolveThreshold(float threshold)
 {
 	dissolveData_->threshold = threshold;
+}
+
+void PostEffect::Update(float deltaTime)
+{
+	randomNoiseData_->time += deltaTime;
+}
+
+void PostEffect::SetRandomNoiseIntensity(float intensity)
+{
+	randomNoiseData_->intensity = intensity;
 }
 
 void PostEffect::SetDissolveEdgeWidth(float edgeWidth)
@@ -84,6 +98,8 @@ void PostEffect::Draw(uint32_t sourceSrvIndex, bool useEffect)
 		? PipelineType::RadialBlur
 		: isDissolve_
 		? (isDissolveEdge_ ? PipelineType::DissolveEdge : PipelineType::Dissolve)
+		: isRandomNoise_
+		? PipelineType::RandomNoise
 		: isSmoothing_
 		? PipelineType::Smoothing
 		: isVignette_
@@ -131,6 +147,9 @@ void PostEffect::DrawWithPipeline(uint32_t sourceSrvIndex, PipelineType pipeline
 	commandList->SetGraphicsRootConstantBufferView(
 		3,
 		dissolveResource_->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(
+		4,
+		randomNoiseResource_->GetGPUVirtualAddress());
 
 	// VertexShaderのSV_VertexIDで3頂点を作るため、頂点バッファは不要
 	commandList->DrawInstanced(3, 1, 0, 0);
@@ -149,7 +168,7 @@ void PostEffect::CreateRootSignature()
 	descriptorRanges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptorRanges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	D3D12_ROOT_PARAMETER rootParameters[4]{};
+	D3D12_ROOT_PARAMETER rootParameters[5]{};
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[0].DescriptorTable.pDescriptorRanges = &descriptorRanges[0];
@@ -164,6 +183,9 @@ void PostEffect::CreateRootSignature()
 	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[3].Descriptor.ShaderRegister = 1;
+	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[4].Descriptor.ShaderRegister = 2;
 
 	// PixelShaderのs0でRenderTextureをサンプリングする
 	D3D12_STATIC_SAMPLER_DESC staticSamplers[2]{};
@@ -212,6 +234,7 @@ void PostEffect::CreateGraphicsPipeline()
 	CreateGraphicsPipelineState(PipelineType::RadialBlur, L"resources/shaders/RadialBlur.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::Dissolve, L"resources/shaders/DissolveNoise.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::DissolveEdge, L"resources/shaders/Dissolve.PS.hlsl");
+	CreateGraphicsPipelineState(PipelineType::RandomNoise, L"resources/shaders/RandomNoise.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::LuminanceBasedOutline, L"resources/shaders/LuminanceBasedOutline.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::DepthBasedOutline, L"resources/shaders/DepthBasedOutline.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::GaussianFilterHorizontal, L"resources/shaders/GaussianFilter.PS.hlsl");

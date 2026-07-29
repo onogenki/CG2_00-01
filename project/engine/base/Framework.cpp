@@ -147,6 +147,7 @@ void Framework::Update()
 	dxCommon_->ResizeIfNeeded();
 	input_->Update();
 	Audio::GetInstance()->Update();
+	PostEffect::GetInstance()->Update(dxCommon_->GetDeltaTime());
 
 	//マネージャーにシーンの更新(と切り替え)を任せる
 	SceneManager::GetInstance()->Update();
