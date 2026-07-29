@@ -327,8 +327,15 @@ void Stage1::Draw()
 	//Post Effectが有効なときは、SceneのRenderTextureへ効果を適用してからGame Viewへ表示する
 	const bool isPostEffectEnabled = PostEffect::GetInstance()->IsEnabled();
 	if (isPostEffectEnabled) {
-		DirectXCommon::GetInstance()->PreDrawForPostEffectTexture();
-		PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), true);
+		if (PostEffect::GetInstance()->IsGaussianFilter()) {
+			DirectXCommon::GetInstance()->PreDrawForGaussianHorizontalTexture();
+			PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), true);
+			DirectXCommon::GetInstance()->PreDrawForGaussianVerticalTexture();
+			PostEffect::GetInstance()->DrawGaussianVertical(DirectXCommon::GetInstance()->GetGaussianBlurTextureSrvIndex());
+		} else {
+			DirectXCommon::GetInstance()->PreDrawForPostEffectTexture();
+			PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), true);
+		}
 	}
 
 	DirectXCommon::GetInstance()->PreDrawForSwapChain(isPostEffectEnabled);

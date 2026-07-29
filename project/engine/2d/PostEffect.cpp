@@ -20,13 +20,10 @@ void PostEffect::Draw()
 
 void PostEffect::Draw(uint32_t sourceSrvIndex, bool useEffect)
 {
-	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
-
-	// RenderTextureのSRVが入ったDescriptorHeapを使用する
-	// CopyImage用の描画設定をCommandListへ積む
-	commandList->SetGraphicsRootSignature(rootSignature_.Get());
 	const PipelineType pipelineType = !useEffect
 		? PipelineType::Fullscreen
+		: isGaussianFilter_
+		? PipelineType::GaussianFilterHorizontal
 		: isSmoothing_
 		? PipelineType::Smoothing
 		: isVignette_
@@ -34,6 +31,21 @@ void PostEffect::Draw(uint32_t sourceSrvIndex, bool useEffect)
 		: isSepia_
 		? PipelineType::Sepia
 		: (isGrayscale_ ? PipelineType::Grayscale : PipelineType::Fullscreen);
+	DrawWithPipeline(sourceSrvIndex, pipelineType);
+}
+
+void PostEffect::DrawGaussianVertical(uint32_t sourceSrvIndex)
+{
+	DrawWithPipeline(sourceSrvIndex, PipelineType::GaussianFilterVertical);
+}
+
+void PostEffect::DrawWithPipeline(uint32_t sourceSrvIndex, PipelineType pipelineType)
+{
+	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
+
+	// RenderTextureのSRVが入ったDescriptorHeapを使用する
+	// CopyImage用の描画設定をCommandListへ積む
+	commandList->SetGraphicsRootSignature(rootSignature_.Get());
 	commandList->SetPipelineState(graphicsPipelineStates_[static_cast<int>(pipelineType)].Get());
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -102,6 +114,8 @@ void PostEffect::CreateGraphicsPipeline()
 	CreateGraphicsPipelineState(PipelineType::Grayscale, L"resources/shaders/Grayscale.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::Sepia, L"resources/shaders/Sepia.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::Vignette, L"resources/shaders/Vignette.PS.hlsl");
+	CreateGraphicsPipelineState(PipelineType::GaussianFilterHorizontal, L"resources/shaders/GaussianFilter.PS.hlsl");
+	CreateGraphicsPipelineState(PipelineType::GaussianFilterVertical, L"resources/shaders/GaussianFilterVertical.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::Smoothing, L"resources/shaders/BoxFilter.PS.hlsl");
 }
 

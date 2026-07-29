@@ -45,6 +45,8 @@ public:
 	void PreDraw();
 	// Scene描画後、ImGuiを描画するSwapChainへ描画先を切り替える
 	void PreDrawForPostEffectTexture();
+	void PreDrawForGaussianHorizontalTexture();
+	void PreDrawForGaussianVerticalTexture();
 	void PreDrawForSwapChain(bool usePostEffectTexture = false);
 	//描画後処理
 	void PostDraw();
@@ -100,6 +102,7 @@ public:
 	ID3D12CommandAllocator* GetCommandAllocator() const { return commandAllocators_[frameIndex_].Get(); }
 	uint32_t GetRenderTextureSrvIndex() const { return renderTextureSrvIndex_; }
 	uint32_t GetPostEffectTextureSrvIndex() const { return postEffectTextureSrvIndex_; }
+	uint32_t GetGaussianBlurTextureSrvIndex() const { return gaussianBlurTextureSrvIndex_; }
 	uint32_t GetClientWidth() const { return width; }
 	uint32_t GetClientHeight() const { return height; }
 	float GetDeltaTime() const { return deltaTime_; }
@@ -198,6 +201,10 @@ private:
 	D3D12_CPU_DESCRIPTOR_HANDLE postEffectTextureRtvHandle_{};
 	uint32_t postEffectTextureSrvIndex_ = UINT32_MAX;
 	bool isPostEffectTextureShaderResource_ = false;
+	Microsoft::WRL::ComPtr<ID3D12Resource> gaussianBlurTextureResource_;
+	D3D12_CPU_DESCRIPTOR_HANDLE gaussianBlurTextureRtvHandle_{};
+	uint32_t gaussianBlurTextureSrvIndex_ = UINT32_MAX;
+	bool isGaussianBlurTextureShaderResource_ = false;
 	const Vector4 renderTextureClearColor_{ 1.0f, 0.0f, 0.0f, 1.0f };
 
 	//ビューポート

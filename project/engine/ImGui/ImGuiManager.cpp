@@ -254,33 +254,46 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 			bool isSepia = PostEffect::GetInstance()->IsSepia();
 			bool isVignette = PostEffect::GetInstance()->IsVignette();
 			bool isSmoothing = PostEffect::GetInstance()->IsSmoothing();
+			bool isGaussianFilter = PostEffect::GetInstance()->IsGaussianFilter();
 			if (ImGui::Checkbox("Gray", &isGrayscale) && isGrayscale) {
 				isSepia = false;
 				isVignette = false;
 				isSmoothing = false;
+				isGaussianFilter = false;
 			}
 			ImGui::SameLine();
 			if (ImGui::Checkbox("Sepia", &isSepia) && isSepia) {
 				isGrayscale = false;
 				isVignette = false;
 				isSmoothing = false;
+				isGaussianFilter = false;
 			}
 			ImGui::SameLine();
 			if (ImGui::Checkbox("Vignette", &isVignette) && isVignette) {
 				isGrayscale = false;
 				isSepia = false;
 				isSmoothing = false;
+				isGaussianFilter = false;
 			}
 			ImGui::SameLine();
 			if (ImGui::Checkbox("Smoothing", &isSmoothing) && isSmoothing) {
 				isGrayscale = false;
 				isSepia = false;
 				isVignette = false;
+				isGaussianFilter = false;
+			}
+			ImGui::SameLine();
+			if (ImGui::Checkbox("Gaussian", &isGaussianFilter) && isGaussianFilter) {
+				isGrayscale = false;
+				isSepia = false;
+				isVignette = false;
+				isSmoothing = false;
 			}
 			PostEffect::GetInstance()->SetGrayscale(isGrayscale);
 			PostEffect::GetInstance()->SetSepia(isSepia);
 			PostEffect::GetInstance()->SetVignette(isVignette);
 			PostEffect::GetInstance()->SetSmoothing(isSmoothing);
+			PostEffect::GetInstance()->SetGaussianFilter(isGaussianFilter);
 			ParticleManager* particleManager = ParticleManager::GetInstance();
 			bool particlesReturning = particleManager->IsReturning();
 			if (ImGui::Checkbox("Particle return##TopTools", &particlesReturning)) {
@@ -1184,30 +1197,42 @@ void ImGuiManager::PostEffectWindow()
 	bool isSepia = PostEffect::GetInstance()->IsSepia();
 	bool isVignette = PostEffect::GetInstance()->IsVignette();
 	bool isSmoothing = PostEffect::GetInstance()->IsSmoothing();
+	bool isGaussianFilter = PostEffect::GetInstance()->IsGaussianFilter();
 	if (ImGui::Checkbox("Grayscale", &isGrayscale) && isGrayscale) {
 		isSepia = false;
 		isVignette = false;
 		isSmoothing = false;
+		isGaussianFilter = false;
 	}
 	if (ImGui::Checkbox("Sepia", &isSepia) && isSepia) {
 		isGrayscale = false;
 		isVignette = false;
 		isSmoothing = false;
+		isGaussianFilter = false;
 	}
 	if (ImGui::Checkbox("Vignette", &isVignette) && isVignette) {
 		isGrayscale = false;
 		isSepia = false;
 		isSmoothing = false;
+		isGaussianFilter = false;
 	}
 	if (ImGui::Checkbox("Smoothing", &isSmoothing) && isSmoothing) {
 		isGrayscale = false;
 		isSepia = false;
 		isVignette = false;
+		isGaussianFilter = false;
+	}
+	if (ImGui::Checkbox("Gaussian", &isGaussianFilter) && isGaussianFilter) {
+		isGrayscale = false;
+		isSepia = false;
+		isVignette = false;
+		isSmoothing = false;
 	}
 	PostEffect::GetInstance()->SetGrayscale(isGrayscale);
 	PostEffect::GetInstance()->SetSepia(isSepia);
 	PostEffect::GetInstance()->SetVignette(isVignette);
 	PostEffect::GetInstance()->SetSmoothing(isSmoothing);
+	PostEffect::GetInstance()->SetGaussianFilter(isGaussianFilter);
 	ImGui::End();
 #else
 #endif
