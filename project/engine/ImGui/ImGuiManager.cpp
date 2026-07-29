@@ -255,6 +255,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 			bool isVignette = PostEffect::GetInstance()->IsVignette();
 			bool isSmoothing = PostEffect::GetInstance()->IsSmoothing();
 			bool isGaussianFilter = PostEffect::GetInstance()->IsGaussianFilter();
+			bool isRadialBlur = PostEffect::GetInstance()->IsRadialBlur();
 			bool isLuminanceBasedOutline = PostEffect::GetInstance()->IsLuminanceBasedOutline();
 			bool isDepthBasedOutline = PostEffect::GetInstance()->IsDepthBasedOutline();
 			if (ImGui::Checkbox("Gray", &isGrayscale) && isGrayscale) {
@@ -262,6 +263,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isVignette = false;
 				isSmoothing = false;
 				isGaussianFilter = false;
+				isRadialBlur = false;
 				isLuminanceBasedOutline = false;
 				isDepthBasedOutline = false;
 			}
@@ -271,6 +273,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isVignette = false;
 				isSmoothing = false;
 				isGaussianFilter = false;
+				isRadialBlur = false;
 				isLuminanceBasedOutline = false;
 				isDepthBasedOutline = false;
 			}
@@ -280,6 +283,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isSepia = false;
 				isSmoothing = false;
 				isGaussianFilter = false;
+				isRadialBlur = false;
 				isLuminanceBasedOutline = false;
 				isDepthBasedOutline = false;
 			}
@@ -289,6 +293,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isSepia = false;
 				isVignette = false;
 				isGaussianFilter = false;
+				isRadialBlur = false;
 				isLuminanceBasedOutline = false;
 				isDepthBasedOutline = false;
 			}
@@ -298,16 +303,27 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isSepia = false;
 				isVignette = false;
 				isSmoothing = false;
+				isRadialBlur = false;
 				isLuminanceBasedOutline = false;
 				isDepthBasedOutline = false;
 			}
 			ImGui::SameLine();
+			if (ImGui::Checkbox("Radial Blur", &isRadialBlur) && isRadialBlur) {
+				isGrayscale = false;
+				isSepia = false;
+				isVignette = false;
+				isSmoothing = false;
+				isGaussianFilter = false;
+				isLuminanceBasedOutline = false;
+				isDepthBasedOutline = false;
+			}
 			if (ImGui::Checkbox("Outline", &isLuminanceBasedOutline) && isLuminanceBasedOutline) {
 				isGrayscale = false;
 				isSepia = false;
 				isVignette = false;
 				isSmoothing = false;
 				isGaussianFilter = false;
+				isRadialBlur = false;
 				isDepthBasedOutline = false;
 			}
 			ImGui::SameLine();
@@ -317,6 +333,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isVignette = false;
 				isSmoothing = false;
 				isGaussianFilter = false;
+				isRadialBlur = false;
 				isLuminanceBasedOutline = false;
 			}
 			PostEffect::GetInstance()->SetGrayscale(isGrayscale);
@@ -324,6 +341,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 			PostEffect::GetInstance()->SetVignette(isVignette);
 			PostEffect::GetInstance()->SetSmoothing(isSmoothing);
 			PostEffect::GetInstance()->SetGaussianFilter(isGaussianFilter);
+			PostEffect::GetInstance()->SetRadialBlur(isRadialBlur);
 			PostEffect::GetInstance()->SetLuminanceBasedOutline(isLuminanceBasedOutline);
 			PostEffect::GetInstance()->SetDepthBasedOutline(isDepthBasedOutline);
 			ParticleManager* particleManager = ParticleManager::GetInstance();
@@ -1230,6 +1248,7 @@ void ImGuiManager::PostEffectWindow()
 	bool isVignette = PostEffect::GetInstance()->IsVignette();
 	bool isSmoothing = PostEffect::GetInstance()->IsSmoothing();
 	bool isGaussianFilter = PostEffect::GetInstance()->IsGaussianFilter();
+	bool isRadialBlur = PostEffect::GetInstance()->IsRadialBlur();
 	bool isLuminanceBasedOutline = PostEffect::GetInstance()->IsLuminanceBasedOutline();
 	bool isDepthBasedOutline = PostEffect::GetInstance()->IsDepthBasedOutline();
 	if (ImGui::Checkbox("Grayscale", &isGrayscale) && isGrayscale) {
@@ -1237,6 +1256,7 @@ void ImGuiManager::PostEffectWindow()
 		isVignette = false;
 		isSmoothing = false;
 		isGaussianFilter = false;
+		isRadialBlur = false;
 		isLuminanceBasedOutline = false;
 		isDepthBasedOutline = false;
 	}
@@ -1245,6 +1265,7 @@ void ImGuiManager::PostEffectWindow()
 		isVignette = false;
 		isSmoothing = false;
 		isGaussianFilter = false;
+		isRadialBlur = false;
 		isLuminanceBasedOutline = false;
 		isDepthBasedOutline = false;
 	}
@@ -1253,6 +1274,7 @@ void ImGuiManager::PostEffectWindow()
 		isSepia = false;
 		isSmoothing = false;
 		isGaussianFilter = false;
+		isRadialBlur = false;
 		isLuminanceBasedOutline = false;
 		isDepthBasedOutline = false;
 	}
@@ -1261,6 +1283,7 @@ void ImGuiManager::PostEffectWindow()
 		isSepia = false;
 		isVignette = false;
 		isGaussianFilter = false;
+		isRadialBlur = false;
 		isLuminanceBasedOutline = false;
 		isDepthBasedOutline = false;
 	}
@@ -1269,6 +1292,16 @@ void ImGuiManager::PostEffectWindow()
 		isSepia = false;
 		isVignette = false;
 		isSmoothing = false;
+		isRadialBlur = false;
+		isLuminanceBasedOutline = false;
+		isDepthBasedOutline = false;
+	}
+	if (ImGui::Checkbox("Radial Blur", &isRadialBlur) && isRadialBlur) {
+		isGrayscale = false;
+		isSepia = false;
+		isVignette = false;
+		isSmoothing = false;
+		isGaussianFilter = false;
 		isLuminanceBasedOutline = false;
 		isDepthBasedOutline = false;
 	}
@@ -1278,6 +1311,7 @@ void ImGuiManager::PostEffectWindow()
 		isVignette = false;
 		isSmoothing = false;
 		isGaussianFilter = false;
+		isRadialBlur = false;
 		isDepthBasedOutline = false;
 	}
 	if (ImGui::Checkbox("Depth Outline", &isDepthBasedOutline) && isDepthBasedOutline) {
@@ -1286,6 +1320,7 @@ void ImGuiManager::PostEffectWindow()
 		isVignette = false;
 		isSmoothing = false;
 		isGaussianFilter = false;
+		isRadialBlur = false;
 		isLuminanceBasedOutline = false;
 	}
 	PostEffect::GetInstance()->SetGrayscale(isGrayscale);
@@ -1293,6 +1328,7 @@ void ImGuiManager::PostEffectWindow()
 	PostEffect::GetInstance()->SetVignette(isVignette);
 	PostEffect::GetInstance()->SetSmoothing(isSmoothing);
 	PostEffect::GetInstance()->SetGaussianFilter(isGaussianFilter);
+	PostEffect::GetInstance()->SetRadialBlur(isRadialBlur);
 	PostEffect::GetInstance()->SetLuminanceBasedOutline(isLuminanceBasedOutline);
 	PostEffect::GetInstance()->SetDepthBasedOutline(isDepthBasedOutline);
 	ImGui::End();

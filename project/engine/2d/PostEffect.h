@@ -31,6 +31,7 @@ public:
 	void SetVignette(bool isVignette) { isVignette_ = isVignette; }
 	void SetSmoothing(bool isSmoothing) { isSmoothing_ = isSmoothing; }
 	void SetGaussianFilter(bool isGaussianFilter) { isGaussianFilter_ = isGaussianFilter; }
+	void SetRadialBlur(bool isRadialBlur) { isRadialBlur_ = isRadialBlur; }
 	void SetLuminanceBasedOutline(bool isLuminanceBasedOutline) { isLuminanceBasedOutline_ = isLuminanceBasedOutline; }
 	void SetDepthBasedOutline(bool isDepthBasedOutline) { isDepthBasedOutline_ = isDepthBasedOutline; }
 	void SetProjectionInverse(const Matrix4x4& projectionInverse);
@@ -39,9 +40,10 @@ public:
 	bool IsVignette() const { return isVignette_; }
 	bool IsSmoothing() const { return isSmoothing_; }
 	bool IsGaussianFilter() const { return isGaussianFilter_; }
+	bool IsRadialBlur() const { return isRadialBlur_; }
 	bool IsLuminanceBasedOutline() const { return isLuminanceBasedOutline_; }
 	bool IsDepthBasedOutline() const { return isDepthBasedOutline_; }
-	bool IsEnabled() const { return isGrayscale_ || isSepia_ || isVignette_ || isSmoothing_ || isGaussianFilter_ || isLuminanceBasedOutline_ || isDepthBasedOutline_; }
+	bool IsEnabled() const { return isGrayscale_ || isSepia_ || isVignette_ || isSmoothing_ || isGaussianFilter_ || isRadialBlur_ || isLuminanceBasedOutline_ || isDepthBasedOutline_; }
 
 private:
 	PostEffect() = default;
@@ -54,6 +56,7 @@ private:
 		Grayscale,
 		Sepia,
 		Vignette,
+		RadialBlur,
 		LuminanceBasedOutline,
 		DepthBasedOutline,
 		GaussianFilterHorizontal,
@@ -84,6 +87,7 @@ private:
 	bool isVignette_ = false;
 	bool isSmoothing_ = false;
 	bool isGaussianFilter_ = false;
+	bool isRadialBlur_ = false;
 	bool isLuminanceBasedOutline_ = false;
 	bool isDepthBasedOutline_ = false;
 };
