@@ -33,6 +33,7 @@ namespace {
 		};
 	}
 
+#ifdef USE_IMGUI
 	bool ProjectEditorPoint(const Vector3& point, const Matrix4x4& viewProjection, const ImVec2& imageMin, const ImVec2& imageSize, ImVec2& screen)
 	{
 		const float x = point.x * viewProjection.m[0][0] + point.y * viewProjection.m[1][0] + point.z * viewProjection.m[2][0] + viewProjection.m[3][0];
@@ -60,6 +61,7 @@ namespace {
 		const float dy = point.y - (start.y + segment.y * amount);
 		return std::sqrt(dx * dx + dy * dy);
 	}
+#endif
 
 	bool BuildEditorWorldBounds(const Object3d& object, Vector3& minimum, Vector3& maximum)
 	{
