@@ -115,10 +115,9 @@ void Framework::Initialize()
 	srvManager_->Initialize(dxCommon_);
 	// RenderTextureをShaderから読めるよう、SrvManager初期化後にSRVを生成する
 	dxCommon_->CreateRenderTextureSRV(srvManager_);
+	TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
 	// RenderTextureをSwapChainへコピーするPostEffectを初期化する
 	PostEffect::GetInstance()->Initialize(dxCommon_, srvManager_);
-
-	TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
 	ModelManager::GetInstance()->Initialize(dxCommon_);
 	ParticleManager::GetInstance()->Initialize(dxCommon_, srvManager_);
 	GPUParticle::GetInstance()->Initialize(dxCommon_, srvManager_);

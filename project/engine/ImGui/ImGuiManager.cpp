@@ -256,6 +256,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 			bool isSmoothing = PostEffect::GetInstance()->IsSmoothing();
 			bool isGaussianFilter = PostEffect::GetInstance()->IsGaussianFilter();
 			bool isRadialBlur = PostEffect::GetInstance()->IsRadialBlur();
+			bool isDissolve = PostEffect::GetInstance()->IsDissolve();
 			bool isLuminanceBasedOutline = PostEffect::GetInstance()->IsLuminanceBasedOutline();
 			bool isDepthBasedOutline = PostEffect::GetInstance()->IsDepthBasedOutline();
 			if (ImGui::Checkbox("Gray", &isGrayscale) && isGrayscale) {
@@ -264,6 +265,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isSmoothing = false;
 				isGaussianFilter = false;
 				isRadialBlur = false;
+				isDissolve = false;
 				isLuminanceBasedOutline = false;
 				isDepthBasedOutline = false;
 			}
@@ -274,6 +276,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isSmoothing = false;
 				isGaussianFilter = false;
 				isRadialBlur = false;
+				isDissolve = false;
 				isLuminanceBasedOutline = false;
 				isDepthBasedOutline = false;
 			}
@@ -284,6 +287,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isSmoothing = false;
 				isGaussianFilter = false;
 				isRadialBlur = false;
+				isDissolve = false;
 				isLuminanceBasedOutline = false;
 				isDepthBasedOutline = false;
 			}
@@ -294,6 +298,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isVignette = false;
 				isGaussianFilter = false;
 				isRadialBlur = false;
+				isDissolve = false;
 				isLuminanceBasedOutline = false;
 				isDepthBasedOutline = false;
 			}
@@ -304,6 +309,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isVignette = false;
 				isSmoothing = false;
 				isRadialBlur = false;
+				isDissolve = false;
 				isLuminanceBasedOutline = false;
 				isDepthBasedOutline = false;
 			}
@@ -314,9 +320,21 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isVignette = false;
 				isSmoothing = false;
 				isGaussianFilter = false;
+				isDissolve = false;
 				isLuminanceBasedOutline = false;
 				isDepthBasedOutline = false;
 			}
+			if (ImGui::Checkbox("Dissolve", &isDissolve) && isDissolve) {
+				isGrayscale = false;
+				isSepia = false;
+				isVignette = false;
+				isSmoothing = false;
+				isGaussianFilter = false;
+				isRadialBlur = false;
+				isLuminanceBasedOutline = false;
+				isDepthBasedOutline = false;
+			}
+			ImGui::SameLine();
 			if (ImGui::Checkbox("Outline", &isLuminanceBasedOutline) && isLuminanceBasedOutline) {
 				isGrayscale = false;
 				isSepia = false;
@@ -324,6 +342,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isSmoothing = false;
 				isGaussianFilter = false;
 				isRadialBlur = false;
+				isDissolve = false;
 				isDepthBasedOutline = false;
 			}
 			ImGui::SameLine();
@@ -334,7 +353,11 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isSmoothing = false;
 				isGaussianFilter = false;
 				isRadialBlur = false;
+				isDissolve = false;
 				isLuminanceBasedOutline = false;
+			}
+			if (isGrayscale || isSepia || isVignette || isSmoothing || isGaussianFilter || isRadialBlur || isLuminanceBasedOutline || isDepthBasedOutline) {
+				isDissolve = false;
 			}
 			PostEffect::GetInstance()->SetGrayscale(isGrayscale);
 			PostEffect::GetInstance()->SetSepia(isSepia);
@@ -342,8 +365,35 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 			PostEffect::GetInstance()->SetSmoothing(isSmoothing);
 			PostEffect::GetInstance()->SetGaussianFilter(isGaussianFilter);
 			PostEffect::GetInstance()->SetRadialBlur(isRadialBlur);
+			PostEffect::GetInstance()->SetDissolve(isDissolve);
 			PostEffect::GetInstance()->SetLuminanceBasedOutline(isLuminanceBasedOutline);
 			PostEffect::GetInstance()->SetDepthBasedOutline(isDepthBasedOutline);
+			if (isDissolve) {
+				int dissolveMask = static_cast<int>(PostEffect::GetInstance()->GetDissolveMask());
+				const char* dissolveMaskItems[] = { "Noise0", "Noise1" };
+				if (ImGui::Combo("Dissolve Mask", &dissolveMask, dissolveMaskItems, _countof(dissolveMaskItems))) {
+					PostEffect::GetInstance()->SetDissolveMask(static_cast<PostEffect::DissolveMask>(dissolveMask));
+				}
+				bool isDissolveEdge = PostEffect::GetInstance()->IsDissolveEdge();
+				if (ImGui::Checkbox("Dissolve Edge", &isDissolveEdge)) {
+					PostEffect::GetInstance()->SetDissolveEdge(isDissolveEdge);
+				}
+				float dissolveThreshold = PostEffect::GetInstance()->GetDissolveThreshold();
+				float dissolveEdgeWidth = PostEffect::GetInstance()->GetDissolveEdgeWidth();
+				float dissolveEdgeColor[3]{};
+				PostEffect::GetInstance()->GetDissolveEdgeColor(dissolveEdgeColor[0], dissolveEdgeColor[1], dissolveEdgeColor[2]);
+				if (ImGui::SliderFloat("Dissolve Threshold", &dissolveThreshold, 0.0f, 1.0f)) {
+					PostEffect::GetInstance()->SetDissolveThreshold(dissolveThreshold);
+				}
+				if (isDissolveEdge) {
+					if (ImGui::SliderFloat("Dissolve Edge Width", &dissolveEdgeWidth, 0.001f, 0.2f)) {
+						PostEffect::GetInstance()->SetDissolveEdgeWidth(dissolveEdgeWidth);
+					}
+					if (ImGui::ColorEdit3("Dissolve Edge Color", dissolveEdgeColor)) {
+						PostEffect::GetInstance()->SetDissolveEdgeColor(dissolveEdgeColor[0], dissolveEdgeColor[1], dissolveEdgeColor[2]);
+					}
+				}
+			}
 			ParticleManager* particleManager = ParticleManager::GetInstance();
 			bool particlesReturning = particleManager->IsReturning();
 			if (ImGui::Checkbox("Particle return##TopTools", &particlesReturning)) {
@@ -1249,6 +1299,7 @@ void ImGuiManager::PostEffectWindow()
 	bool isSmoothing = PostEffect::GetInstance()->IsSmoothing();
 	bool isGaussianFilter = PostEffect::GetInstance()->IsGaussianFilter();
 	bool isRadialBlur = PostEffect::GetInstance()->IsRadialBlur();
+	bool isDissolve = PostEffect::GetInstance()->IsDissolve();
 	bool isLuminanceBasedOutline = PostEffect::GetInstance()->IsLuminanceBasedOutline();
 	bool isDepthBasedOutline = PostEffect::GetInstance()->IsDepthBasedOutline();
 	if (ImGui::Checkbox("Grayscale", &isGrayscale) && isGrayscale) {
@@ -1257,6 +1308,7 @@ void ImGuiManager::PostEffectWindow()
 		isSmoothing = false;
 		isGaussianFilter = false;
 		isRadialBlur = false;
+		isDissolve = false;
 		isLuminanceBasedOutline = false;
 		isDepthBasedOutline = false;
 	}
@@ -1266,6 +1318,7 @@ void ImGuiManager::PostEffectWindow()
 		isSmoothing = false;
 		isGaussianFilter = false;
 		isRadialBlur = false;
+		isDissolve = false;
 		isLuminanceBasedOutline = false;
 		isDepthBasedOutline = false;
 	}
@@ -1275,6 +1328,7 @@ void ImGuiManager::PostEffectWindow()
 		isSmoothing = false;
 		isGaussianFilter = false;
 		isRadialBlur = false;
+		isDissolve = false;
 		isLuminanceBasedOutline = false;
 		isDepthBasedOutline = false;
 	}
@@ -1284,6 +1338,7 @@ void ImGuiManager::PostEffectWindow()
 		isVignette = false;
 		isGaussianFilter = false;
 		isRadialBlur = false;
+		isDissolve = false;
 		isLuminanceBasedOutline = false;
 		isDepthBasedOutline = false;
 	}
@@ -1293,6 +1348,7 @@ void ImGuiManager::PostEffectWindow()
 		isVignette = false;
 		isSmoothing = false;
 		isRadialBlur = false;
+		isDissolve = false;
 		isLuminanceBasedOutline = false;
 		isDepthBasedOutline = false;
 	}
@@ -1302,6 +1358,17 @@ void ImGuiManager::PostEffectWindow()
 		isVignette = false;
 		isSmoothing = false;
 		isGaussianFilter = false;
+		isDissolve = false;
+		isLuminanceBasedOutline = false;
+		isDepthBasedOutline = false;
+	}
+	if (ImGui::Checkbox("Dissolve", &isDissolve) && isDissolve) {
+		isGrayscale = false;
+		isSepia = false;
+		isVignette = false;
+		isSmoothing = false;
+		isGaussianFilter = false;
+		isRadialBlur = false;
 		isLuminanceBasedOutline = false;
 		isDepthBasedOutline = false;
 	}
@@ -1312,6 +1379,7 @@ void ImGuiManager::PostEffectWindow()
 		isSmoothing = false;
 		isGaussianFilter = false;
 		isRadialBlur = false;
+		isDissolve = false;
 		isDepthBasedOutline = false;
 	}
 	if (ImGui::Checkbox("Depth Outline", &isDepthBasedOutline) && isDepthBasedOutline) {
@@ -1321,16 +1389,47 @@ void ImGuiManager::PostEffectWindow()
 		isSmoothing = false;
 		isGaussianFilter = false;
 		isRadialBlur = false;
+		isDissolve = false;
 		isLuminanceBasedOutline = false;
 	}
+	if (isGrayscale || isSepia || isVignette || isSmoothing || isGaussianFilter || isRadialBlur || isLuminanceBasedOutline || isDepthBasedOutline) {
+				isDissolve = false;
+			}
 	PostEffect::GetInstance()->SetGrayscale(isGrayscale);
 	PostEffect::GetInstance()->SetSepia(isSepia);
 	PostEffect::GetInstance()->SetVignette(isVignette);
 	PostEffect::GetInstance()->SetSmoothing(isSmoothing);
 	PostEffect::GetInstance()->SetGaussianFilter(isGaussianFilter);
 	PostEffect::GetInstance()->SetRadialBlur(isRadialBlur);
+			PostEffect::GetInstance()->SetDissolve(isDissolve);
 	PostEffect::GetInstance()->SetLuminanceBasedOutline(isLuminanceBasedOutline);
 	PostEffect::GetInstance()->SetDepthBasedOutline(isDepthBasedOutline);
+			if (isDissolve) {
+				int dissolveMask = static_cast<int>(PostEffect::GetInstance()->GetDissolveMask());
+				const char* dissolveMaskItems[] = { "Noise0", "Noise1" };
+				if (ImGui::Combo("Dissolve Mask", &dissolveMask, dissolveMaskItems, _countof(dissolveMaskItems))) {
+					PostEffect::GetInstance()->SetDissolveMask(static_cast<PostEffect::DissolveMask>(dissolveMask));
+				}
+				bool isDissolveEdge = PostEffect::GetInstance()->IsDissolveEdge();
+				if (ImGui::Checkbox("Dissolve Edge", &isDissolveEdge)) {
+					PostEffect::GetInstance()->SetDissolveEdge(isDissolveEdge);
+				}
+				float dissolveThreshold = PostEffect::GetInstance()->GetDissolveThreshold();
+		float dissolveEdgeWidth = PostEffect::GetInstance()->GetDissolveEdgeWidth();
+		float dissolveEdgeColor[3]{};
+		PostEffect::GetInstance()->GetDissolveEdgeColor(dissolveEdgeColor[0], dissolveEdgeColor[1], dissolveEdgeColor[2]);
+		if (ImGui::SliderFloat("Threshold", &dissolveThreshold, 0.0f, 1.0f)) {
+			PostEffect::GetInstance()->SetDissolveThreshold(dissolveThreshold);
+		}
+				if (isDissolveEdge) {
+			if (ImGui::SliderFloat("Edge Width", &dissolveEdgeWidth, 0.001f, 0.2f)) {
+				PostEffect::GetInstance()->SetDissolveEdgeWidth(dissolveEdgeWidth);
+			}
+			if (ImGui::ColorEdit3("Edge Color", dissolveEdgeColor)) {
+				PostEffect::GetInstance()->SetDissolveEdgeColor(dissolveEdgeColor[0], dissolveEdgeColor[1], dissolveEdgeColor[2]);
+			}
+		}
+	}
 	ImGui::End();
 #else
 #endif
