@@ -36,6 +36,8 @@ void PostEffect::Draw(uint32_t sourceSrvIndex, bool useEffect)
 		? PipelineType::LuminanceBasedOutline
 		: isGaussianFilter_
 		? PipelineType::GaussianFilterHorizontal
+		: isRadialBlur_
+		? PipelineType::RadialBlur
 		: isSmoothing_
 		? PipelineType::Smoothing
 		: isVignette_
@@ -149,6 +151,7 @@ void PostEffect::CreateGraphicsPipeline()
 	CreateGraphicsPipelineState(PipelineType::Grayscale, L"resources/shaders/Grayscale.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::Sepia, L"resources/shaders/Sepia.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::Vignette, L"resources/shaders/Vignette.PS.hlsl");
+	CreateGraphicsPipelineState(PipelineType::RadialBlur, L"resources/shaders/RadialBlur.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::LuminanceBasedOutline, L"resources/shaders/LuminanceBasedOutline.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::DepthBasedOutline, L"resources/shaders/DepthBasedOutline.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::GaussianFilterHorizontal, L"resources/shaders/GaussianFilter.PS.hlsl");
