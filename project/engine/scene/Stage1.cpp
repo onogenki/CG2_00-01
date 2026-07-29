@@ -332,6 +332,10 @@ void Stage1::Draw()
 			PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), true);
 			DirectXCommon::GetInstance()->PreDrawForGaussianVerticalTexture();
 			PostEffect::GetInstance()->DrawGaussianVertical(DirectXCommon::GetInstance()->GetGaussianBlurTextureSrvIndex());
+		} else if (PostEffect::GetInstance()->IsDepthBasedOutline()) {
+			PostEffect::GetInstance()->SetProjectionInverse(Inverse(cameraManager->GetActiveCamera()->GetProjectionMatrix()));
+			DirectXCommon::GetInstance()->PreDrawForDepthBasedOutlineTexture();
+			PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), true);
 		} else {
 			DirectXCommon::GetInstance()->PreDrawForPostEffectTexture();
 			PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), true);

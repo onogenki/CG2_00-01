@@ -221,8 +221,8 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 		const ImGuiTableFlags tableFlags =
 			ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_BordersInnerV;
 		if (ImGui::BeginTable("SharedTopToolsTable", 3, tableFlags, ImVec2(-1.0f, 0.0f))) {
-			ImGui::TableSetupColumn("FPS", ImGuiTableColumnFlags_WidthFixed, 200.0f);
-			ImGui::TableSetupColumn("Capture", ImGuiTableColumnFlags_WidthFixed, 620.0f);
+			ImGui::TableSetupColumn("FPS", ImGuiTableColumnFlags_WidthFixed, 160.0f);
+			ImGui::TableSetupColumn("Capture", ImGuiTableColumnFlags_WidthFixed, 460.0f);
 			ImGui::TableSetupColumn("PostEffect", ImGuiTableColumnFlags_WidthStretch, 1.0f);
 			ImGui::TableNextRow();
 
@@ -255,11 +255,15 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 			bool isVignette = PostEffect::GetInstance()->IsVignette();
 			bool isSmoothing = PostEffect::GetInstance()->IsSmoothing();
 			bool isGaussianFilter = PostEffect::GetInstance()->IsGaussianFilter();
+			bool isLuminanceBasedOutline = PostEffect::GetInstance()->IsLuminanceBasedOutline();
+			bool isDepthBasedOutline = PostEffect::GetInstance()->IsDepthBasedOutline();
 			if (ImGui::Checkbox("Gray", &isGrayscale) && isGrayscale) {
 				isSepia = false;
 				isVignette = false;
 				isSmoothing = false;
 				isGaussianFilter = false;
+				isLuminanceBasedOutline = false;
+				isDepthBasedOutline = false;
 			}
 			ImGui::SameLine();
 			if (ImGui::Checkbox("Sepia", &isSepia) && isSepia) {
@@ -267,6 +271,8 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isVignette = false;
 				isSmoothing = false;
 				isGaussianFilter = false;
+				isLuminanceBasedOutline = false;
+				isDepthBasedOutline = false;
 			}
 			ImGui::SameLine();
 			if (ImGui::Checkbox("Vignette", &isVignette) && isVignette) {
@@ -274,6 +280,8 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isSepia = false;
 				isSmoothing = false;
 				isGaussianFilter = false;
+				isLuminanceBasedOutline = false;
+				isDepthBasedOutline = false;
 			}
 			ImGui::SameLine();
 			if (ImGui::Checkbox("Smoothing", &isSmoothing) && isSmoothing) {
@@ -281,6 +289,8 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isSepia = false;
 				isVignette = false;
 				isGaussianFilter = false;
+				isLuminanceBasedOutline = false;
+				isDepthBasedOutline = false;
 			}
 			ImGui::SameLine();
 			if (ImGui::Checkbox("Gaussian", &isGaussianFilter) && isGaussianFilter) {
@@ -288,12 +298,34 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				isSepia = false;
 				isVignette = false;
 				isSmoothing = false;
+				isLuminanceBasedOutline = false;
+				isDepthBasedOutline = false;
+			}
+			ImGui::SameLine();
+			if (ImGui::Checkbox("Outline", &isLuminanceBasedOutline) && isLuminanceBasedOutline) {
+				isGrayscale = false;
+				isSepia = false;
+				isVignette = false;
+				isSmoothing = false;
+				isGaussianFilter = false;
+				isDepthBasedOutline = false;
+			}
+			ImGui::SameLine();
+			if (ImGui::Checkbox("Depth Outline", &isDepthBasedOutline) && isDepthBasedOutline) {
+				isGrayscale = false;
+				isSepia = false;
+				isVignette = false;
+				isSmoothing = false;
+				isGaussianFilter = false;
+				isLuminanceBasedOutline = false;
 			}
 			PostEffect::GetInstance()->SetGrayscale(isGrayscale);
 			PostEffect::GetInstance()->SetSepia(isSepia);
 			PostEffect::GetInstance()->SetVignette(isVignette);
 			PostEffect::GetInstance()->SetSmoothing(isSmoothing);
 			PostEffect::GetInstance()->SetGaussianFilter(isGaussianFilter);
+			PostEffect::GetInstance()->SetLuminanceBasedOutline(isLuminanceBasedOutline);
+			PostEffect::GetInstance()->SetDepthBasedOutline(isDepthBasedOutline);
 			ParticleManager* particleManager = ParticleManager::GetInstance();
 			bool particlesReturning = particleManager->IsReturning();
 			if (ImGui::Checkbox("Particle return##TopTools", &particlesReturning)) {
@@ -1198,41 +1230,71 @@ void ImGuiManager::PostEffectWindow()
 	bool isVignette = PostEffect::GetInstance()->IsVignette();
 	bool isSmoothing = PostEffect::GetInstance()->IsSmoothing();
 	bool isGaussianFilter = PostEffect::GetInstance()->IsGaussianFilter();
+	bool isLuminanceBasedOutline = PostEffect::GetInstance()->IsLuminanceBasedOutline();
+	bool isDepthBasedOutline = PostEffect::GetInstance()->IsDepthBasedOutline();
 	if (ImGui::Checkbox("Grayscale", &isGrayscale) && isGrayscale) {
 		isSepia = false;
 		isVignette = false;
 		isSmoothing = false;
 		isGaussianFilter = false;
+		isLuminanceBasedOutline = false;
+		isDepthBasedOutline = false;
 	}
 	if (ImGui::Checkbox("Sepia", &isSepia) && isSepia) {
 		isGrayscale = false;
 		isVignette = false;
 		isSmoothing = false;
 		isGaussianFilter = false;
+		isLuminanceBasedOutline = false;
+		isDepthBasedOutline = false;
 	}
 	if (ImGui::Checkbox("Vignette", &isVignette) && isVignette) {
 		isGrayscale = false;
 		isSepia = false;
 		isSmoothing = false;
 		isGaussianFilter = false;
+		isLuminanceBasedOutline = false;
+		isDepthBasedOutline = false;
 	}
 	if (ImGui::Checkbox("Smoothing", &isSmoothing) && isSmoothing) {
 		isGrayscale = false;
 		isSepia = false;
 		isVignette = false;
 		isGaussianFilter = false;
+		isLuminanceBasedOutline = false;
+		isDepthBasedOutline = false;
 	}
 	if (ImGui::Checkbox("Gaussian", &isGaussianFilter) && isGaussianFilter) {
 		isGrayscale = false;
 		isSepia = false;
 		isVignette = false;
 		isSmoothing = false;
+		isLuminanceBasedOutline = false;
+		isDepthBasedOutline = false;
+	}
+	if (ImGui::Checkbox("Outline", &isLuminanceBasedOutline) && isLuminanceBasedOutline) {
+		isGrayscale = false;
+		isSepia = false;
+		isVignette = false;
+		isSmoothing = false;
+		isGaussianFilter = false;
+		isDepthBasedOutline = false;
+	}
+	if (ImGui::Checkbox("Depth Outline", &isDepthBasedOutline) && isDepthBasedOutline) {
+		isGrayscale = false;
+		isSepia = false;
+		isVignette = false;
+		isSmoothing = false;
+		isGaussianFilter = false;
+		isLuminanceBasedOutline = false;
 	}
 	PostEffect::GetInstance()->SetGrayscale(isGrayscale);
 	PostEffect::GetInstance()->SetSepia(isSepia);
 	PostEffect::GetInstance()->SetVignette(isVignette);
 	PostEffect::GetInstance()->SetSmoothing(isSmoothing);
 	PostEffect::GetInstance()->SetGaussianFilter(isGaussianFilter);
+	PostEffect::GetInstance()->SetLuminanceBasedOutline(isLuminanceBasedOutline);
+	PostEffect::GetInstance()->SetDepthBasedOutline(isDepthBasedOutline);
 	ImGui::End();
 #else
 #endif

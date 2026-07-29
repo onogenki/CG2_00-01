@@ -11,6 +11,14 @@ void PostEffect::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 
 	CreateRootSignature();
 	CreateGraphicsPipeline();
+
+	depthBasedOutlineResource_ = dxCommon_->CreateBufferResource(sizeof(DepthBasedOutlineData));
+	depthBasedOutlineResource_->Map(0, nullptr, reinterpret_cast<void**>(&depthBasedOutlineData_));
+}
+
+void PostEffect::SetProjectionInverse(const Matrix4x4& projectionInverse)
+{
+	depthBasedOutlineData_->projectionInverse = projectionInverse;
 }
 
 void PostEffect::Draw()
@@ -22,6 +30,10 @@ void PostEffect::Draw(uint32_t sourceSrvIndex, bool useEffect)
 {
 	const PipelineType pipelineType = !useEffect
 		? PipelineType::Fullscreen
+		: isDepthBasedOutline_
+		? PipelineType::DepthBasedOutline
+		: isLuminanceBasedOutline_
+		? PipelineType::LuminanceBasedOutline
 		: isGaussianFilter_
 		? PipelineType::GaussianFilterHorizontal
 		: isSmoothing_
@@ -53,6 +65,15 @@ void PostEffect::DrawWithPipeline(uint32_t sourceSrvIndex, PipelineType pipeline
 	srvManager_->SetGraphicsRootDescriptorTable(
 		0,
 		sourceSrvIndex);
+	if (pipelineType == PipelineType::DepthBasedOutline)
+	{
+		srvManager_->SetGraphicsRootDescriptorTable(
+			1,
+			dxCommon_->GetDepthStencilSrvIndex());
+	}
+	commandList->SetGraphicsRootConstantBufferView(
+		2,
+		depthBasedOutlineResource_->GetGPUVirtualAddress());
 
 	// VertexShaderのSV_VertexIDで3頂点を作るため、頂点バッファは不要
 	commandList->DrawInstanced(3, 1, 0, 0);
@@ -61,35 +82,49 @@ void PostEffect::DrawWithPipeline(uint32_t sourceSrvIndex, PipelineType pipeline
 void PostEffect::CreateRootSignature()
 {
 	// PixelShaderのt0でRenderTextureを読むためのDescriptorRange
-	D3D12_DESCRIPTOR_RANGE descriptorRange{};
-	descriptorRange.BaseShaderRegister = 0;
-	descriptorRange.NumDescriptors = 1;
-	descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	D3D12_DESCRIPTOR_RANGE descriptorRanges[2]{};
+	descriptorRanges[0].BaseShaderRegister = 0;
+	descriptorRanges[0].NumDescriptors = 1;
+	descriptorRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descriptorRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	descriptorRanges[1].BaseShaderRegister = 1;
+	descriptorRanges[1].NumDescriptors = 1;
+	descriptorRanges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descriptorRanges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	D3D12_ROOT_PARAMETER rootParameter{};
-	rootParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameter.DescriptorTable.pDescriptorRanges = &descriptorRange;
-	rootParameter.DescriptorTable.NumDescriptorRanges = 1;
+	D3D12_ROOT_PARAMETER rootParameters[3]{};
+	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[0].DescriptorTable.pDescriptorRanges = &descriptorRanges[0];
+	rootParameters[0].DescriptorTable.NumDescriptorRanges = 1;
+	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[1].DescriptorTable.pDescriptorRanges = &descriptorRanges[1];
+	rootParameters[1].DescriptorTable.NumDescriptorRanges = 1;
+	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[2].Descriptor.ShaderRegister = 0;
 
 	// PixelShaderのs0でRenderTextureをサンプリングする
-	D3D12_STATIC_SAMPLER_DESC staticSampler{};
-	staticSampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-	staticSampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	staticSampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	staticSampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	staticSampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-	staticSampler.MaxLOD = D3D12_FLOAT32_MAX;
-	staticSampler.ShaderRegister = 0;
-	staticSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	D3D12_STATIC_SAMPLER_DESC staticSamplers[2]{};
+	staticSamplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+	staticSamplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	staticSamplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	staticSamplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	staticSamplers[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+	staticSamplers[0].MaxLOD = D3D12_FLOAT32_MAX;
+	staticSamplers[0].ShaderRegister = 0;
+	staticSamplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	staticSamplers[1] = staticSamplers[0];
+	staticSamplers[1].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+	staticSamplers[1].ShaderRegister = 1;
 
 	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc{};
 	rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	rootSignatureDesc.pParameters = &rootParameter;
-	rootSignatureDesc.NumParameters = 1;
-	rootSignatureDesc.pStaticSamplers = &staticSampler;
-	rootSignatureDesc.NumStaticSamplers = 1;
+	rootSignatureDesc.pParameters = rootParameters;
+	rootSignatureDesc.NumParameters = _countof(rootParameters);
+	rootSignatureDesc.pStaticSamplers = staticSamplers;
+	rootSignatureDesc.NumStaticSamplers = _countof(staticSamplers);
 
 	Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob = nullptr;
 	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
@@ -114,6 +149,8 @@ void PostEffect::CreateGraphicsPipeline()
 	CreateGraphicsPipelineState(PipelineType::Grayscale, L"resources/shaders/Grayscale.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::Sepia, L"resources/shaders/Sepia.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::Vignette, L"resources/shaders/Vignette.PS.hlsl");
+	CreateGraphicsPipelineState(PipelineType::LuminanceBasedOutline, L"resources/shaders/LuminanceBasedOutline.PS.hlsl");
+	CreateGraphicsPipelineState(PipelineType::DepthBasedOutline, L"resources/shaders/DepthBasedOutline.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::GaussianFilterHorizontal, L"resources/shaders/GaussianFilter.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::GaussianFilterVertical, L"resources/shaders/GaussianFilterVertical.PS.hlsl");
 	CreateGraphicsPipelineState(PipelineType::Smoothing, L"resources/shaders/BoxFilter.PS.hlsl");
