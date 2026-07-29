@@ -28,12 +28,15 @@ PixelShaderOutput main(VertexShaderOutput input)
     output.color = float32_t4(0.0f, 0.0f, 0.0f, 0.0f);
 
     float32_t weight = 0.0f;
-    for (int32_t y = -3; y <= 3; ++y)
+    for (int32_t y = -3; y <= 3; y += 2)
     {
-        float32_t kernel = gauss(float32_t(y), 2.0f);
-        float32_t2 texcoord = input.texcoord + float32_t2(0.0f, float32_t(y)) * uvStepSize;
-        output.color += gTexture.Sample(gSampler, texcoord) * kernel;
-        weight += kernel;
+        float32_t firstKernel = gauss(float32_t(y), 2.0f);
+        float32_t secondKernel = y < 3 ? gauss(float32_t(y + 1), 2.0f) : 0.0f;
+        float32_t combinedKernel = firstKernel + secondKernel;
+        float32_t offset = float32_t(y) + secondKernel * rcp(combinedKernel);
+        float32_t2 texcoord = input.texcoord + float32_t2(0.0f, offset) * uvStepSize;
+        output.color += gTexture.Sample(gSampler, texcoord) * combinedKernel;
+        weight += combinedKernel;
     }
     output.color *= rcp(weight);
 
