@@ -45,6 +45,7 @@ public:
 	void PreDraw();
 	// Scene描画後、ImGuiを描画するSwapChainへ描画先を切り替える
 	void PreDrawForPostEffectTexture();
+	void PreDrawForDepthBasedOutlineTexture();
 	void PreDrawForGaussianHorizontalTexture();
 	void PreDrawForGaussianVerticalTexture();
 	void PreDrawForSwapChain(bool usePostEffectTexture = false);
@@ -103,6 +104,7 @@ public:
 	uint32_t GetRenderTextureSrvIndex() const { return renderTextureSrvIndex_; }
 	uint32_t GetPostEffectTextureSrvIndex() const { return postEffectTextureSrvIndex_; }
 	uint32_t GetGaussianBlurTextureSrvIndex() const { return gaussianBlurTextureSrvIndex_; }
+	uint32_t GetDepthStencilSrvIndex() const { return depthStencilSrvIndex_; }
 	uint32_t GetClientWidth() const { return width; }
 	uint32_t GetClientHeight() const { return height; }
 	float GetDeltaTime() const { return deltaTime_; }
@@ -183,6 +185,8 @@ private:
 	HANDLE fenceEvent_ = nullptr;
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource;
+	uint32_t depthStencilSrvIndex_ = UINT32_MAX;
+	bool isDepthStencilShaderResource_ = false;
 	UINT descriptorSizeSRV = 0;
 	UINT descriptorSizeRTV = 0;
 	UINT descriptorSizeDSV = 0;

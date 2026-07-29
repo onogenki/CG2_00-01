@@ -94,6 +94,7 @@ void DirectXCommon::ResizeIfNeeded()
 	isRenderTextureShaderResource_ = false;
 	isPostEffectTextureShaderResource_ = false;
 	isGaussianBlurTextureShaderResource_ = false;
+	isDepthStencilShaderResource_ = false;
 }
 
 void DirectXCommon::InitializeDevice()//デバイスの初期化
@@ -248,7 +249,7 @@ void DirectXCommon::depthBuffer()
 	resourceDesc.Height = height;//Textureの高さ
 	resourceDesc.MipLevels = 1;//mipmapの数
 	resourceDesc.DepthOrArraySize = 1;//奥行き or 配列Textureの配列数
-	resourceDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;//DepthStencilとして利用可能なフォーマット
+	resourceDesc.Format = DXGI_FORMAT_R24G8_TYPELESS;//DepthStencilとSRVの両方で利用可能なフォーマット
 	resourceDesc.SampleDesc.Count = 1;//サンプリングカウント。1固定
 	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;//2次元
 	resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;//DepthStencilとして使う通知
@@ -433,6 +434,19 @@ void DirectXCommon::CreateDxcCompiler()
 
 void DirectXCommon::PreDraw()
 {
+	if (isDepthStencilShaderResource_)
+	{
+		D3D12_RESOURCE_BARRIER depthStencilBarrier{};
+		depthStencilBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		depthStencilBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		depthStencilBarrier.Transition.pResource = depthStencilResource.Get();
+		depthStencilBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		depthStencilBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+		depthStencilBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		commandList_->ResourceBarrier(1, &depthStencilBarrier);
+		isDepthStencilShaderResource_ = false;
+	}
+
 	// 2フレーム目以降は、読み取り状態からSceneを描ける状態へ戻す
 	if (isRenderTextureShaderResource_)
 	{
@@ -516,6 +530,24 @@ void DirectXCommon::PreDrawForPostEffectTexture()
 
 	commandList_->RSSetViewports(1, &viewport_);
 	commandList_->RSSetScissorRects(1, &scissorRect_);
+}
+
+void DirectXCommon::PreDrawForDepthBasedOutlineTexture()
+{
+	PreDrawForPostEffectTexture();
+
+	if (!isDepthStencilShaderResource_)
+	{
+		D3D12_RESOURCE_BARRIER depthStencilBarrier{};
+		depthStencilBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		depthStencilBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		depthStencilBarrier.Transition.pResource = depthStencilResource.Get();
+		depthStencilBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+		depthStencilBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		depthStencilBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		commandList_->ResourceBarrier(1, &depthStencilBarrier);
+		isDepthStencilShaderResource_ = true;
+	}
 }
 
 void DirectXCommon::PreDrawForGaussianHorizontalTexture()
@@ -1305,6 +1337,7 @@ void DirectXCommon::CreateRenderTextureSRV(SrvManager* srvManager)
 	assert(renderTextureResource_);
 	assert(postEffectTextureResource_);
 	assert(gaussianBlurTextureResource_);
+	assert(depthStencilResource);
 
 	// RenderTextureの描画結果をShaderから読めるよう、SRVの場所を1個確保する
 	if (renderTextureSrvIndex_ == UINT32_MAX) {
@@ -1315,6 +1348,9 @@ void DirectXCommon::CreateRenderTextureSRV(SrvManager* srvManager)
 	}
 	if (gaussianBlurTextureSrvIndex_ == UINT32_MAX) {
 		gaussianBlurTextureSrvIndex_ = srvManager->Allocate();
+	}
+	if (depthStencilSrvIndex_ == UINT32_MAX) {
+		depthStencilSrvIndex_ = srvManager->Allocate();
 	}
 
 	// Resourceと同じFormat、ミップレベル1でTexture2D用SRVを生成する
@@ -1338,6 +1374,16 @@ void DirectXCommon::CreateRenderTextureSRV(SrvManager* srvManager)
 		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
 		1,
 		true);
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC depthStencilSrvDesc{};
+	depthStencilSrvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+	depthStencilSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	depthStencilSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	depthStencilSrvDesc.Texture2D.MipLevels = 1;
+	device_->CreateShaderResourceView(
+		depthStencilResource.Get(),
+		&depthStencilSrvDesc,
+		srvManager->GetCPUDescriptorHandle(depthStencilSrvIndex_));
 }
 
 //CPUのMap/memcpy
