@@ -63,7 +63,7 @@ private:
 	static constexpr uint32_t kMaxSRVCount = 512;
 
 	//SRV用のデスクリプタサイズ
-	uint32_t descriptorSize;
+	uint32_t descriptorSize = 0;
 
 	//SRV用デスクリプタヒープ
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap;

@@ -4,14 +4,14 @@
 
 struct Transform
 {
-	Vector3 scale;
+	Vector3 scale{ 1.0f, 1.0f, 1.0f };
 	Vector3 rotate;//Eulerでの回転
-	Vector3 translate;
+	Vector3 translate{};
 };
 
 struct QuaternionTransform
 {
-	Vector3 scale;
-	Quaternion rotate;
-	Vector3 translate;
+	Vector3 scale{ 1.0f, 1.0f, 1.0f };
+	Quaternion rotate{};
+	Vector3 translate{};
 };

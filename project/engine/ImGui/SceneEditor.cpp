@@ -39,14 +39,17 @@ namespace {
 		const float x = point.x * viewProjection.m[0][0] + point.y * viewProjection.m[1][0] + point.z * viewProjection.m[2][0] + viewProjection.m[3][0];
 		const float y = point.x * viewProjection.m[0][1] + point.y * viewProjection.m[1][1] + point.z * viewProjection.m[2][1] + viewProjection.m[3][1];
 		const float w = point.x * viewProjection.m[0][3] + point.y * viewProjection.m[1][3] + point.z * viewProjection.m[2][3] + viewProjection.m[3][3];
-		if (w <= 0.0001f) {
+		if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(w) ||
+			!std::isfinite(imageMin.x) || !std::isfinite(imageMin.y) ||
+			!std::isfinite(imageSize.x) || !std::isfinite(imageSize.y) ||
+			w <= 0.0001f) {
 			return false;
 		}
 		screen = {
 			imageMin.x + (x / w + 1.0f) * 0.5f * imageSize.x,
 			imageMin.y + (1.0f - y / w) * 0.5f * imageSize.y,
 		};
-		return true;
+		return std::isfinite(screen.x) && std::isfinite(screen.y);
 	}
 
 	float EditorDistanceToSegment(const ImVec2& point, const ImVec2& start, const ImVec2& end)
@@ -122,6 +125,9 @@ namespace {
 		};
 		for (const Vector3& corner : corners) {
 			const Vector3 point = TransformEditorPoint(corner, world);
+			if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) {
+				return false;
+			}
 			minimum.x = (std::min)(minimum.x, point.x);
 			minimum.y = (std::min)(minimum.y, point.y);
 			minimum.z = (std::min)(minimum.z, point.z);
@@ -689,6 +695,11 @@ void SceneEditor::DrawViewportEditor(ViewportState& state, const ViewportOptions
 	if (!ImGuiManager::GetInstance()->GetGameViewRect(rectX, rectY, rectWidth, rectHeight)) {
 		return;
 	}
+	if (!std::isfinite(rectX) || !std::isfinite(rectY) ||
+		!std::isfinite(rectWidth) || !std::isfinite(rectHeight) ||
+		rectWidth <= 1.0f || rectHeight <= 1.0f) {
+		return;
+	}
 	const ImVec2 imageMin(rectX, rectY);
 	const ImVec2 imageSize(rectWidth, rectHeight);
 	const ImRect imageRect(imageMin, ImVec2(rectX + rectWidth, rectY + rectHeight));
@@ -711,7 +722,8 @@ void SceneEditor::DrawViewportEditor(ViewportState& state, const ViewportOptions
 		ImGuiWindowFlags_NoDocking;
 	ImGui::Begin("Edit View Tools", nullptr, toolbarFlags);
 	const auto drawToolButton = [&](const char* label, TransformTool tool) {
-		if (state.tool == tool) {
+		const bool isActive = state.tool == tool;
+		if (isActive) {
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.48f, 0.82f, 1.0f));
 		}
 		if (ImGui::Button(label)) {
@@ -719,7 +731,7 @@ void SceneEditor::DrawViewportEditor(ViewportState& state, const ViewportOptions
 			state.isDragging = false;
 			state.activeAxis = -1;
 		}
-		if (state.tool == tool) {
+		if (isActive) {
 			ImGui::PopStyleColor();
 		}
 	};
@@ -763,6 +775,9 @@ void SceneEditor::DrawViewportEditor(ViewportState& state, const ViewportOptions
 		? options.objects[state.selectedIndex].object
 		: nullptr;
 	bool gizmoHovered = false;
+	bool transformChanged = false;
+	Transform changedTransform{};
+	int changedTransformIndex = -1;
 	if (selectedObject) {
 		Vector3 boundsMin{};
 		Vector3 boundsMax{};
@@ -793,12 +808,19 @@ void SceneEditor::DrawViewportEditor(ViewportState& state, const ViewportOptions
 			} };
 			ImVec2 centerScreen{};
 			std::array<ImVec2, 6> endScreens{};
+			std::array<bool, 6> isAxisEndVisible{};
 			if (ProjectEditorPoint(center, viewProjection, imageMin, imageSize, centerScreen)) {
 				const ImVec2 mouse = ImGui::GetMousePos();
 				int hoveredAxisEnd = -1;
 				float bestDistance = 11.0f;
 				for (int axisEndIndex = 0; axisEndIndex < 6; ++axisEndIndex) {
-					if (!ProjectEditorPoint(axisEnds[axisEndIndex], viewProjection, imageMin, imageSize, endScreens[axisEndIndex])) {
+					isAxisEndVisible[axisEndIndex] = ProjectEditorPoint(
+						axisEnds[axisEndIndex],
+						viewProjection,
+						imageMin,
+						imageSize,
+						endScreens[axisEndIndex]);
+					if (!isAxisEndVisible[axisEndIndex]) {
 						continue;
 					}
 					const float distance = EditorDistanceToSegment(mouse, centerScreen, endScreens[axisEndIndex]);
@@ -831,7 +853,7 @@ void SceneEditor::DrawViewportEditor(ViewportState& state, const ViewportOptions
 						mouseDelta.x * state.dragScreenDirectionX +
 						mouseDelta.y * state.dragScreenDirectionY;
 					if (std::abs(dragAmount) > 0.0001f) {
-						Transform& transform = selectedObject->GetTransform();
+						Transform transform = selectedObject->GetTransform();
 						const Transform beforeEdit = transform;
 						if (state.tool == TransformTool::Move) {
 							const float amount = dragAmount * (std::max)(axisLength, 1.0f) * 0.006f;
@@ -844,17 +866,24 @@ void SceneEditor::DrawViewportEditor(ViewportState& state, const ViewportOptions
 							if (state.activeAxis == 1) transform.rotate.y += dragAmount * directionSign * 0.01f;
 							if (state.activeAxis == 2) transform.rotate.z += dragAmount * directionSign * 0.01f;
 						} else {
-							if (state.activeAxis == 0) transform.scale.x = (std::max)(0.01f, transform.scale.x + dragAmount * 0.01f);
-							if (state.activeAxis == 1) transform.scale.y = (std::max)(0.01f, transform.scale.y + dragAmount * 0.01f);
-							if (state.activeAxis == 2) transform.scale.z = (std::max)(0.01f, transform.scale.z + dragAmount * 0.01f);
+							if (state.activeAxis == 0) transform.scale.x = std::clamp(transform.scale.x + dragAmount * 0.01f, 0.01f, 100.0f);
+							if (state.activeAxis == 1) transform.scale.y = std::clamp(transform.scale.y + dragAmount * 0.01f, 0.01f, 100.0f);
+							if (state.activeAxis == 2) transform.scale.z = std::clamp(transform.scale.z + dragAmount * 0.01f, 0.01f, 100.0f);
+						}
+						if (!std::isfinite(transform.translate.x) || !std::isfinite(transform.translate.y) || !std::isfinite(transform.translate.z) ||
+							!std::isfinite(transform.rotate.x) || !std::isfinite(transform.rotate.y) || !std::isfinite(transform.rotate.z) ||
+							!std::isfinite(transform.scale.x) || !std::isfinite(transform.scale.y) || !std::isfinite(transform.scale.z)) {
+							state.isDragging = false;
+							state.activeAxis = -1;
+							return;
 						}
 						selectedObject->SetTranslate(transform.translate);
 						selectedObject->SetRotate(transform.rotate);
 						selectedObject->SetScale(transform.scale);
 						selectedObject->RecordTransformEdit(beforeEdit);
-						if (options.onTransformChanged) {
-							options.onTransformChanged(state.selectedIndex, transform);
-						}
+						transformChanged = true;
+						changedTransform = transform;
+						changedTransformIndex = state.selectedIndex;
 					}
 				}
 
@@ -866,6 +895,9 @@ void SceneEditor::DrawViewportEditor(ViewportState& state, const ViewportOptions
 					IM_COL32(70, 145, 255, 255),
 				};
 				for (int axisEndIndex = 0; axisEndIndex < 6; ++axisEndIndex) {
+					if (!isAxisEndVisible[axisEndIndex]) {
+						continue;
+					}
 					const int axis = axisEndIndex / 2;
 					ImU32 color = axisColors[axis];
 					if (state.isDragging && state.activeAxis == axis) color = IM_COL32(255, 255, 255, 255);
@@ -942,6 +974,10 @@ void SceneEditor::DrawViewportEditor(ViewportState& state, const ViewportOptions
 	}
 
 	// 左クリックは選択・ギズモ専用とし、カメラは右・中ボタンへ分離して誤操作を防ぐ。
+	if (transformChanged && options.onTransformChanged) {
+		options.onTransformChanged(changedTransformIndex, changedTransform);
+	}
+
 	UpdateViewportCamera(options.camera, state.isDragging || toolbarHovered);
 #else
 	(void)state;
@@ -997,7 +1033,8 @@ void SceneEditor::DrawSpriteViewportEditor(SpriteViewportState& state, const Spr
 		ImGuiWindowFlags_NoDocking;
 	ImGui::Begin("2D Edit Tools", nullptr, toolbarFlags);
 	const auto drawToolButton = [&](const char* label, TransformTool tool) {
-		if (state.tool == tool) {
+		const bool isActive = state.tool == tool;
+		if (isActive) {
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.48f, 0.82f, 1.0f));
 		}
 		if (ImGui::Button(label)) {
@@ -1005,7 +1042,7 @@ void SceneEditor::DrawSpriteViewportEditor(SpriteViewportState& state, const Spr
 			state.isDragging = false;
 			state.activeAxis = -1;
 		}
-		if (state.tool == tool) {
+		if (isActive) {
 			ImGui::PopStyleColor();
 		}
 	};

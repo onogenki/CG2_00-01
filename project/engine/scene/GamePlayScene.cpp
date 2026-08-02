@@ -52,11 +52,12 @@ bool TransformCoord(const Vector3& point, const Matrix4x4& matrix, Vector3& outP
 	const float y = point.x * matrix.m[0][1] + point.y * matrix.m[1][1] + point.z * matrix.m[2][1] + matrix.m[3][1];
 	const float z = point.x * matrix.m[0][2] + point.y * matrix.m[1][2] + point.z * matrix.m[2][2] + matrix.m[3][2];
 	const float w = point.x * matrix.m[0][3] + point.y * matrix.m[1][3] + point.z * matrix.m[2][3] + matrix.m[3][3];
-	if (std::abs(w) <= 0.0001f) {
+	if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z) || !std::isfinite(w) ||
+		std::abs(w) <= 0.0001f) {
 		return false;
 	}
 	outPoint = { x / w, y / w, z / w };
-	return true;
+	return std::isfinite(outPoint.x) && std::isfinite(outPoint.y) && std::isfinite(outPoint.z);
 }
 
 bool IsAabbOverlapping(const AABB& lhs, const AABB& rhs)
@@ -2778,13 +2779,13 @@ void GamePlayScene::DrawCollisionDebugOverlay()
 		const float x = position.x * viewProjectionMatrix.m[0][0] + position.y * viewProjectionMatrix.m[1][0] + position.z * viewProjectionMatrix.m[2][0] + viewProjectionMatrix.m[3][0];
 		const float y = position.x * viewProjectionMatrix.m[0][1] + position.y * viewProjectionMatrix.m[1][1] + position.z * viewProjectionMatrix.m[2][1] + viewProjectionMatrix.m[3][1];
 		const float w = position.x * viewProjectionMatrix.m[0][3] + position.y * viewProjectionMatrix.m[1][3] + position.z * viewProjectionMatrix.m[2][3] + viewProjectionMatrix.m[3][3];
-		if (w <= 0.0f) {
+		if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(w) || w <= 0.0f) {
 			return false;
 		}
 		screenPosition = ImVec2(
 			imageMin.x + (x / w + 1.0f) * 0.5f * rectWidth,
 			imageMin.y + (1.0f - y / w) * 0.5f * rectHeight);
-		return true;
+		return std::isfinite(screenPosition.x) && std::isfinite(screenPosition.y);
 	};
 
 	constexpr std::array<std::pair<int, int>, 12> edges{ {

@@ -1064,7 +1064,7 @@ void ImGuiManager::ModelWindow(
 		ImGui::BeginDisabled(transformPlaybackActive);
 		transformEdited |= ImGui::DragFloat3("Translate", &transform.translate.x, 0.01f);
 		transformEdited |= ImGui::DragFloat3("Rotate", &transform.rotate.x, 0.01f);
-		transformEdited |= ImGui::DragFloat3("Scale", &transform.scale.x, 0.01f);
+		transformEdited |= ImGui::DragFloat3("Scale", &transform.scale.x, 0.01f, 0.01f, 100.0f);
 
 		ImGui::Separator();
 		ImGui::TextDisabled("Quick Adjust");
@@ -1504,13 +1504,13 @@ void ImGuiManager::DrawObbCollisionDebug(const MyMath::OBB& obb, const MyMath::S
 		const float x = position.x * viewProjectionMatrix.m[0][0] + position.y * viewProjectionMatrix.m[1][0] + position.z * viewProjectionMatrix.m[2][0] + viewProjectionMatrix.m[3][0];
 		const float y = position.x * viewProjectionMatrix.m[0][1] + position.y * viewProjectionMatrix.m[1][1] + position.z * viewProjectionMatrix.m[2][1] + viewProjectionMatrix.m[3][1];
 		const float w = position.x * viewProjectionMatrix.m[0][3] + position.y * viewProjectionMatrix.m[1][3] + position.z * viewProjectionMatrix.m[2][3] + viewProjectionMatrix.m[3][3];
-		if (w <= 0.0f) {
+		if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(w) || w <= 0.0f) {
 			return false;
 		}
 		screenPosition = ImVec2(
 			imageMin.x + (x / w + 1.0f) * 0.5f * rectWidth,
 			imageMin.y + (1.0f - y / w) * 0.5f * rectHeight);
-		return true;
+		return std::isfinite(screenPosition.x) && std::isfinite(screenPosition.y);
 	};
 
 	const auto makeCorner = [&](float signX, float signY, float signZ) {
@@ -1583,13 +1583,13 @@ void ImGuiManager::DrawControlPointPathDebug(
 		const float x = position.x * viewProjectionMatrix.m[0][0] + position.y * viewProjectionMatrix.m[1][0] + position.z * viewProjectionMatrix.m[2][0] + viewProjectionMatrix.m[3][0];
 		const float y = position.x * viewProjectionMatrix.m[0][1] + position.y * viewProjectionMatrix.m[1][1] + position.z * viewProjectionMatrix.m[2][1] + viewProjectionMatrix.m[3][1];
 		const float w = position.x * viewProjectionMatrix.m[0][3] + position.y * viewProjectionMatrix.m[1][3] + position.z * viewProjectionMatrix.m[2][3] + viewProjectionMatrix.m[3][3];
-		if (w <= 0.0f) {
+		if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(w) || w <= 0.0f) {
 			return false;
 		}
 		screenPosition = ImVec2(
 			imageMin.x + (x / w + 1.0f) * 0.5f * rectWidth,
 			imageMin.y + (1.0f - y / w) * 0.5f * rectHeight);
-		return true;
+		return std::isfinite(screenPosition.x) && std::isfinite(screenPosition.y);
 	};
 
 	std::vector<ImVec2> projected(controlPoints.size());
@@ -1837,6 +1837,11 @@ LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 		if (objectData.objectType == "EVENT_CAMERA") {
 			ImGui::SeparatorText("Event Camera");
 			ImGui::TextDisabled("Position is the camera location. Camera Focus is the point it looks at.");
+			if (findTriggerIndexForCamera(objectData.name) < 0) {
+				ImGui::TextColored(
+					ImVec4(1.0f, 0.72f, 0.25f, 1.0f),
+					"This camera has no Event Trigger, so it will not become active.");
+			}
 			if (!objectData.hasCameraFocus) {
 				objectData.hasCameraFocus = true;
 				objectData.cameraFocus = objectData.translation;
@@ -1851,6 +1856,7 @@ LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 		// ---------- 制御点移動オブジェクト固有の設定 ----------
 		if (objectData.objectType == "PATH_OBJECT") {
 			ImGui::SeparatorText("Control Point Path");
+			ImGui::TextDisabled("Path movement runs while Game View is active.");
 			result.dataChanged |= ImGui::DragFloat(
 				"Path Speed",
 				&objectData.pathSpeed,
@@ -2013,13 +2019,13 @@ void ImGuiManager::SkeletonDebugDraw(const Model::Skeleton& skeleton, const Matr
 		const float x = position.x * matWVP.m[0][0] + position.y * matWVP.m[1][0] + position.z * matWVP.m[2][0] + matWVP.m[3][0];
 		const float y = position.x * matWVP.m[0][1] + position.y * matWVP.m[1][1] + position.z * matWVP.m[2][1] + matWVP.m[3][1];
 		const float w = position.x * matWVP.m[0][3] + position.y * matWVP.m[1][3] + position.z * matWVP.m[2][3] + matWVP.m[3][3];
-		if (w <= 0.0f) {
+		if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(w) || w <= 0.0f) {
 			return false;
 		}
 		screenPosition = ImVec2(
 			imageMin.x + (x / w + 1.0f) * 0.5f * imageSize.x,
 			imageMin.y + (1.0f - y / w) * 0.5f * imageSize.y);
-		return true;
+		return std::isfinite(screenPosition.x) && std::isfinite(screenPosition.y);
 	};
 
 	drawList->PushClipRect(imageMin, ImVec2(imageMin.x + imageSize.x, imageMin.y + imageSize.y), true);
@@ -2027,7 +2033,11 @@ void ImGuiManager::SkeletonDebugDraw(const Model::Skeleton& skeleton, const Matr
 		if (!joint.parent.has_value()) {
 			continue;
 		}
-		const auto& parentJoint = skeleton.joints[joint.parent.value()];
+		const size_t parentIndex = joint.parent.value();
+		if (parentIndex >= skeleton.joints.size()) {
+			continue;
+		}
+		const auto& parentJoint = skeleton.joints[parentIndex];
 		const Vector3 jointPosition{
 			joint.skeletonSpaceMatrix.m[3][0], joint.skeletonSpaceMatrix.m[3][1], joint.skeletonSpaceMatrix.m[3][2] };
 		const Vector3 parentPosition{

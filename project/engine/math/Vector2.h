@@ -1,7 +1,8 @@
 #pragma once
 
 struct Vector2 {
-	float x, y;
+	float x = 0.0f;
+	float y = 0.0f;
 
 	Vector2& operator+=(const Vector2& other) {
 		x += other.x;

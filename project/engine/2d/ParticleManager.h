@@ -18,12 +18,12 @@ class CameraManager;
 
 struct Particle{
 public:
-    Transform transform;
-    Vector3 velocity;
-    Vector4 color;
-    float lifeTime;
-    float currentTime;
-    bool receivesWind;//風を受けるかどうか
+    Transform transform{};
+    Vector3 velocity{};
+    Vector4 color{};
+    float lifeTime = 0.0f;
+    float currentTime = 0.0f;
+    bool receivesWind = false;//風を受けるかどうか
     bool isEndless = false;
     float scaleVelocityY = 0.0f;
 
@@ -45,8 +45,8 @@ public:
 
 struct AccelerationField
 {
-    Vector3 acceleration;//加速度
-    AABB area;//範囲
+    Vector3 acceleration{};//加速度
+    AABB area{};//範囲
 };
 
 struct ParticleForGPU {
@@ -75,15 +75,15 @@ struct ParticleGroup
 	using UpdateCallback = void (*)(Particle& particle, float signedDeltaTime, bool returning);
     // マテリアルデータ
     std::string textureFilePath;
-    uint32_t textureSrvIndex;
+	uint32_t textureSrvIndex = UINT32_MAX;
     // パーティクルのリスト
     std::list<Particle> particles;
     // インスタンシング用データ
-    uint32_t instancingSrvIndex;
+	uint32_t instancingSrvIndex = UINT32_MAX;
     Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource;
-    uint32_t instanceCount;
+	uint32_t instanceCount = 0;
     // インスタンシングデータを書き込むためのポインタ
-    ParticleForGPU* mappedData;
+	ParticleForGPU* mappedData = nullptr;
     Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource;
     D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
     uint32_t vertexCount = 6;
@@ -191,7 +191,7 @@ private:
     Material* materialData_ = nullptr;
 
     //場
-    AccelerationField accelerationField_;
+	AccelerationField accelerationField_{};
 	ReturnPlaybackState returnState_;
     bool autoWindSwitch_ = true;
     float windTimer_ = 0.0f;//吹く時間

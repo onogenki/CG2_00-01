@@ -14,8 +14,8 @@ public:
 	{
 		// コライダー種別とローカル座標系での形状情報。
 		std::string type;
-		Vector3 center;
-		Vector3 size;
+		Vector3 center{};
+		Vector3 size{};
 	};
 
 	struct ObjectData

@@ -18,7 +18,7 @@ namespace MyMath {
 
 	Vector3 Normalize(const Vector3& v) {
 		float len = Length(v);
-		if (len != 0) {
+		if (std::isfinite(len) && len > 0.000001f) {
 			return Multiply(1.0f / len, v);
 		}
 		return { 0, 0, 0 };

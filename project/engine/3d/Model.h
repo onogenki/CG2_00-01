@@ -27,8 +27,8 @@ public:
 	template<typename tValue>
 	struct Keyframe
 	{
-		float time;//キーフレームの時刻
-		tValue value;//キーフレームの幅
+		float time = 0.0f;//キーフレームの時刻
+		tValue value{};//キーフレームの幅
 	};
 	using KeyframeVector3 = Keyframe<Vector3>;
 	using KeyframeQuaternion = Keyframe<Quaternion>;
@@ -60,35 +60,35 @@ public:
 	};
 
 	struct MeshData {
-		uint32_t indexOffset;
-		uint32_t indexCount;
-		uint32_t materialIndex;
+		uint32_t indexOffset = 0;
+		uint32_t indexCount = 0;
+		uint32_t materialIndex = 0;
 	};
 
 	struct Node
 	{
-		QuaternionTransform transform;
-		Matrix4x4 localMatrix;
+		QuaternionTransform transform{};
+		Matrix4x4 localMatrix{};
 		std::string name;
 		std::vector<Node> children;
 	};
 
 	struct VertexWeightData
 	{
-		float weight;
-		uint32_t vertexIndex;
+		float weight = 0.0f;
+		uint32_t vertexIndex = 0;
 	};
 
 	struct JointWeightData
 	{
-		Matrix4x4 inverseBindPoseMatrix;
+		Matrix4x4 inverseBindPoseMatrix{};
 		std::vector<VertexWeightData> vertexWeights;
 	};
 
 	struct VertexInfluence
 	{
-		std::array<float, kNumMaxInfluence> weights;
-		std::array<int32_t, kNumMaxInfluence>jointIndices;
+		std::array<float, kNumMaxInfluence> weights{};
+		std::array<int32_t, kNumMaxInfluence>jointIndices{};
 	};
 
 	struct WellForGPU
@@ -101,25 +101,25 @@ public:
 	{
 		struct SkinningInformation
 		{
-			uint32_t numVertices;
+			uint32_t numVertices = 0;
 		};
 
 		std::vector<Matrix4x4>inverseBindPoseMatrices;
 		Microsoft::WRL::ComPtr<ID3D12Resource>influenceResource;
-		D3D12_VERTEX_BUFFER_VIEW influenceBufferView;
+		D3D12_VERTEX_BUFFER_VIEW influenceBufferView{};
 		std::span<VertexInfluence>mappedInfluence;
 		Microsoft::WRL::ComPtr<ID3D12Resource>paletteResource;
 		std::span<WellForGPU>mappedPalette;
 		uint32_t paletteSrvIndex = UINT32_MAX;
-		std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>paletteSrvHandle;
+		std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>paletteSrvHandle{};
 		uint32_t inputVertexSrvIndex = UINT32_MAX;
-		std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>inputVertexSrvHandle;
+		std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>inputVertexSrvHandle{};
 		uint32_t influenceSrvIndex = UINT32_MAX;
-		std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>influenceSrvHandle;
+		std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>influenceSrvHandle{};
 		Microsoft::WRL::ComPtr<ID3D12Resource>outputVertexResource;
-		D3D12_VERTEX_BUFFER_VIEW outputVertexBufferView;
+		D3D12_VERTEX_BUFFER_VIEW outputVertexBufferView{};
 		uint32_t outputVertexUavIndex = UINT32_MAX;
-		std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>outputVertexUavHandle;
+		std::pair<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE>outputVertexUavHandle{};
 		D3D12_RESOURCE_STATES outputVertexResourceState = D3D12_RESOURCE_STATE_COMMON;
 		Microsoft::WRL::ComPtr<ID3D12Resource>skinningInformationResource;
 		SkinningInformation* mappedSkinningInformation = nullptr;
@@ -149,19 +149,19 @@ public:
 
 	struct Animation
 	{
-		float duration;//アニメーション全体の尺(単位は秒)
+		float duration = 0.0f;//アニメーション全体の尺(単位は秒)
 		//NodeAnimationの集合。Node名でひけるようにしておく
 		std::map<std::string, NodeAnimation>nodeAnimations;
 	};
 
 	struct Joint
 	{
-		QuaternionTransform transform;//Transform情報
-		Matrix4x4 localMatrix;
-		Matrix4x4 skeletonSpaceMatrix;//skeletonSpaceでの変換行列
+		QuaternionTransform transform{};//Transform情報
+		Matrix4x4 localMatrix{};
+		Matrix4x4 skeletonSpaceMatrix{};//skeletonSpaceでの変換行列
 		std::string name;
 		std::vector<int32_t> children;//子JointのIndexのリスト。いなければ空
-		int32_t index;
+		int32_t index = -1;
 		std::optional<int32_t>parent;//親JointのIndex、いなければnull
 	};
 
@@ -169,7 +169,7 @@ public:
 	{
 		std::vector<const NodeAnimation*> animationNodeMap;
 		const Animation* cachedAnimation = nullptr;
-		int32_t root;//RootJointのIndex
+		int32_t root = -1;//RootJointのIndex
 		std::map<std::string, int32_t>jointMap;//Joint名とIndexとの辞書
 		std::vector<Joint>joints;//所属しているジョイント
 	};

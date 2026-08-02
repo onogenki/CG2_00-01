@@ -170,8 +170,8 @@ private:
 	Microsoft::WRL::ComPtr < IDXGISwapChain4> swapChain;
 	Microsoft::WRL::ComPtr < ID3D12Resource> swapChainResources[2];
 
-	DXGI_SWAP_CHAIN_DESC1 swapChainDesc_;
-	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc_;
+	DXGI_SWAP_CHAIN_DESC1 swapChainDesc_{};
+	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc_{};
 
 	//Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors, bool shaderVisible);
 
@@ -192,9 +192,9 @@ private:
 	UINT descriptorSizeDSV = 0;
 
 	//描画先のRTVとDSVを設定する
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle_;
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle_{};
 
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle_[2];
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle_[2]{};
 
 	// Sceneの描画先として使うオフスクリーンRenderTexture
 	Microsoft::WRL::ComPtr<ID3D12Resource> renderTextureResource_;
@@ -212,12 +212,12 @@ private:
 	const Vector4 renderTextureClearColor_{ 1.0f, 0.0f, 0.0f, 1.0f };
 
 	//ビューポート
-	D3D12_VIEWPORT viewport_;
+	D3D12_VIEWPORT viewport_{};
 
 	HRESULT hr = S_OK;
 
 	//シザー短形
-	D3D12_RECT scissorRect_;
+	D3D12_RECT scissorRect_{};
 
 	//WindowsAPI
 	WinApp* winApp = nullptr;
@@ -232,9 +232,9 @@ private:
 	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap, uint32_t descriptorSize, uint32_t index);
 
 	//記録時間(FPS固定用)
-	std::chrono::steady_clock::time_point reference_;
-	std::chrono::microseconds kMinTime_;
-	std::chrono::microseconds kMinCheckTime_;
+	std::chrono::steady_clock::time_point reference_{};
+	std::chrono::microseconds kMinTime_{};
+	std::chrono::microseconds kMinCheckTime_{};
 	float deltaTime_ = 1.0f / 60.0f;
 
 	uint32_t width = WinApp::kClientWidth; // 幅・高さをメンバに

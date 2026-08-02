@@ -75,8 +75,8 @@ private:
 	ComPtr<IDirectInputDevice8> mouse = nullptr;
 	DIMOUSESTATE mouseStatePre{};
 	DIMOUSESTATE mouseState{}; // マウスの状態
-	int mouseScreenX; // マウスのスクリーン座標X
-	int mouseScreenY; // マウスのスクリーン座標Y
+	int mouseScreenX = 0; // マウスのスクリーン座標X
+	int mouseScreenY = 0; // マウスのスクリーン座標Y
 
 	// ゲームパッド
 	std::vector<ComPtr<IDirectInputDevice8>> gamepads;

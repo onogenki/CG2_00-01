@@ -28,32 +28,32 @@ public:
 
 	// 平行光源データ
 	struct DirectionalLight {
-		Vector4 color;
-		Vector3 direction;//ハイライトの位置
-		float intensity;//明るさの強さ
+		Vector4 color{};
+		Vector3 direction{};//ハイライトの位置
+		float intensity = 0.0f;//明るさの強さ
 	};
 
 	struct PointLight
 	{
-		Vector4 color;//ライトの色
-		Vector3 position;//ライトの位置
-		float intensity;//輝度
-		float radius;//ライトの届く最大距離
-		float decay;//減衰率
-		float padding[2];
+		Vector4 color{};//ライトの色
+		Vector3 position{};//ライトの位置
+		float intensity = 0.0f;//輝度
+		float radius = 0.0f;//ライトの届く最大距離
+		float decay = 0.0f;//減衰率
+		float padding[2]{};
 	};
 
 	struct SpotLight
 	{
-		Vector4 color;//ライトの色
-		Vector3 position;//ライトの位置
-		float intensity;//輝度
-		Vector3 direction;//スポットライトの方向
-		float distance;//ライトの届く最大距離
-		float decay;//減衰率
-		float cosAngle;//スポットライトの余弦
-		float cosFalloffStart;
-		float padding[1];
+		Vector4 color{};//ライトの色
+		Vector3 position{};//ライトの位置
+		float intensity = 0.0f;//輝度
+		Vector3 direction{};//スポットライトの方向
+		float distance = 0.0f;//ライトの届く最大距離
+		float decay = 0.0f;//減衰率
+		float cosAngle = 0.0f;//スポットライトの余弦
+		float cosFalloffStart = 0.0f;
+		float padding[1]{};
 	};
 
 	struct CameraForGPU

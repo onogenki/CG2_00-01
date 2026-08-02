@@ -5,7 +5,7 @@
         {
             "collider": {
                 "center": [
-                    0.0,
+                    -1.5,
                     0.0,
                     0.0
                 ],
@@ -267,6 +267,100 @@
                 ]
             },
             "type": "EMPTY"
+        },
+        {
+            "camera_focus": [
+                -1.4033424854278564,
+                0.20000004768371582,
+                9.481008529663086
+            ],
+            "name": "EventCamera3",
+            "object_type": "EVENT_CAMERA",
+            "tag": "EventCamera",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    4.596657752990723,
+                    3.200000047683716,
+                    1.481008529663086
+                ]
+            },
+            "type": "CAMERA"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    4.0,
+                    3.0,
+                    4.0
+                ],
+                "type": "BOX"
+            },
+            "event_camera": "EventCamera3",
+            "event_id": "Event3",
+            "name": "EventTrigger3",
+            "object_type": "EVENT_TRIGGER",
+            "tag": "EventTrigger",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    -1.4033424854278564,
+                    -0.7999999523162842,
+                    9.481008529663086
+                ]
+            },
+            "type": "EMPTY"
+        },
+        {
+            "camera_focus": [
+                0.0,
+                0.20000004768371582,
+                11.0
+            ],
+            "name": "EventCamera4",
+            "object_type": "EVENT_CAMERA",
+            "tag": "EventCamera",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    6.0,
+                    3.200000047683716,
+                    4.5
+                ]
+            },
+            "type": "CAMERA"
         }
     ]
 }

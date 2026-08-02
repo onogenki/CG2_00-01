@@ -2,6 +2,10 @@
 
 void CameraManager::AddCamera(const std::string& name, Camera* camera)
 {
+	if (!camera) {
+		return;
+	}
+
 	//カメラを書き込む
 	cameras_[name] = camera;
 	//現在使用中のカメラが決まってなければ
@@ -43,7 +47,9 @@ void CameraManager::Update()
 	//全てのカメラを順番に取り出す
 	for (auto& pair : cameras_)
 	{
-		pair.second->Update();
+		if (pair.second) {
+			pair.second->Update();
+		}
 	}
 }
 
