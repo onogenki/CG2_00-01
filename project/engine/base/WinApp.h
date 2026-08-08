@@ -39,6 +39,7 @@ private:
 	WNDCLASS wc{};
 	WindowMode windowMode_ = WindowMode::Maximized;
 	RECT windowedRect_{};
+	bool isComInitialized_ = false;
 
 	void ToggleFullscreen();
 };

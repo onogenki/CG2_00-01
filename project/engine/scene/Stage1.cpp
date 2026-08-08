@@ -130,6 +130,9 @@ void Stage1::Initialize()
 	ModelManager::GetInstance()->LoadModel("plane.obj");
 	ModelManager::GetInstance()->LoadModel("floor.obj");
 	ModelManager::GetInstance()->LoadModel("sphere.obj");
+	if (Model* sphereModel = ModelManager::GetInstance()->FindModel("sphere.obj")) {
+		sphereModel->SetTexture("Resources/monsterBall.png");
+	}
 
 	// ---------- 床の作成 ----------
 	// 床を置くと、鏡がどの位置にあるかを確認しやすくなります。
@@ -343,6 +346,14 @@ void Stage1::Draw()
 	}
 
 	DirectXCommon::GetInstance()->PreDrawForSwapChain(isPostEffectEnabled);
+#ifndef USE_IMGUI
+	// ImGuiを含まない構成では、RenderTextureのSceneを全画面三角形でSwapChainへコピーする。
+	if (isPostEffectEnabled) {
+		PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetPostEffectTextureSrvIndex(), false);
+	} else {
+		PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), false);
+	}
+#endif
 	ImGuiManager::GetInstance()->Draw(DirectXCommon::GetInstance());
 	DirectXCommon::GetInstance()->PostDraw();
 }

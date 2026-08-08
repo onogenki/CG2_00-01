@@ -42,7 +42,7 @@ LRESULT CALLBACK WinApp::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM l
 
 void WinApp::Initialize()
 {
-	CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+	isComInitialized_ = SUCCEEDED(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
 
 	wc.lpfnWndProc = WindowProc;
 	wc.lpszClassName = L"CG2WindowClass";
@@ -87,7 +87,10 @@ void WinApp::Finalize()
 {
 	timeEndPeriod(1);
 	CloseWindow(hwnd);
-	CoUninitialize();
+	if (isComInitialized_) {
+		CoUninitialize();
+		isComInitialized_ = false;
+	}
 }
 
 bool WinApp::ProcessMessage()
