@@ -3,6 +3,7 @@
 #include "CameraManager.h"
 #include "DirectXCommon.h"
 #include "LevelLoader.h"
+#include "Laser.h"
 #include "Object3d.h"
 #include "ParticleEmitter.h"
 #include "SrvManager.h"
@@ -38,6 +39,7 @@ struct LevelEditorResult
 	bool dataChanged = false;
 	bool addSphereRequested = false;
 	bool addEventPairRequested = false;
+	bool addCameraAreaRequested = false;
 	bool addPathSphereRequested = false;
 	bool removeSelectedRequested = false;
 };
@@ -89,13 +91,27 @@ public:
 		int& selectedObjectIndex);
 	// 鏡の中心・大きさ・回転を編集するデバッグ用ウィンドウを表示します。
 	// 値が変更されたフレームだけ true を返します。
-	bool MirrorDebugWindow(Mirror& mirror, float& mirrorYaw, const Camera& reflectionCamera);
+	bool MirrorDebugWindow(
+		Mirror& mirror,
+		float& mirrorYaw,
+		const Camera& reflectionCamera,
+		bool hasReflectionCapture);
 	//OBBをゲーム画面へワイヤー表示し、衝突中は赤、非衝突時は青で描画する
 	void DrawObbCollisionDebug(const MyMath::OBB& obb, const MyMath::Sphere& sphere, const Camera* camera, bool isColliding);
+	// Playerの球Colliderを表示する。物体接触中は青、Laser接触中は優先して黄色にする。
+	void DrawPlayerCollisionDebug(
+		const MyMath::Sphere& sphere,
+		const Camera* camera,
+		bool isObjectColliding,
+		bool isLaserHit);
 	// 制御点をGame Viewへ線と番号で重ねて表示します。
 	void DrawControlPointPathDebug(
 		const Vector3& basePosition,
 		const std::vector<Vector3>& controlPoints,
+		const Camera* camera);
+	// レーザー経路をGame Viewへ赤い線として重ねて表示します。
+	void DrawLaserDebug(
+		const std::vector<LaserSegment>& segments,
 		const Camera* camera);
 	bool IsSkeletonDebugDrawEnabled() const;
 	bool IsMouseOverGameView(float mouseScreenX, float mouseScreenY) const;

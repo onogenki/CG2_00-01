@@ -10,6 +10,7 @@
 #include "PostEffect.h"
 #include "CaptureManager.h"
 #include "Mirror.h"
+#include "Laser.h"
 #include <cmath>
 #include <numbers>
 #ifdef USE_IMGUI
@@ -1630,6 +1631,147 @@ void ImGuiManager::DrawControlPointPathDebug(
 #endif
 }
 
+void ImGuiManager::DrawLaserDebug(
+	const std::vector<LaserSegment>& segments,
+	const Camera* camera)
+{
+#ifdef USE_IMGUI
+	if (!camera || segments.empty()) {
+		return;
+	}
+
+	float rectX = 0.0f;
+	float rectY = 0.0f;
+	float rectWidth = 0.0f;
+	float rectHeight = 0.0f;
+	if (!GetGameViewRect(rectX, rectY, rectWidth, rectHeight)) {
+		return;
+	}
+
+	const Matrix4x4& viewProjectionMatrix = camera->GetViewProjectionMatrix();
+	const ImVec2 imageMin(rectX, rectY);
+	const ImVec2 imageMax(rectX + rectWidth, rectY + rectHeight);
+	ImDrawList* drawList = ImGui::GetForegroundDrawList();
+	drawList->PushClipRect(imageMin, imageMax, true);
+
+	const auto projectToGameView = [&](const Vector3& position, ImVec2& screenPosition) {
+		const float x = position.x * viewProjectionMatrix.m[0][0] + position.y * viewProjectionMatrix.m[1][0] + position.z * viewProjectionMatrix.m[2][0] + viewProjectionMatrix.m[3][0];
+		const float y = position.x * viewProjectionMatrix.m[0][1] + position.y * viewProjectionMatrix.m[1][1] + position.z * viewProjectionMatrix.m[2][1] + viewProjectionMatrix.m[3][1];
+		const float w = position.x * viewProjectionMatrix.m[0][3] + position.y * viewProjectionMatrix.m[1][3] + position.z * viewProjectionMatrix.m[2][3] + viewProjectionMatrix.m[3][3];
+		if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(w) || w <= 0.0f) {
+			return false;
+		}
+		screenPosition = ImVec2(
+			imageMin.x + (x / w + 1.0f) * 0.5f * rectWidth,
+			imageMin.y + (1.0f - y / w) * 0.5f * rectHeight);
+		return std::isfinite(screenPosition.x) && std::isfinite(screenPosition.y);
+	};
+
+	for (const LaserSegment& segment : segments) {
+		ImVec2 start{};
+		ImVec2 end{};
+		if (projectToGameView(segment.start, start) && projectToGameView(segment.end, end)) {
+			drawList->AddLine(start, end, IM_COL32(255, 40, 40, 255), 4.0f);
+			drawList->AddCircleFilled(end, 4.0f, IM_COL32(255, 230, 120, 255));
+		}
+	}
+
+	drawList->PopClipRect();
+#else
+	(void)segments;
+	(void)camera;
+#endif
+}
+
+void ImGuiManager::DrawPlayerCollisionDebug(
+	const MyMath::Sphere& sphere,
+	const Camera* camera,
+	bool isObjectColliding,
+	bool isLaserHit)
+{
+#ifdef USE_IMGUI
+	if (!camera) {
+		return;
+	}
+
+	float rectX = 0.0f;
+	float rectY = 0.0f;
+	float rectWidth = 0.0f;
+	float rectHeight = 0.0f;
+	if (!GetGameViewRect(rectX, rectY, rectWidth, rectHeight)) {
+		return;
+	}
+
+	const Matrix4x4& viewProjectionMatrix = camera->GetViewProjectionMatrix();
+	const ImVec2 imageMin(rectX, rectY);
+	const ImVec2 imageMax(rectX + rectWidth, rectY + rectHeight);
+	ImDrawList* drawList = ImGui::GetForegroundDrawList();
+	drawList->PushClipRect(imageMin, imageMax, true);
+
+	const auto projectToGameView = [&](const Vector3& position, ImVec2& screenPosition) {
+		const float x = position.x * viewProjectionMatrix.m[0][0] + position.y * viewProjectionMatrix.m[1][0] + position.z * viewProjectionMatrix.m[2][0] + viewProjectionMatrix.m[3][0];
+		const float y = position.x * viewProjectionMatrix.m[0][1] + position.y * viewProjectionMatrix.m[1][1] + position.z * viewProjectionMatrix.m[2][1] + viewProjectionMatrix.m[3][1];
+		const float w = position.x * viewProjectionMatrix.m[0][3] + position.y * viewProjectionMatrix.m[1][3] + position.z * viewProjectionMatrix.m[2][3] + viewProjectionMatrix.m[3][3];
+		if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(w) || w <= 0.0f) {
+			return false;
+		}
+		screenPosition = ImVec2(
+			imageMin.x + (x / w + 1.0f) * 0.5f * rectWidth,
+			imageMin.y + (1.0f - y / w) * 0.5f * rectHeight);
+		return std::isfinite(screenPosition.x) && std::isfinite(screenPosition.y);
+	};
+
+	// Laser判定を最優先し、物体接触の青色より危険を示す黄色を表示する。
+	const ImU32 color = isLaserHit
+		? IM_COL32(255, 225, 40, 255)
+		: (isObjectColliding
+			? IM_COL32(70, 160, 255, 255)
+			: IM_COL32(235, 235, 235, 255));
+	constexpr int kCircleDivision = 32;
+	const auto drawCircle = [&](int plane) {
+		for (int index = 0; index < kCircleDivision; ++index) {
+			const float firstAngle =
+				2.0f * std::numbers::pi_v<float> * static_cast<float>(index) /
+				static_cast<float>(kCircleDivision);
+			const float secondAngle =
+				2.0f * std::numbers::pi_v<float> * static_cast<float>(index + 1) /
+				static_cast<float>(kCircleDivision);
+			const auto makePoint = [&](float angle) {
+				Vector3 point = sphere.center;
+				const float first = std::cos(angle) * sphere.radius;
+				const float second = std::sin(angle) * sphere.radius;
+				if (plane == 0) {
+					point.x += first;
+					point.y += second;
+				} else if (plane == 1) {
+					point.x += first;
+					point.z += second;
+				} else {
+					point.y += first;
+					point.z += second;
+				}
+				return point;
+			};
+			ImVec2 firstScreen{};
+			ImVec2 secondScreen{};
+			if (projectToGameView(makePoint(firstAngle), firstScreen) &&
+				projectToGameView(makePoint(secondAngle), secondScreen)) {
+				drawList->AddLine(firstScreen, secondScreen, color, 3.0f);
+			}
+		}
+	};
+	drawCircle(0);
+	drawCircle(1);
+	drawCircle(2);
+	drawList->PopClipRect();
+#else
+	(void)sphere;
+	(void)camera;
+	(void)isObjectColliding;
+	(void)isLaserHit;
+#endif
+}
+
 LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 	bool& autoReload,
 	const std::string& filePath,
@@ -1726,7 +1868,7 @@ LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 		// 保存データのTransformを直接編集し、変更フレームだけSceneへ通知する
 		const char* positionLabel = objectData.objectType == "EVENT_TRIGGER"
 			? "Trigger Position"
-			: "Position";
+			: (objectData.objectType == "CAMERA_AREA" ? "Area Position" : "Position");
 		result.dataChanged |= ImGui::DragFloat3(
 			positionLabel,
 			&objectData.translation.x,
@@ -1741,7 +1883,7 @@ LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 		};
 		const char* rotationLabel = objectData.objectType == "EVENT_TRIGGER"
 			? "Trigger Rotation (deg)"
-			: "Rotation (deg)";
+			: (objectData.objectType == "CAMERA_AREA" ? "Area Rotation (deg)" : "Rotation (deg)");
 		if (ImGui::DragFloat3(rotationLabel, rotationDegrees, 1.0f)) {
 			objectData.rotation = {
 				rotationDegrees[0] * kDegreeToRadian,
@@ -1753,7 +1895,7 @@ LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 
 		const char* scaleLabel = objectData.objectType == "EVENT_TRIGGER"
 			? "Trigger Scale"
-			: "Scale";
+			: (objectData.objectType == "CAMERA_AREA" ? "Area Scale" : "Scale");
 		result.dataChanged |= ImGui::DragFloat3(
 			scaleLabel,
 			&objectData.scaling.x,
@@ -1853,6 +1995,39 @@ LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 				0.05f);
 		}
 
+		// ---------- 通常カメラ設定Area固有の設定 ----------
+		if (objectData.objectType == "CAMERA_AREA") {
+			ImGui::SeparatorText("Camera Area");
+			ImGui::TextDisabled("This box keeps player control and changes only the follow camera settings.");
+			if (!objectData.hasCameraArea) {
+				objectData.hasCameraArea = true;
+				result.dataChanged = true;
+			}
+			if (!objectData.hasCollider) {
+				objectData.hasCollider = true;
+				objectData.collider.type = "BOX";
+				objectData.collider.size = { 8.0f, 6.0f, 8.0f };
+				result.dataChanged = true;
+			}
+			result.dataChanged |= ImGui::DragFloat(
+				"Camera Distance",
+				&objectData.cameraArea.distance,
+				0.05f,
+				3.0f,
+				20.0f);
+			float pitchDegrees = objectData.cameraArea.pitch * kRadianToDegree;
+			if (ImGui::DragFloat("Camera Pitch (deg)", &pitchDegrees, 0.5f, -8.0f, 65.0f)) {
+				objectData.cameraArea.pitch = pitchDegrees * kDegreeToRadian;
+				result.dataChanged = true;
+			}
+			result.dataChanged |= ImGui::DragFloat(
+				"Base FOV",
+				&objectData.cameraArea.fovY,
+				0.005f,
+				0.2f,
+				1.2f);
+		}
+
 		// ---------- 制御点移動オブジェクト固有の設定 ----------
 		if (objectData.objectType == "PATH_OBJECT") {
 			ImGui::SeparatorText("Control Point Path");
@@ -1907,6 +2082,10 @@ LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 		if (ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("Adds a camera and its detection box. The new camera is selected for editing.");
 		}
+		result.addCameraAreaRequested = ImGui::Button("Add Camera Area");
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Adds a box that changes distance, pitch, and FOV while player stays in control.");
+		}
 		result.addPathSphereRequested = ImGui::Button("Add Path Sphere");
 		const bool protectedObject =
 			objectData.tag == "Floor" || objectData.tag == "Mirror";
@@ -1928,7 +2107,11 @@ LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 	return result;
 }
 
-bool ImGuiManager::MirrorDebugWindow(Mirror& mirror, float& mirrorYaw, const Camera& reflectionCamera)
+bool ImGuiManager::MirrorDebugWindow(
+	Mirror& mirror,
+	float& mirrorYaw,
+	const Camera& reflectionCamera,
+	bool hasReflectionCapture)
 {
 #ifdef USE_IMGUI
 	if (inspectorDockId_ != 0) {
@@ -1940,8 +2123,17 @@ bool ImGuiManager::MirrorDebugWindow(Mirror& mirror, float& mirrorYaw, const Cam
 	}
 
 	// ---------- 鏡の説明 ----------
-	ImGui::Text("Step 1: The mirror is a visible plane and data object.");
-	ImGui::Text("Reflection rendering is not enabled yet.");
+	ImGui::Text("Planar Reflection Mirror");
+	if (hasReflectionCapture) {
+		ImGui::TextColored(
+			ImVec4(0.35f, 1.0f, 0.55f, 1.0f),
+			"Reflection texture: ACTIVE");
+		ImGui::TextWrapped("The room is being drawn by the reflection camera and shown on this mirror.");
+	} else {
+		ImGui::TextColored(
+			ImVec4(1.0f, 0.85f, 0.25f, 1.0f),
+			"Reflection texture: waiting for first capture");
+	}
 
 	bool isChanged = false;
 
@@ -1978,7 +2170,7 @@ bool ImGuiManager::MirrorDebugWindow(Mirror& mirror, float& mirrorYaw, const Cam
 	const Vector3& reflectionRotate = reflectionCamera.GetRotate();
 	ImGui::Text("Reflection Camera Position: %.2f, %.2f, %.2f", reflectionPosition.x, reflectionPosition.y, reflectionPosition.z);
 	ImGui::Text("Reflection Camera Rotation: %.2f, %.2f, %.2f", reflectionRotate.x, reflectionRotate.y, reflectionRotate.z);
-	ImGui::TextWrapped("The reflection camera is updating. Next, it will draw the room into a mirror texture.");
+	ImGui::TextWrapped("This camera is mirrored across the plane and draws the room into the mirror texture.");
 	ImGui::End();
 
 	return isChanged;
@@ -1987,6 +2179,7 @@ bool ImGuiManager::MirrorDebugWindow(Mirror& mirror, float& mirrorYaw, const Cam
 	(void)mirror;
 	(void)mirrorYaw;
 	(void)reflectionCamera;
+	(void)hasReflectionCapture;
 	return false;
 #endif
 }

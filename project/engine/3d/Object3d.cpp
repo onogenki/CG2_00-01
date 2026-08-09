@@ -25,6 +25,7 @@ void Object3d::Initialize(Object3dCommon* object3dCommon)
 	CreateTransformationMatrixData();
 	//カメラデータ作成
 	CreateCameraData();
+	CreateReflectionData();
 	//平行光源データ作成
 	CreateDirectionalLightData();
 	//点光源データ作成
@@ -139,6 +140,22 @@ void Object3d::RecordTransformEdit(const Transform& before, float elapsedSeconds
 	transformPlayback_.RecordEdit(before, transform, elapsedSeconds);
 }
 
+void Object3d::UpdateCameraForDraw(Camera* drawCamera)
+{
+	if (!drawCamera) {
+		return;
+	}
+	camera = drawCamera;
+	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+	if (hasParentWorldMatrix_) {
+		worldMatrix = Multiply(worldMatrix, parentWorldMatrix_);
+	}
+	transformationMatrixData->WVP = Multiply(worldMatrix, camera->GetViewProjectionMatrix());
+	transformationMatrixData->World = worldMatrix;
+	transformationMatrixData->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
+	cameraData->worldPosition = camera->GetTranslate();
+}
+
 void Object3d::Draw()
 {
 	// コマンドリストを取得
@@ -161,7 +178,7 @@ void Object3d::Draw()
 				TextureManager::GetInstance()->GetSrvHandleGPU(environmentTexturePath);
 			commandList->SetGraphicsRootDescriptorTable(7, environmentTextureSrvHandle);
 		}
-		model_->DrawSkinned(skinCluster_);
+		model_->DrawSkinned(skinCluster_, textureSrvIndexOverride_);
 		return;
 	}
 	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
@@ -182,12 +199,36 @@ void Object3d::Draw()
 		//アニメーションモデルならアドレスを渡す
 		if (isSkeletal_)
 		{
-			model_->Draw(skinCluster_);
+			model_->Draw(skinCluster_, textureSrvIndexOverride_);
 		} else
 		{
-			model_->Draw();
+			model_->Draw(textureSrvIndexOverride_);
 		}
 	}
+}
+
+void Object3d::DrawMirror(
+	uint32_t reflectionTextureSrvIndex,
+	const Matrix4x4& reflectionViewProjection)
+{
+	if (!model_ || reflectionTextureSrvIndex == UINT32_MAX || !reflectionData_) {
+		return;
+	}
+
+	reflectionData_->reflectionViewProjection = reflectionViewProjection;
+	reflectionData_->tint = { 0.96f, 0.98f, 1.0f, 1.0f };
+	ID3D12GraphicsCommandList* commandList = object3dCommon->GetDxCommon()->GetCommandList();
+	object3dCommon->SetMirrorDrawSetting();
+	commandList->SetGraphicsRootConstantBufferView(
+		0,
+		transformationMatrixResource->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(
+		1,
+		reflectionDataResource_->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootDescriptorTable(
+		2,
+		SrvManager::GetInstance()->GetGPUDescriptorHandle(reflectionTextureSrvIndex));
+	model_->DrawGeometry();
 }
 
 void Object3d::SetModel(const std::string& filePath)
@@ -195,6 +236,12 @@ void Object3d::SetModel(const std::string& filePath)
 	// モデルマネージャからモデルを検索してセットする
 	model_ = ModelManager::GetInstance()->FindModel(filePath);
 	modelName_ = filePath;
+}
+
+void Object3d::SetTextureOverride(const std::string& texturePath)
+{
+	TextureManager::GetInstance()->LoadTexture(texturePath);
+	textureSrvIndexOverride_ = TextureManager::GetInstance()->GetSrvIndex(texturePath);
 }
 // この関数を初期化時に1回だけ呼ぶ
 void Object3d::InitializeAnimation()
@@ -312,6 +359,14 @@ void Object3d::CreateCameraData()
 	cameraResource->Map(0, nullptr, reinterpret_cast<void**>(&cameraData));
 
 	cameraData->worldPosition = { 0.0f, 0.0f, 10.0f };
+}
+
+void Object3d::CreateReflectionData()
+{
+	reflectionDataResource_ = object3dCommon->GetDxCommon()->CreateBufferResource(sizeof(ReflectionData));
+	reflectionDataResource_->Map(0, nullptr, reinterpret_cast<void**>(&reflectionData_));
+	reflectionData_->reflectionViewProjection = MakeIdentity4x4();
+	reflectionData_->tint = { 1.0f, 1.0f, 1.0f, 1.0f };
 }
 
 void Object3d::CreatePointLightData()

@@ -5,7 +5,7 @@
         {
             "collider": {
                 "center": [
-                    -1.5,
+                    0.0,
                     0.0,
                     0.0
                 ],
@@ -38,6 +38,47 @@
                 ]
             },
             "type": "MESH"
+        },
+        {
+            "camera_area": {
+                "distance": 11.5,
+                "fov_y": 0.48,
+                "pitch": 0.58
+            },
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    8.0,
+                    6.0,
+                    8.0
+                ],
+                "type": "BOX"
+            },
+            "name": "StartCameraArea",
+            "object_type": "CAMERA_AREA",
+            "tag": "CameraArea",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    0.0,
+                    -0.8,
+                    5.0
+                ]
+            },
+            "type": "EMPTY"
         },
         {
             "collider": {

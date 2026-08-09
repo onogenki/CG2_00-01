@@ -7,6 +7,10 @@
     <FxCompile Include="resources\shaders\Sepia.PS.hlsl" />
     <FxCompile Include="resources\shaders\Object3d.PS.hlsl" />
     <FxCompile Include="resources\shaders\Object3d.VS.hlsl" />
+	<FxCompile Include="resources\shaders\Mirror.PS.hlsl" />
+	<FxCompile Include="resources\shaders\Laser.PS.hlsl" />
+	<FxCompile Include="resources\shaders\Laser.VS.hlsl" />
+	<FxCompile Include="resources\shaders\Mirror.VS.hlsl" />
     <FxCompile Include="resources\shaders\Particle.PS.hlsl" />
     <FxCompile Include="resources\shaders\GPUParticle.PS.hlsl" />
     <FxCompile Include="resources\shaders\GPUParticle.VS.hlsl" />
@@ -32,6 +36,11 @@
     <ClCompile Include="engine\2d\TextureManager.cpp" />
     <ClCompile Include="engine\3d\Camera.cpp" />
     <ClCompile Include="engine\3d\CameraController.cpp" />
+	<ClCompile Include="engine\3d\CarryableMirror.cpp" />
+	<ClCompile Include="engine\3d\FixedMirror.cpp" />
+	<ClCompile Include="engine\3d\Laser.cpp" />
+	<ClCompile Include="engine\3d\LaserRenderer.cpp" />
+	<ClCompile Include="engine\3d\PlanarReflectionTarget.cpp" />
     <ClCompile Include="engine\3d\CameraManager.cpp" />
     <ClCompile Include="engine\3d\Model.cpp" />
     <ClCompile Include="engine\3d\ModelCommon.cpp" />
@@ -83,6 +92,11 @@
     <ClInclude Include="engine\2d\TextureManager.h" />
     <ClInclude Include="engine\3d\Camera.h" />
     <ClInclude Include="engine\3d\CameraController.h" />
+	<ClInclude Include="engine\3d\CarryableMirror.h" />
+	<ClInclude Include="engine\3d\FixedMirror.h" />
+	<ClInclude Include="engine\3d\Laser.h" />
+	<ClInclude Include="engine\3d\LaserRenderer.h" />
+	<ClInclude Include="engine\3d\PlanarReflectionTarget.h" />
     <ClInclude Include="engine\3d\CameraManager.h" />
     <ClInclude Include="engine\3d\Model.h" />
     <ClInclude Include="engine\3d\ModelCommon.h" />
@@ -141,6 +155,7 @@
   <ItemGroup>
     <None Include="resources\shaders\Fullscreen.hlsli" />
     <None Include="resources\shaders\Object3d.hlsli" />
+	<None Include="resources\shaders\Mirror.hlsli" />
     <None Include="resources\shaders\Particle.hlsli" />
     <None Include="resources\shaders\Skybox.hlsli" />
     <None Include="resources\shaders\Sprite.hlsli" />

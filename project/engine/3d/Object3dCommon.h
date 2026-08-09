@@ -30,6 +30,8 @@ public:
 	//共通描画設定
 	void SetCommonDrawSetting();
 	void SetSkinningComputeSetting();
+	// 反射Textureを平面へ投影する固定鏡専用の描画設定
+	void SetMirrorDrawSetting();
 
 	//setter
 	void SetDefaultCamera(Camera* camera) { this->defaultCamera_ = camera; }
@@ -59,11 +61,15 @@ private:
 	void CreateRootSignature();
 	// グラフィックスパイプラインの生成
 	void CreateGraphicsPipeline();
+	void CreateMirrorRootSignature();
+	void CreateMirrorGraphicsPipeline();
 
 	// RootSignature
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;
 	// PipelineState
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState_;
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> mirrorRootSignature_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> mirrorGraphicsPipelineState_;
 
 	// スキニング用のルートシグネチャとパイプライン
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> skinningRootSignature_;

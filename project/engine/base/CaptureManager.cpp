@@ -207,6 +207,39 @@ void CaptureManager::UpdateSmokeBeforeCapture()
 		return;
 	}
 
+	if (sceneName == "STAGE1") {
+		++smokeGamePlayFrame_;
+		// 最初の静止状態と、Playerが移動した後の状態をそれぞれ保存します。
+		const bool captureInitialState =
+			smokeGamePlayFrame_ >= 5 && smokeGamePlayFrame_ <= 8;
+		const bool captureMovedState =
+			smokeGamePlayFrame_ >= 60 && smokeGamePlayFrame_ <= 63;
+		if (captureInitialState || captureMovedState) {
+			photoRequested_ = true;
+		}
+		if (smokeGamePlayFrame_ == 90) {
+			std::error_code errorCode;
+			bool filesExist = !smokePhotoPaths_.empty();
+			for (const std::filesystem::path& path : smokePhotoPaths_) {
+				filesExist = filesExist &&
+					path.extension() == ".png" &&
+					std::filesystem::exists(path, errorCode) &&
+					!errorCode;
+				errorCode.clear();
+			}
+			const bool success =
+				filesExist &&
+				smokeSavedPhotos_ >= 1 &&
+				smokeCaptureAttempts_ >= 1 &&
+				smokeVisibleCaptures_ == smokeCaptureAttempts_;
+			std::ostringstream message;
+			message << "scene=STAGE1 photos=" << smokeSavedPhotos_
+				<< " visible=" << smokeVisibleCaptures_ << '/' << smokeCaptureAttempts_;
+			FinishSmoke(success, message.str());
+		}
+		return;
+	}
+
 	if (sceneName == "GAMEPLAY") {
 		++smokeGamePlayFrame_;
 		if (smokeGamePlayFrame_ <= 8) {
@@ -1727,7 +1760,8 @@ void CaptureManager::UpdateAfterDraw()
 		return;
 	}
 	if (performanceBaselineEnabled_) {
-		if (SceneManager::GetInstance()->GetCurrentSceneName() == "GAMEPLAY") {
+		const std::string& performanceScene = SceneManager::GetInstance()->GetCurrentSceneName();
+		if (performanceScene == "GAMEPLAY" || performanceScene == "STAGE1") {
 			++smokeGamePlayFrame_;
 			const float deltaTime = DirectXCommon::GetInstance()->GetDeltaTime();
 			if (smokeGamePlayFrame_ > 8 && smokeGamePlayFrame_ < 69) {
@@ -1741,7 +1775,8 @@ void CaptureManager::UpdateAfterDraw()
 					: 0.0f;
 				std::ofstream log(std::filesystem::path("logs") / "capture_performance_baseline.log", std::ios::trunc);
 				if (log) {
-					log << "BASELINE: averageFps=" << averageFps
+					log << "BASELINE: scene=" << performanceScene
+						<< " averageFps=" << averageFps
 						<< " maxFrameMs=" << smokeMaximumDeltaTime_ * 1000.0f << '\n';
 				}
 				smokeFinished_ = true;

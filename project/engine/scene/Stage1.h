@@ -2,9 +2,12 @@
 
 #include "BaseScene.h"
 #include "CameraController.h"
+#include "CarryableMirror.h"
 #include "FileHotReload.h"
+#include "FixedMirror.h"
 #include "LevelLoader.h"
-#include "Mirror.h"
+#include "Laser.h"
+#include "LaserRenderer.h"
 #include "Player.h"
 #include "SceneEditor.h"
 #include <memory>
@@ -60,8 +63,21 @@ private:
 	{
 		std::string sourceName;
 		std::unique_ptr<Camera> camera;
+		std::unique_ptr<CameraController> manualController;
 		Vector3 focus{};
 		bool hasFocus = false;
+	};
+
+	// 狭い通路やボス部屋などで、通常Cameraの設定だけを切り替える描画されないBOXです。
+	struct StageCameraArea
+	{
+		std::string sourceName;
+		Transform transform{};
+		Vector3 colliderLocalCenter{};
+		Vector3 colliderLocalHalfSize{ 1.0f, 1.0f, 1.0f };
+		OBB collider{};
+		CameraAreaSettings settings{};
+		bool isPlayerInside = false;
 	};
 
 	// 指定したモデルを使う 3D オブジェクトを作成し、照明を設定します。
@@ -69,11 +85,18 @@ private:
 	// カメラと照明を渡してから、3D オブジェクトの行列を更新します。
 	void UpdateObject(Object3d& object);
 	// Mirror のデータを、画面に表示する鏡の板へ反映します。
-	void SyncMirrorVisual();
+	void UpdateReflectionCameras();
 	// 通常カメラを鏡面で反転し、反射カメラの位置と回転を更新します。
-	void UpdateReflectionCamera();
-	//プレイヤーを追従し、右マウス操作で周回できる通常カメラを更新します。
+	// 反射CameraでSceneを鏡専用Textureへ一度だけ描画します。
+	void DrawFixedMirrorReflections();
+	// 反射描画後、Object3dの行列を現在のGame Camera用へ戻します。
+	void RestoreSceneCameraMatrices();
+	// 持てる鏡の拾う・置く処理と、全鏡を使うレーザー経路を更新します。
+	void UpdateMirrorGameplay();
+	// Playerを自動追尾する通常Cameraを更新します。
 	void UpdateMainCamera();
+	// Event Cameraゾーン内だけ、右マウスで操作できる手動Cameraを更新します。
+	void UpdateEventManualCamera();
 	// カメラが現在見ている正面方向を取得します。
 	Vector3 GetCameraForward(const Camera& camera) const;
 	// ImGuiManager に鏡の設定用 UI の表示を依頼し、変更を板へ反映します。
@@ -101,29 +124,41 @@ private:
 	bool RemoveSelectedStageMapObject();
 	// イベントトリガーとイベントカメラを一組でLevelDataへ追加します。
 	bool AddStageMapEventPair();
+	// 通常Cameraの距離・角度・視野角を切り替えるAreaをLevelDataへ追加します。
+	bool AddStageMapCameraArea();
 	// Playerとイベントトリガーを判定し、使用するCameraを切り替えます。
 	void UpdateStageEvents();
 	// EventCameraの位置と注視点からCameraの回転を更新します。
 	void UpdateStageEventCamera(StageEventCamera& eventCamera, const LevelLoader::ObjectData& objectData);
+	// Playerが入っているCamera Areaを調べ、通常Cameraの設定を切り替えます。
+	void UpdateCameraAreas();
 	// 制御点を持つ追加オブジェクトを、曲線上で毎フレーム移動させます。
 	void UpdateStageMapPaths(float deltaTime);
 	// 制御点移動を設定したsphere.objをLevelDataへ追加します。
 	bool AddStageMapPathSphere();
+	// 環境変数で起動した時だけ、携帯鏡・レーザー・床落下を自動検証します。
+	void InitializeGameplaySmoke();
+	void UpdateGameplaySmoke(float deltaTime);
 
 	// 床と球です。後で鏡へ映す対象にもなります。
 	std::vector<std::unique_ptr<Object3d>> sceneObjects_;
-	// 鏡の見た目を描画する、一枚の平面モデルです。
-	std::unique_ptr<Object3d> mirrorVisual_;
-	// 鏡の中心・正面・大きさを管理するデータです。
-	Mirror mirror_;
-	//鏡のローカル座標における半分の大きさ
-	Vector3 mirrorLocalHalfSize_{ 1.0f,1.0f,0.05f };
-	//鏡のローカル座標におけるコライダー中心です。
-	Vector3 mirrorColliderLocalCenter_{};
-	//鏡の見た目と一致する衝突判定用の薄いOBBです。
-	OBB mirrorObb_{};
-	// 鏡の向こう側から部屋を見るための、二台目のカメラです。
-	std::unique_ptr<Camera> reflectionCamera_;
+	// 大型の固定鏡です。複数枚それぞれが反射Cameraと専用Textureを持ちます。
+	std::vector<std::unique_ptr<FixedMirror>> fixedMirrors_;
+	// 複数の固定鏡を一枚ずつ順番に更新するための番号です。
+	size_t reflectionUpdateCursor_ = 0;
+	// 景色は映さず、PlayerがEキーで持ち運べるレーザー反射用の小型鏡です。
+	std::unique_ptr<CarryableMirror> carryableMirror_;
+	// 固定鏡と小型鏡の両方で反射するテスト用レーザーです。
+	Laser laser_;
+	std::unique_ptr<LaserRenderer> laserRenderer_;
+	// 光の発射位置を見分けるために置く、小さな白い球です。
+	Object3d* laserEmitter_ = nullptr;
+	// 初期状態のPlayer正面から光を当て、正面に構えた携帯鏡で受けられる位置にする。
+	Vector3 laserOrigin_{ 0.0f, 1.0f, 7.5f };
+	Vector3 laserDirection_{ 0.0f, -1.8f, -2.5f };
+	// 描画幅0.12の半分を、Playerとの線分判定にも使用します。
+	float laserCollisionRadius_ = 0.06f;
+	bool isPlayerHitByLaser_ = false;
 	//WASD移動とジャンプを行う球のプレイヤーです。
 	std::unique_ptr<Player> player_;
 	//見た目とOBBを共有する床モデルです。
@@ -136,6 +171,8 @@ private:
 	OBB floorObb_{};
 	// Player などの対象を追従する、三人称カメラ専用の操作役です。
 	std::unique_ptr<CameraController> cameraController_;
+	// PlayerとCameraが共通で使う、床・壁・鏡などの衝突判定用OBBです。
+	std::vector<OBB> stageSolidObbs_;
 	// Stage1の外部マップファイルが保存された瞬間を検出します。
 	FileHotReload stageMapHotReload_;
 	// Stage1のJSONをゲーム内で編集できる形で保持します。
@@ -146,8 +183,12 @@ private:
 	std::vector<StageEventTrigger> stageEventTriggers_;
 	// JSONから生成したイベント専用カメラです。
 	std::vector<StageEventCamera> stageEventCameras_;
+	// JSONから生成した通常Camera設定の切替領域です。
+	std::vector<StageCameraArea> stageCameraAreas_;
 	// 現在起動中のイベントカメラ名です。空文字なら通常カメラです。
 	std::string activeEventCameraName_;
+	// 現在適用中のCamera Area名です。空文字なら通常設定です。
+	std::string activeCameraAreaName_;
 	// Hot Reloadウィンドウで選択しているオブジェクト番号です。
 	int selectedStageMapObjectIndex_ = 0;
 	SceneEditor::ViewportState viewportEditorState_{};
@@ -156,10 +197,25 @@ private:
 	bool autoStageMapReload_ = true;
 	// ImGuiへ表示する、直近の再読込結果です。
 	std::string stageMapReloadStatus_ = "Not loaded yet.";
-	// Stage1 では、壁の鏡をまず簡単に回せるよう、Y 軸回転だけを編集します。
-	float mirrorYaw_ = 3.14159265f;
 	// Stage1 内の全モデルで共有する平行光源です。
 	Object3d::DirectionalLight directionalLight_{};
 	// Stage1 内の全モデルで共有する点光源です。
 	Object3d::PointLight pointLight_{};
+	bool gameplaySmokeEnabled_ = false;
+	bool gameplaySmokeSawGrounded_ = false;
+	bool gameplaySmokeLeftFloor_ = false;
+	bool gameplaySmokeFell_ = false;
+	bool gameplaySmokePickedUpMirror_ = false;
+	bool gameplaySmokeDroppedMirror_ = false;
+	bool gameplaySmokeCarryMirrorReflectedLaser_ = false;
+	bool gameplaySmokeCarriedMirrorBlocksPlayer_ = false;
+	bool gameplaySmokeLaserHitsPlayer_ = false;
+	bool gameplaySmokeMirrorBlocksPlayer_ = false;
+	bool gameplaySmokeFixedMirrorReflection_ = false;
+	bool gameplaySmokeCameraSteps_ = false;
+	bool gameplaySmokeCameraWallBlock_ = false;
+	bool gameplaySmokeCameraSmooth_ = false;
+	float gameplaySmokeElapsedTime_ = 0.0f;
+	float gameplaySmokeStartY_ = 0.0f;
+	int gameplaySmokeFrame_ = 0;
 };

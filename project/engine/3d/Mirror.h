@@ -7,6 +7,13 @@
 // Stage1（将来的には専用の描画クラス）が担当します。
 class Mirror {
 public:
+	struct RayHit {
+		bool isHit = false;
+		float distance = 0.0f;
+		Vector3 position{};
+		Vector3 normal{};
+	};
+
 	Mirror() = default;
 	Mirror(const Vector3& center, const Vector3& normal, float width, float height) {
 		SetCenter(center);
@@ -59,6 +66,65 @@ public:
 			direction.y - correction.y,
 			direction.z - correction.z,
 		};
+	}
+
+	// 無限に続く平面ではなく、幅と高さを持つ鏡の板へRayが当たるか調べます。
+	RayHit IntersectRay(
+		const Vector3& origin,
+		const Vector3& direction,
+		float maxDistance) const {
+		const Vector3 normalizedDirection = MyMath::Normalize(direction);
+		if (MyMath::Length(normalizedDirection) <= 0.0001f || maxDistance <= 0.0f) {
+			return {};
+		}
+
+		const float denominator = MyMath::Dot(normalizedDirection, normal_);
+		if (std::abs(denominator) <= 0.0001f) {
+			return {};
+		}
+
+		const Vector3 fromOriginToCenter{
+			center_.x - origin.x,
+			center_.y - origin.y,
+			center_.z - origin.z,
+		};
+		const float hitDistance = MyMath::Dot(fromOriginToCenter, normal_) / denominator;
+		if (hitDistance <= 0.001f || hitDistance > maxDistance) {
+			return {};
+		}
+
+		const Vector3 hitPosition{
+			origin.x + normalizedDirection.x * hitDistance,
+			origin.y + normalizedDirection.y * hitDistance,
+			origin.z + normalizedDirection.z * hitDistance,
+		};
+		const Vector3 fromCenter{
+			hitPosition.x - center_.x,
+			hitPosition.y - center_.y,
+			hitPosition.z - center_.z,
+		};
+
+		// 鏡の法線と平行にならない補助軸から、鏡の横軸と縦軸を作ります。
+		const Vector3 worldUp{ 0.0f, 1.0f, 0.0f };
+		const Vector3 referenceAxis =
+			std::abs(MyMath::Dot(normal_, worldUp)) > 0.99f
+			? Vector3{ 1.0f, 0.0f, 0.0f }
+			: worldUp;
+		const Vector3 right = MyMath::Normalize(MyMath::Cross(referenceAxis, normal_));
+		const Vector3 up = MyMath::Normalize(MyMath::Cross(normal_, right));
+		const float localX = MyMath::Dot(fromCenter, right);
+		const float localY = MyMath::Dot(fromCenter, up);
+		if (std::abs(localX) > width_ * 0.5f || std::abs(localY) > height_ * 0.5f) {
+			return {};
+		}
+
+		RayHit result{};
+		result.isHit = true;
+		result.distance = hitDistance;
+		result.position = hitPosition;
+		// Rayが裏側から来た場合も、Ray側を向く法線を返します。
+		result.normal = denominator < 0.0f ? normal_ : MyMath::Multiply(-1.0f, normal_);
+		return result;
 	}
 
 private:

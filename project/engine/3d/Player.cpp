@@ -4,6 +4,7 @@
 #include "Collision.h"
 #include "Input.h"
 #include "MyMath.h"
+#include <algorithm>
 #include <cmath>
 #include <dinput.h>
 
@@ -26,37 +27,67 @@ void Player::Initialize(Object3dCommon* object3dCommon, const std::string& model
 	object_.SetTranslate(position_);
 }
 
-void Player::Update(float deltaTime, const std::vector<OBB>& solidObbs)
+void Player::Update(
+	float deltaTime,
+	const std::vector<OBB>& solidObbs,
+	const Vector3& cameraForward)
 {
-	//WASDの入力から、床と平行な移動方向を作る
-	Vector3 moveDirection{};
+	// Keyboard入力を機器に依存しない値へ変換してから、共通の移動処理へ渡します。
+	ControlInput controlInput{};
 	Input* input = Input::GetInstance();
 	if (input->PushKey(DIK_W)) {
-		moveDirection.z += 1.0f;
+		controlInput.forward += 1.0f;
 	}
 	if (input->PushKey(DIK_S)) {
-		moveDirection.z -= 1.0f;
+		controlInput.forward -= 1.0f;
 	}
 	if (input->PushKey(DIK_A)) {
-		moveDirection.x -= 1.0f;
+		controlInput.right -= 1.0f;
 	}
 	if (input->PushKey(DIK_D)) {
-		moveDirection.x += 1.0f;
+		controlInput.right += 1.0f;
 	}
+	controlInput.jumpPressed = input->TriggerKey(DIK_SPACE);
+	UpdateWithControl(deltaTime, solidObbs, cameraForward, controlInput);
+}
 
-	//斜め移動だけ速くならないよう、方向だけを正規化する
-	if (Length(moveDirection) > 0.0f) {
-		moveDirection = Normalize(moveDirection);
-		position_.x += moveDirection.x * moveSpeed_ * deltaTime;
-		position_.z += moveDirection.z * moveSpeed_ * deltaTime;
+void Player::UpdateWithControl(
+	float deltaTime,
+	const std::vector<OBB>& solidObbs,
+	const Vector3& cameraForward,
+	const ControlInput& controlInput)
+{
+	const float forwardInput = std::clamp(controlInput.forward, -1.0f, 1.0f);
+	const float rightInput = std::clamp(controlInput.right, -1.0f, 1.0f);
 
-		//移動方向からY軸の回転角を作り、球の模様が進行方向を向くようにする
-		facingYaw_ = std::atan2(moveDirection.x, moveDirection.z);
+	// Cameraが上下を向いていても、移動には床と平行なX-Z方向だけを使う
+	Vector3 forwardOnGround{ cameraForward.x, 0.0f, cameraForward.z };
+	if (Length(forwardOnGround) <= 0.0001f) {
+		forwardOnGround = { 0.0f, 0.0f, 1.0f };
+	}
+	forwardOnGround = Normalize(forwardOnGround);
+	const Vector3 rightOnGround{ forwardOnGround.z, 0.0f, -forwardOnGround.x };
+
+	// Wなら画面奥、Dなら画面右へ向く世界座標の移動方向を作る
+	moveDirection_ = {
+		forwardOnGround.x * forwardInput + rightOnGround.x * rightInput,
+		0.0f,
+		forwardOnGround.z * forwardInput + rightOnGround.z * rightInput,
+	};
+
+	// 斜め移動だけ速くならないよう、方向だけを正規化する
+	if (Length(moveDirection_) > 0.0f) {
+		moveDirection_ = Normalize(moveDirection_);
+		position_.x += moveDirection_.x * moveSpeed_ * deltaTime;
+		position_.z += moveDirection_.z * moveSpeed_ * deltaTime;
+
+		// 移動方向からY軸の回転角を作り、球の模様が進行方向を向くようにする
+		facingYaw_ = std::atan2(moveDirection_.x, moveDirection_.z);
 		object_.SetRotate({ 0.0f, facingYaw_, 0.0f });
 	}
 
 	//床に立っているときだけ、Spaceで上向きの速さを与える
-	if (isGrounded_ && input->TriggerKey(DIK_SPACE)) {
+	if (isGrounded_ && controlInput.jumpPressed) {
 		velocity_.y = jumpSpeed_;
 		isGrounded_ = false;
 	}

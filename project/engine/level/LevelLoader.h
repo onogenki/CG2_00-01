@@ -18,6 +18,14 @@ public:
 		Vector3 size{};
 	};
 
+	struct CameraAreaData
+	{
+		// Area内で使用する三人称Cameraの距離・縦角度・通常時の視野角。
+		float distance = 10.77f;
+		float pitch = 0.38050638f;
+		float fovY = 0.45f;
+	};
+
 	struct ObjectData
 	{
 		// オブジェクト本体、Transform、子オブジェクトをまとめた再帰データ。
@@ -34,6 +42,9 @@ public:
 		std::string eventCameraName;
 		bool hasCameraFocus = false;
 		Vector3 cameraFocus{};
+		// Playerが入った間だけ、通常Cameraの設定を変更する領域です。
+		bool hasCameraArea = false;
+		CameraAreaData cameraArea;
 		// オブジェクトが移動する曲線の制御点と再生設定。
 		std::vector<Vector3> controlPoints;
 		float pathSpeed = 1.0f;

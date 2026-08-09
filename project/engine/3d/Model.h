@@ -197,12 +197,14 @@ public:
 	void Update(SkinCluster& skinCluster,const Skeleton& skeleton);
 
 	// 通常モデル描画用（骨なし）
-	void Draw();
+	void Draw(uint32_t textureSrvIndexOverride = UINT32_MAX);
+	// 専用Shader側で材質を設定する描画用に、頂点とIndexだけを描画する
+	void DrawGeometry();
 
 	// スキニングモデル描画用（骨あり）
-	void Draw(const SkinCluster& skinCluster);
+	void Draw(const SkinCluster& skinCluster, uint32_t textureSrvIndexOverride = UINT32_MAX);
 	void DispatchSkinning(SkinCluster& skinCluster);
-	void DrawSkinned(const SkinCluster& skinCluster);
+	void DrawSkinned(const SkinCluster& skinCluster, uint32_t textureSrvIndexOverride = UINT32_MAX);
 
 	void SetTexture(const std::string& filePath);
 
