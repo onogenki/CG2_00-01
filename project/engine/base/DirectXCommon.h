@@ -105,6 +105,7 @@ public:
 	uint32_t GetPostEffectTextureSrvIndex() const { return postEffectTextureSrvIndex_; }
 	uint32_t GetGaussianBlurTextureSrvIndex() const { return gaussianBlurTextureSrvIndex_; }
 	uint32_t GetDepthStencilSrvIndex() const { return depthStencilSrvIndex_; }
+	D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilViewHandle() const { return dsvHandle_; }
 	uint32_t GetClientWidth() const { return width; }
 	uint32_t GetClientHeight() const { return height; }
 	float GetDeltaTime() const { return deltaTime_; }

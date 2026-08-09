@@ -33,6 +33,9 @@ namespace MyMath {
 	// 内積
 	float Dot(const Vector3& v1, const Vector3& v2);
 
+	// 2本のベクトルへ垂直なベクトルを作る
+	Vector3 Cross(const Vector3& v1, const Vector3& v2);
+
 	// 長さ(ノルム)
 	float Length(const Vector3& v);
 

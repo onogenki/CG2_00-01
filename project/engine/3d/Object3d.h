@@ -61,13 +61,23 @@ public:
 		Vector3 worldPosition;
 	};
 
+	struct ReflectionData
+	{
+		Matrix4x4 reflectionViewProjection;
+		Vector4 tint;
+	};
+
 	~Object3d();
 
 	void Initialize(Object3dCommon* object3dCommon);
 
 	void Update();
+	// Animation時間を進めず、指定Camera用の行列だけを描画直前に更新する
+	void UpdateCameraForDraw(Camera* drawCamera);
 
 	void Draw();
+	// 反射CameraのTextureを鏡面へ投影して描画する
+	void DrawMirror(uint32_t reflectionTextureSrvIndex, const Matrix4x4& reflectionViewProjection);
 
 	bool GetJointWorldMatrix(const std::string& jointName, Matrix4x4& worldMatrix) const;
 	void SetParentWorldMatrix(const Matrix4x4& parentWorldMatrix);
@@ -132,6 +142,9 @@ public:
 		*spotLightData = light;
 	}
 	void SetEnvironmentCoefficient(float coefficient);
+	// このObject3dだけ、Model本来の画像とは別のTextureを使用する
+	void SetTextureOverride(const std::string& texturePath);
+	void ClearTextureOverride() { textureSrvIndexOverride_ = UINT32_MAX; }
 
 	//getter
 	const Vector3& GetScale()const { return transform.scale; }
@@ -156,6 +169,7 @@ private:
 
 	Model* model_ = nullptr;
 	std::string modelName_;
+	uint32_t textureSrvIndexOverride_ = UINT32_MAX;
 
 	Camera* camera = nullptr;
 
@@ -178,6 +192,10 @@ private:
 	void CreateCameraData();
 	Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource;
 	CameraForGPU* cameraData = nullptr;
+
+	void CreateReflectionData();
+	Microsoft::WRL::ComPtr<ID3D12Resource> reflectionDataResource_;
+	ReflectionData* reflectionData_ = nullptr;
 
 	// カメラデータ作成関数
 	void CreatePointLightData();

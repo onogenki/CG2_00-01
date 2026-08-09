@@ -173,6 +173,11 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="engine\2d\TextureManager.cpp" />
     <ClCompile Include="engine\3d\Camera.cpp" />
     <ClCompile Include="engine\3d\CameraController.cpp" />
+	<ClCompile Include="engine\3d\CarryableMirror.cpp" />
+	<ClCompile Include="engine\3d\FixedMirror.cpp" />
+	<ClCompile Include="engine\3d\Laser.cpp" />
+	<ClCompile Include="engine\3d\LaserRenderer.cpp" />
+	<ClCompile Include="engine\3d\PlanarReflectionTarget.cpp" />
     <ClCompile Include="engine\3d\CameraManager.cpp" />
     <ClCompile Include="engine\3d\Model.cpp" />
     <ClCompile Include="engine\3d\ModelCommon.cpp" />
@@ -262,6 +267,26 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
+	<FxCompile Include="resources\shaders\Laser.PS.hlsl">
+		<ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+		<ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+		<ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+	</FxCompile>
+	<FxCompile Include="resources\shaders\Laser.VS.hlsl">
+		<ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+		<ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+		<ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+	</FxCompile>
+	<FxCompile Include="resources\shaders\Mirror.PS.hlsl">
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+	</FxCompile>
+	<FxCompile Include="resources\shaders\Mirror.VS.hlsl">
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+	</FxCompile>
     <FxCompile Include="resources\shaders\Particle.PS.hlsl">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -343,6 +368,11 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="engine\2d\TextureManager.h" />
     <ClInclude Include="engine\3d\Camera.h" />
     <ClInclude Include="engine\3d\CameraController.h" />
+	<ClInclude Include="engine\3d\CarryableMirror.h" />
+	<ClInclude Include="engine\3d\FixedMirror.h" />
+	<ClInclude Include="engine\3d\Laser.h" />
+	<ClInclude Include="engine\3d\LaserRenderer.h" />
+	<ClInclude Include="engine\3d\PlanarReflectionTarget.h" />
     <ClInclude Include="engine\3d\CameraManager.h" />
     <ClInclude Include="engine\3d\Model.h" />
     <ClInclude Include="engine\3d\ModelCommon.h" />
@@ -422,6 +452,11 @@ copy "$(windowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </None>
+	<None Include="resources\shaders\Mirror.hlsli">
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+	  <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+	</None>
     <None Include="resources\shaders\Particle.hlsli">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>

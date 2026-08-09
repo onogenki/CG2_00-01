@@ -1,8 +1,17 @@
 #pragma once
 
-#include "Vector3.h"
+#include "MyMath.h"
+#include <vector>
 
 class Camera;
+
+// 狭い通路やボス部屋など、場所ごとに変更するCameraの基本設定
+struct CameraAreaSettings
+{
+	float distance = 11.5f;
+	float pitch = 0.58f;
+	float fovY = 0.48f;
+};
 
 // Player や敵などの対象を、少し遅れて追いかける三人称カメラ用の操作クラス
 class CameraController
@@ -10,13 +19,40 @@ class CameraController
 public:
 	// 操作する Camera と、最初に追いかける対象の位置を登録する
 	void Initialize(Camera* camera, const Vector3& targetPosition);
-	// 対象の現在位置を受け取り、Focus と Camera を更新する
-	void Update(float deltaTime, const Vector3& targetPosition);
+	// Camera配置済みのイベント視点を、指定した周回値から手動Cameraとして開始する
+	void Initialize(
+		Camera* camera,
+		const Vector3& targetPosition,
+		float distance,
+		float orbitYaw,
+		float orbitPitch);
+	// 対象の現在位置と移動方向を受け取り、Focus と Camera を更新する
+	void Update(
+		float deltaTime,
+		const Vector3& targetPosition,
+		const Vector3& targetMoveDirection,
+		bool isOrbitInput,
+		const std::vector<MyMath::OBB>& cameraCollisionObbs);
 
 	// カメラの高さ・距離・横方向の角度を設定する
-	void SetHeight(float height) { height_ = height; }
-	void SetDistance(float distance) { distance_ = distance; }
-	void SetOrbitYaw(float orbitYaw) { orbitYaw_ = orbitYaw; }
+	void SetDistance(float distance);
+	void SetOrbitYaw(float orbitYaw);
+	// マウス操作で、カメラをFocusの周囲へ回す角度を加算する
+	void AddOrbitYaw(float deltaYaw);
+	void AddOrbitPitch(float deltaPitch);
+	// 左右キー一回につき一段階だけ周回し、壁へ近づく方向なら変更しません。
+	bool TryStepOrbit(
+		int stepDirection,
+		const std::vector<MyMath::OBB>& cameraCollisionObbs);
+	// 上下キー一回につき一段階だけ遠近を変え、壁へ入る距離なら変更しません。
+	bool TryStepDistance(
+		int stepDirection,
+		const std::vector<MyMath::OBB>& cameraCollisionObbs);
+	// Playerが向いている方向の後ろへ、カメラをゆっくり戻す
+	void ResetBehindTarget(float targetFacingYaw);
+	// Areaへ入った時だけ、Cameraの距離・縦角度・視野角を変更する
+	void SetAreaSettings(const CameraAreaSettings& settings);
+	void ClearAreaSettings();
 	// 追従対象の中心から、カメラが見る Focus までのずれを設定する
 	void SetFocusOffset(const Vector3& offset) { focusOffset_ = offset; }
 	// Player がこの半径内にいる間は Focus を動かさない
@@ -24,35 +60,101 @@ public:
 	// Focus と Camera が追従する速さを設定する
 	void SetFocusFollowSpeed(float speed) { focusFollowSpeed_ = speed; }
 	void SetCameraFollowSpeed(float speed) { cameraFollowSpeed_ = speed; }
+	// falseにすると、手動Cameraで移動中も背後へ自動整列しない
+	void SetAutoRecenterEnabled(bool enabled) { isAutoRecenterEnabled_ = enabled; }
 
-	float GetHeight() const { return height_; }
 	float GetDistance() const { return distance_; }
 	float GetOrbitYaw() const { return orbitYaw_; }
+	float GetOrbitPitch() const { return orbitPitch_; }
+	int GetOrbitStepIndex() const { return orbitStepIndex_; }
+	int GetDistanceStepIndex() const { return distanceStepIndex_; }
 	const Vector3& GetFocus() const { return focus_; }
 	const Vector3& GetCameraPosition() const { return cameraPosition_; }
 
 private:
 	// Focus の後ろ・上にある、カメラが目指す位置を計算する
 	Vector3 CalculateTargetCameraPosition() const;
+	Vector3 CalculateTargetCameraPosition(float yaw, float pitch, float distance) const;
+	// 指定候補までの経路で、壁に遮られず使用できる距離の割合を返します。
+	float CalculateAvailablePathRatio(
+		float yaw,
+		float pitch,
+		float distance,
+		const std::vector<MyMath::OBB>& cameraCollisionObbs) const;
+	bool IsCameraSettingAvailable(
+		float yaw,
+		float pitch,
+		float distance,
+		const std::vector<MyMath::OBB>& cameraCollisionObbs) const;
+	// Focusから理想位置までの線が壁に当たるなら、壁の手前の安全な位置を返す
+	Vector3 CalculateCollisionSafeCameraPosition(
+		const std::vector<MyMath::OBB>& cameraCollisionObbs) const;
 	// 現在のカメラ位置から Focus を向く回転を計算して Camera に設定する
 	void ApplyCameraTransform();
+	// 角度が -π と +π をまたいでも、短い方向へ補間する
+	float LerpAngle(float current, float target, float t) const;
+	float MoveTowardsAngle(float current, float target, float maxDelta) const;
 
 	// 実際に移動させる共通 Camera。本クラスは所有しない
 	Camera* camera_ = nullptr;
 	// Camera が見続ける中心点
 	Vector3 focus_{};
+	// Focusより少し遅れてCameraが見る、視線専用の注視点
+	Vector3 lookAt_{};
 	// カメラ自身の現在位置
 	Vector3 cameraPosition_{};
 	// Player の中心より少し上を見続けるためのずれ
-	Vector3 focusOffset_{ 0.0f, 1.0f, 0.0f };
-	// Focus の後ろ・上に置くカメラの高さと距離
-	float height_ = 4.0f;
-	float distance_ = 10.0f;
+	Vector3 focusOffset_{ 0.0f, 1.2f, 0.0f };
+	// Focusとの直線距離。ホイールで変更する
+	float distance_ = 11.5f;
+	// Areaの外でプレイヤーがホイール・縦ドラッグにより変更した設定
+	float manualDistance_ = 11.5f;
+	float manualOrbitPitch_ = 0.58f;
+	// 現在値がゆっくり近づく、距離と縦角度の目標値
+	float targetDistance_ = 11.5f;
 	// Player の向きとは独立した、カメラ配置用の Y 軸角度
 	float orbitYaw_ = 0.0f;
+	float targetOrbitYaw_ = 0.0f;
+	// 左右段階の中心となる角度です。RキーでPlayer後方へ更新します。
+	float orbitAnchorYaw_ = 0.0f;
+	int orbitStepIndex_ = 0;
+	int maximumOrbitStep_ = 2;
+	float orbitStepAngle_ = 0.52359878f;
+	// Focusの周囲を上下へ回すX軸角度
+	float orbitPitch_ = 0.58f;
+	float targetOrbitPitch_ = 0.58f;
+	float minimumOrbitPitch_ = -0.15f;
+	float maximumOrbitPitch_ = 1.15f;
 	// Player が Focus の周辺にいる間、Focus を止める半径
-	float deadZoneRadius_ = 1.5f;
+	float deadZoneRadius_ = 1.25f;
 	// Focus と Camera の追従速度
-	float focusFollowSpeed_ = 6.0f;
-	float cameraFollowSpeed_ = 3.0f;
+	float focusFollowSpeed_ = 3.2f;
+	float lookAtFollowSpeed_ = 2.4f;
+	float cameraFollowSpeed_ = 1.8f;
+	float orbitFollowSpeed_ = 6.0f;
+	// Playerが移動している方向の少し先へFocusをずらす距離
+	float lookAheadDistance_ = 0.75f;
+	// 走り続けた時に、自動でPlayerの後ろへ戻り始めるまでの時間
+	float autoRecenterDelay_ = 0.8f;
+	float autoRecenterTimer_ = 0.0f;
+	float autoRecenterSpeed_ = 2.0f;
+	bool isAutoRecenterEnabled_ = true;
+	// 上下キーで選ぶ近・中・遠の三段階です。
+	float minimumManualDistance_ = 9.5f;
+	float manualDistanceStep_ = 2.0f;
+	int distanceStepIndex_ = 1;
+	int maximumDistanceStep_ = 2;
+	// 候補位置までの経路がこの割合より短くなる場合、壁側への操作を拒否します。
+	float minimumAvailablePathRatio_ = 0.82f;
+	// 走行中だけ少し広くする、視野角の値と追従速度
+	float baseFovY_ = 0.48f;
+	float movingFovY_ = 0.52f;
+	float currentFovY_ = 0.48f;
+	float fovFollowSpeed_ = 2.0f;
+	// Areaに入っている間だけ有効にする、Camera基本設定
+	bool hasAreaSettings_ = false;
+	float areaBaseFovY_ = 0.48f;
+	// Cameraを小さな球として扱い、壁の近くで少し手前へ止めるための値
+	float cameraCollisionRadius_ = 0.3f;
+	float cameraCollisionMargin_ = 0.1f;
 };

@@ -28,15 +28,6 @@ namespace
 		return value;
 	}
 
-	Vector3 Cross(const Vector3& left, const Vector3& right)
-	{
-		return {
-			left.y * right.z - left.z * right.y,
-			left.z * right.x - left.x * right.z,
-			left.x * right.y - left.y * right.x,
-		};
-	}
-
 	float GetHalfSize(const OBB& obb, int axisIndex)
 	{
 		return axisIndex == 0 ? obb.size.x : (axisIndex == 1 ? obb.size.y : obb.size.z);
@@ -202,4 +193,97 @@ Collision::CollisionInfo Collision::ObbObb(const OBB& first, const OBB& second)
 
 	result.isCollision = true;
 	return result;
+}
+
+Collision::SegmentHit Collision::SegmentOBB(
+	const Vector3& start,
+	const Vector3& end,
+	const OBB& obb,
+	float padding)
+{
+	// 線分の始点と終点を、OBBの3本の軸を基準にしたローカル座標へ変換する
+	const Vector3 fromCenterToStart = Subtract(start, obb.center);
+	const Vector3 fromCenterToEnd = Subtract(end, obb.center);
+	float startLocal[3]{};
+	float endLocal[3]{};
+	for (int axisIndex = 0; axisIndex < 3; ++axisIndex) {
+		startLocal[axisIndex] = Dot(fromCenterToStart, obb.orientations[axisIndex]);
+		endLocal[axisIndex] = Dot(fromCenterToEnd, obb.orientations[axisIndex]);
+	}
+
+	// 3軸それぞれでOBBへ入る時間と出る時間を求め、共通する時間があれば衝突している
+	float entryT = 0.0f;
+	float exitT = 1.0f;
+	for (int axisIndex = 0; axisIndex < 3; ++axisIndex) {
+		const float direction = endLocal[axisIndex] - startLocal[axisIndex];
+		const float halfSize = GetHalfSize(obb, axisIndex) + padding;
+		if (std::abs(direction) <= 0.0001f) {
+			// この軸へ動かない場合、最初から外側なら絶対にOBBへ入れない
+			if (startLocal[axisIndex] < -halfSize || startLocal[axisIndex] > halfSize) {
+				return {};
+			}
+			continue;
+		}
+
+		float axisEntryT = (-halfSize - startLocal[axisIndex]) / direction;
+		float axisExitT = (halfSize - startLocal[axisIndex]) / direction;
+		if (axisEntryT > axisExitT) {
+			std::swap(axisEntryT, axisExitT);
+		}
+		entryT = (std::max)(entryT, axisEntryT);
+		exitT = (std::min)(exitT, axisExitT);
+		if (entryT > exitT) {
+			return {};
+		}
+	}
+
+	SegmentHit result{};
+	result.isHit = true;
+	result.t = entryT;
+	return result;
+}
+
+Collision::SegmentHit Collision::SegmentSphere(
+	const Vector3& start,
+	const Vector3& end,
+	const Sphere& sphere,
+	float padding)
+{
+	const Vector3 segment{
+		end.x - start.x,
+		end.y - start.y,
+		end.z - start.z,
+	};
+	const Vector3 centerToStart{
+		start.x - sphere.center.x,
+		start.y - sphere.center.y,
+		start.z - sphere.center.z,
+	};
+	const float radius = (std::max)(sphere.radius + padding, 0.0f);
+	const float radiusSquared = radius * radius;
+	const float startDistanceSquared = Dot(centerToStart, centerToStart);
+	if (startDistanceSquared <= radiusSquared) {
+		return { true, 0.0f };
+	}
+
+	const float segmentLengthSquared = Dot(segment, segment);
+	if (segmentLengthSquared <= 0.000001f) {
+		return {};
+	}
+
+	// |start + segment * t - center|^2 = radius^2 を解き、0～1の範囲を調べる。
+	const float projection = Dot(centerToStart, segment);
+	const float constant = startDistanceSquared - radiusSquared;
+	const float discriminant =
+		projection * projection - segmentLengthSquared * constant;
+	if (discriminant < 0.0f) {
+		return {};
+	}
+
+	const float hitT =
+		(-projection - std::sqrt(discriminant)) / segmentLengthSquared;
+	if (hitT < 0.0f || hitT > 1.0f) {
+		return {};
+	}
+	return { true, hitT };
 }

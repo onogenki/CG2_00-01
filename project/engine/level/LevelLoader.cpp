@@ -48,6 +48,13 @@ namespace
 				});
 			}
 		}
+		if (objectData.hasCameraArea) {
+			object["camera_area"] = {
+				{ "distance", objectData.cameraArea.distance },
+				{ "pitch", objectData.cameraArea.pitch },
+				{ "fov_y", objectData.cameraArea.fovY },
+			};
+		}
 		if (!objectData.controlPoints.empty()) {
 			object["control_points"] = nlohmann::json::array();
 			for (const Vector3& controlPoint : objectData.controlPoints) {
@@ -260,6 +267,15 @@ LevelLoader::ObjectData LevelLoader::LoadObject(const nlohmann::json& object, bo
 				focus[1].get<float>(),
 			};
 		}
+	}
+
+	if (object.contains("camera_area"))
+	{
+		const nlohmann::json& cameraArea = object["camera_area"];
+		objectData.hasCameraArea = true;
+		objectData.cameraArea.distance = cameraArea.value("distance", 10.77f);
+		objectData.cameraArea.pitch = cameraArea.value("pitch", 0.38050638f);
+		objectData.cameraArea.fovY = cameraArea.value("fov_y", 0.45f);
 	}
 
 	if (object.contains("control_points"))

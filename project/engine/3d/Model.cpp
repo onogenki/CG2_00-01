@@ -365,7 +365,7 @@ void Model::Update(SkinCluster& skinCluster, const Skeleton& skeleton)
 	}
 }
 
-void Model::Draw()
+void Model::Draw(uint32_t textureSrvIndexOverride)
 {
 	ID3D12GraphicsCommandList* commandList = modelCommon_->GetDxCommon()->GetCommandList();
 
@@ -384,14 +384,26 @@ void Model::Draw()
 	for (const MeshData& mesh : modelData.meshes)
 	{
 		const MaterialData& material = modelData.materials[mesh.materialIndex];
-		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle =
-			TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);
+		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle = textureSrvIndexOverride != UINT32_MAX
+			? SrvManager::GetInstance()->GetGPUDescriptorHandle(textureSrvIndexOverride)
+			: TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);
 		commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
 		commandList->DrawIndexedInstanced(mesh.indexCount, 1, mesh.indexOffset, 0, 0);
 	}
 }
 
-void Model::Draw(const SkinCluster& skinCluster)
+void Model::DrawGeometry()
+{
+	ID3D12GraphicsCommandList* commandList = modelCommon_->GetDxCommon()->GetCommandList();
+	commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+	commandList->IASetIndexBuffer(&indexBufferView);
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	for (const MeshData& mesh : modelData.meshes) {
+		commandList->DrawIndexedInstanced(mesh.indexCount, 1, mesh.indexOffset, 0, 0);
+	}
+}
+
+void Model::Draw(const SkinCluster& skinCluster, uint32_t textureSrvIndexOverride)
 {
 	ID3D12GraphicsCommandList* commandList = modelCommon_->GetDxCommon()->GetCommandList();
 
@@ -418,8 +430,9 @@ void Model::Draw(const SkinCluster& skinCluster)
 	for (const MeshData& mesh : modelData.meshes)
 	{
 		const MaterialData& material = modelData.materials[mesh.materialIndex];
-		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle =
-			TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);
+		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle = textureSrvIndexOverride != UINT32_MAX
+			? SrvManager::GetInstance()->GetGPUDescriptorHandle(textureSrvIndexOverride)
+			: TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);
 		commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
 		commandList->DrawIndexedInstanced(mesh.indexCount, 1, mesh.indexOffset, 0, 0);
 	}
@@ -463,7 +476,7 @@ void Model::DispatchSkinning(SkinCluster& skinCluster)
 	skinCluster.outputVertexResourceState = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
 }
 
-void Model::DrawSkinned(const SkinCluster& skinCluster)
+void Model::DrawSkinned(const SkinCluster& skinCluster, uint32_t textureSrvIndexOverride)
 {
 	ID3D12GraphicsCommandList* commandList = modelCommon_->GetDxCommon()->GetCommandList();
 
@@ -475,8 +488,9 @@ void Model::DrawSkinned(const SkinCluster& skinCluster)
 	for (const MeshData& mesh : modelData.meshes)
 	{
 		const MaterialData& material = modelData.materials[mesh.materialIndex];
-		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle =
-			TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);
+		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle = textureSrvIndexOverride != UINT32_MAX
+			? SrvManager::GetInstance()->GetGPUDescriptorHandle(textureSrvIndexOverride)
+			: TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);
 		commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
 		commandList->DrawIndexedInstanced(mesh.indexCount, 1, mesh.indexOffset, 0, 0);
 	}

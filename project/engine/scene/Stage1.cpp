@@ -1,5 +1,6 @@
 #include "Stage1.h"
 
+#include "Camera.h"
 #include "DirectXCommon.h"
 #include "Collision.h"
 #include "Input.h"
@@ -10,7 +11,9 @@
 #include "SrvManager.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <dinput.h>
+#include <fstream>
 #include <functional>
 #include <numbers>
 
@@ -20,6 +23,18 @@ namespace
 {
 	constexpr const char* kStageMapFilePath = "resources/levels/stage1.json";
 	constexpr const char* kStageMapFileName = "stage1";
+
+	bool IsEnvironmentEnabled(const char* name)
+	{
+		char* value = nullptr;
+		size_t size = 0;
+		if (_dupenv_s(&value, &size, name) != 0 || !value) {
+			return false;
+		}
+		const bool enabled = std::string(value) == "1";
+		std::free(value);
+		return enabled;
+	}
 
 	float CatmullRomValue(float p0, float p1, float p2, float p3, float t)
 	{
@@ -105,10 +120,6 @@ void Stage1::Initialize()
 	mainCamera->SetTranslate({ 0.0f, 1.0f, -12.0f });
 	cameraManager->AddCamera("MainCamera", mainCamera.get());
 
-	// 鏡の映像を描画するために使う、二台目のカメラです。
-	// この段階では画面へ描画せず、位置と向きだけを更新します。
-	reflectionCamera_ = std::make_unique<Camera>();
-	cameraManager->AddCamera("ReflectionCamera", reflectionCamera_.get());
 	cameraManager->SetActiveCamera("MainCamera");
 
 	object3dCommon = Object3dCommon::GetInstance();
@@ -151,20 +162,41 @@ void Stage1::Initialize()
 	// Camera 本体とは別の Controller に、Player を追従するルールを任せる
 	cameraController_ = std::make_unique<CameraController>();
 	cameraController_->Initialize(mainCamera.get(), player_->GetPosition());
+	// 通常Cameraの向きはPlayerの移動方向へ勝手に回さず、矢印キーで選んだ位置を保つ
+	cameraController_->SetAutoRecenterEnabled(false);
 
-	// ---------- 鏡のデータと見た目の作成 ----------
-	// Mirror は「中心・法線・幅・高さ」のデータを持ちます。
-	// 見た目の板は別の Object3d として用意します。
-	mirror_ = Mirror({ 0.0f, 1.0f, 8.0f }, { 0.0f, 0.0f, -1.0f }, 6.0f, 6.0f);
-	mirrorVisual_ = CreateObject("plane.obj");
-	mirrorVisual_->SetScale({});
-	SyncMirrorVisual();
+	// ---------- 持てる小型鏡とレーザーの作成 ----------
+	carryableMirror_ = std::make_unique<CarryableMirror>();
+	carryableMirror_->Initialize(
+		object3dCommon,
+		"plane.obj",
+		{ -2.5f, -0.8f, 4.5f },
+		3.0f,
+		3.0f);
+	// 白い小球をLaserの発射装置として置き、光がどこから出るか見えるようにする
+	auto laserEmitter = CreateObject("sphere.obj");
+	laserEmitter->SetTranslate(laserOrigin_);
+	laserEmitter->SetScale({ 0.9f, 0.9f, 0.9f });
+	laserEmitter->SetTextureOverride("resources/white.png");
+	laserEmitter_ = laserEmitter.get();
+	sceneObjects_.push_back(std::move(laserEmitter));
+	laser_.SetOrigin(laserOrigin_);
+	laser_.SetDirection(laserDirection_);
+	laser_.SetMaxDistance(30.0f);
+	laser_.SetMaxReflectionCount(8);
+	laserRenderer_ = std::make_unique<LaserRenderer>();
+	if (!laserRenderer_->Initialize(dxCommon, 32)) {
+		laserRenderer_.reset();
+	} else {
+		laserRenderer_->SetBeamWidth(laserCollisionRadius_ * 2.0f);
+	}
 
 	// 外部ファイルを最初に読み、以降は保存された時だけ再読込する
 	stageMapHotReload_.SetFilePath(kStageMapFilePath);
 	ReloadStageMap();
 	stageMapHotReload_.Synchronize();
 	SceneEditor::ScanResourceShelf(stageShelfState_);
+	InitializeGameplaySmoke();
 }
 
 void Stage1::Finalize()
@@ -179,14 +211,18 @@ void Stage1::Finalize()
 	}
 	stageEventCameras_.clear();
 	stageEventTriggers_.clear();
+	stageCameraAreas_.clear();
 	activeEventCameraName_.clear();
+	activeCameraAreaName_.clear();
 	sceneObjects_.clear();
 	stageMapRuntimeObjects_.clear();
 	stageMapData_.reset();
 	floor_ = nullptr;
-	mirrorVisual_.reset();
+	laserEmitter_ = nullptr;
+	fixedMirrors_.clear();
+	carryableMirror_.reset();
+	laserRenderer_.reset();
 	cameraController_.reset();
-	reflectionCamera_.reset();
 	player_.reset();
 }
 
@@ -199,19 +235,23 @@ void Stage1::Update()
 	}
 
 	// ---------- プレイヤーの移動と重力 ----------
-	if (player_ && floor_ && mirrorVisual_) {
+	if (player_ && floor_) {
 		//floor.objの大きさとTransformから、見た目と一致するOBBを作る
 		floorObb_ = Collision::MakeOBB(
 			floor_->GetTransform(),
 			floorColliderLocalCenter_,
 			floorLocalHalfSize_);
-		mirrorObb_ = Collision::MakeOBB(
-			mirrorVisual_->GetTransform(),
-			mirrorColliderLocalCenter_,
-			mirrorLocalHalfSize_);
-
-		//床・鏡・JSONで追加したオブジェクトを、ぶつかれるOBBとしてまとめる
-		std::vector<MyMath::OBB> solidObbs{ floorObb_, mirrorObb_ };
+		// 床・鏡・JSONで追加したオブジェクトを、PlayerとCameraが使うOBBとしてまとめる
+		stageSolidObbs_ = { floorObb_ };
+		for (const auto& fixedMirror : fixedMirrors_) {
+			if (fixedMirror) {
+				stageSolidObbs_.push_back(fixedMirror->GetCollider());
+			}
+		}
+		// 持っている間はPlayer自身へ当たらないよう、小型鏡を衝突一覧から外します。
+		if (carryableMirror_ && !carryableMirror_->IsCarried()) {
+			stageSolidObbs_.push_back(carryableMirror_->GetCollider());
+		}
 		for (StageMapRuntimeObject& runtimeObject : stageMapRuntimeObjects_) {
 			if (!runtimeObject.visual || !runtimeObject.hasBoxCollider) {
 				continue;
@@ -220,25 +260,53 @@ void Stage1::Update()
 				runtimeObject.visual->GetTransform(),
 				runtimeObject.colliderLocalCenter,
 				runtimeObject.colliderLocalHalfSize);
-			solidObbs.push_back(runtimeObject.collider);
+			stageSolidObbs_.push_back(runtimeObject.collider);
 		}
-		if (ImGuiManager::GetInstance()->IsGameViewActive()) {
-			player_->Update(DirectXCommon::GetInstance()->GetDeltaTime(), solidObbs);
+		if (gameplaySmokeEnabled_) {
+			// 自動検証ではCameraに影響されない世界+X方向へ歩かせます。
+			Player::ControlInput smokeControl{};
+			smokeControl.right = 1.0f;
+			player_->UpdateWithControl(
+				DirectXCommon::GetInstance()->GetDeltaTime(),
+				stageSolidObbs_,
+				{ 0.0f, 0.0f, 1.0f },
+				smokeControl);
+		} else if (ImGuiManager::GetInstance()->IsGameViewActive()) {
+			// 現在画面に映しているCameraの正面を渡し、WASDを画面基準の移動へ変換する
+			Vector3 cameraForward{ 0.0f, 0.0f, 1.0f };
+			if (Camera* activeCamera = cameraManager->GetActiveCamera()) {
+				cameraForward = GetCameraForward(*activeCamera);
+			}
+			player_->Update(
+				DirectXCommon::GetInstance()->GetDeltaTime(),
+				stageSolidObbs_,
+				cameraForward);
 		}
 	}
+	UpdateGameplaySmoke(DirectXCommon::GetInstance()->GetDeltaTime());
+	UpdateMirrorGameplay();
 
 	// ---------- カメラとデバッグ UI の更新 ----------
 	if (ImGuiManager::GetInstance()->IsGameViewActive()) {
 		UpdateMainCamera();
 		UpdateStageEvents();
+		UpdateEventManualCamera();
 	} else if (!activeEventCameraName_.empty()) {
 		// Edit Viewではイベントカメラへ自動切替せず、編集用のMainCameraを維持する。
 		cameraManager->SetActiveCamera("MainCamera");
 		activeEventCameraName_.clear();
 	}
 	cameraManager->Update();
-	UpdateReflectionCamera();
+	UpdateReflectionCameras();
 	ImGuiManager::GetInstance()->Begin("Stage1");
+	// Gameplay中もPlayerの球Colliderを表示し、Laser接触を黄色で確認できるようにする
+	if (player_) {
+		ImGuiManager::GetInstance()->DrawPlayerCollisionDebug(
+			player_->GetCollider(),
+			cameraManager->GetActiveCamera(),
+			player_->IsColliding(),
+			isPlayerHitByLaser_);
+	}
 	if (ImGuiManager::GetInstance()->IsEditViewActive()) {
 		DrawMirrorDebugUi();
 		DrawCollisionDebugUi();
@@ -265,6 +333,11 @@ void Stage1::Update()
 			}
 			if (levelEditorResult.addEventPairRequested) {
 				if (AddStageMapEventPair()) {
+					SaveStageMap();
+				}
+			}
+			if (levelEditorResult.addCameraAreaRequested) {
+				if (AddStageMapCameraArea()) {
 					SaveStageMap();
 				}
 			}
@@ -297,8 +370,13 @@ void Stage1::Update()
 			UpdateObject(*runtimeObject.visual);
 		}
 	}
-	if (mirrorVisual_) {
-		UpdateObject(*mirrorVisual_);
+	for (const auto& fixedMirror : fixedMirrors_) {
+		if (fixedMirror) {
+			UpdateObject(fixedMirror->GetObject());
+		}
+	}
+	if (carryableMirror_) {
+		UpdateObject(carryableMirror_->GetObject());
 	}
 	if (player_) {
 		UpdateObject(player_->GetObject());
@@ -307,9 +385,12 @@ void Stage1::Update()
 
 void Stage1::Draw()
 {
+	// ---------- 固定鏡の反射Textureを先に作成 ----------
+	SrvManager::GetInstance()->PreDraw();
+	DrawFixedMirrorReflections();
+
 	// ---------- ゲーム画面への描画 ----------
 	DirectXCommon::GetInstance()->PreDraw();
-	SrvManager::GetInstance()->PreDraw();
 
 	object3dCommon->SetCommonDrawSetting();
 	for (const auto& object : sceneObjects_) {
@@ -320,11 +401,21 @@ void Stage1::Draw()
 			runtimeObject.visual->Draw();
 		}
 	}
-	if (mirrorVisual_) {
-		mirrorVisual_->Draw();
+	for (const auto& fixedMirror : fixedMirrors_) {
+		if (!fixedMirror) {
+			continue;
+		}
+		fixedMirror->DrawSurface();
+		object3dCommon->SetCommonDrawSetting();
+	}
+	if (carryableMirror_) {
+		carryableMirror_->GetObject().Draw();
 	}
 	if (player_) {
 		player_->GetObject().Draw();
+	}
+	if (laserRenderer_ && cameraManager && cameraManager->GetActiveCamera()) {
+		laserRenderer_->Draw(laser_.GetSegments(), *cameraManager->GetActiveCamera());
 	}
 
 	//Post Effectが有効なときは、SceneのRenderTextureへ効果を適用してからGame Viewへ表示する
@@ -378,37 +469,384 @@ void Stage1::UpdateObject(Object3d& object)
 	object.Update();
 }
 
-void Stage1::SyncMirrorVisual()
+void Stage1::DrawFixedMirrorReflections()
 {
-	if (!mirrorVisual_) {
+	if (fixedMirrors_.empty()) {
 		return;
 	}
 
-	// plane.obj は -1 ～ +1 の大きさなので、幅の半分を Scale に設定すると
-	// 実際の幅が mirror_.GetWidth() と一致します。
-	mirrorVisual_->SetTranslate(mirror_.GetCenter());
-	mirrorVisual_->SetScale({ mirror_.GetWidth() * 0.5f, mirror_.GetHeight() * 0.5f, 1.0f });
-	mirrorVisual_->SetRotate({ 0.0f, mirrorYaw_, 0.0f });
+	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+	// 鏡が増えても反射Sceneの再描画は一フレームに一枚だけ行います。
+	const size_t updateCount = fixedMirrors_.size();
+	for (size_t attempt = 0; attempt < updateCount; ++attempt) {
+		const size_t mirrorIndex = reflectionUpdateCursor_ % updateCount;
+		reflectionUpdateCursor_ = (reflectionUpdateCursor_ + 1) % updateCount;
+		FixedMirror* fixedMirror = fixedMirrors_[mirrorIndex].get();
+		if (!fixedMirror || !fixedMirror->IsReady()) {
+			continue;
+		}
+
+		Camera& reflectionCamera = fixedMirror->GetReflectionCamera();
+		fixedMirror->BeginReflection(dxCommon->GetDepthStencilViewHandle());
+		object3dCommon->SetCommonDrawSetting();
+
+		// 鏡面同士の無限反射は行わず、部屋・小型鏡・Playerだけを一度描画します。
+		for (const auto& object : sceneObjects_) {
+			object->UpdateCameraForDraw(&reflectionCamera);
+			object->Draw();
+		}
+		for (StageMapRuntimeObject& runtimeObject : stageMapRuntimeObjects_) {
+			if (!runtimeObject.visual) {
+				continue;
+			}
+			runtimeObject.visual->UpdateCameraForDraw(&reflectionCamera);
+			runtimeObject.visual->Draw();
+		}
+		if (carryableMirror_) {
+			carryableMirror_->GetObject().UpdateCameraForDraw(&reflectionCamera);
+			carryableMirror_->GetObject().Draw();
+		}
+		if (player_) {
+			player_->GetObject().UpdateCameraForDraw(&reflectionCamera);
+			player_->GetObject().Draw();
+		}
+		if (laserRenderer_) {
+			laserRenderer_->Draw(laser_.GetSegments(), reflectionCamera);
+		}
+
+		fixedMirror->EndReflection();
+		RestoreSceneCameraMatrices();
+		break;
+	}
 }
 
-void Stage1::UpdateReflectionCamera()
+void Stage1::RestoreSceneCameraMatrices()
 {
-	if (!mainCamera || !reflectionCamera_) {
+	Camera* activeCamera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
+	if (!activeCamera) {
+		return;
+	}
+	for (const auto& object : sceneObjects_) {
+		object->UpdateCameraForDraw(activeCamera);
+	}
+	for (StageMapRuntimeObject& runtimeObject : stageMapRuntimeObjects_) {
+		if (runtimeObject.visual) {
+			runtimeObject.visual->UpdateCameraForDraw(activeCamera);
+		}
+	}
+	for (const auto& fixedMirror : fixedMirrors_) {
+		if (fixedMirror) {
+			fixedMirror->GetObject().UpdateCameraForDraw(activeCamera);
+		}
+	}
+	if (carryableMirror_) {
+		carryableMirror_->GetObject().UpdateCameraForDraw(activeCamera);
+	}
+	if (player_) {
+		player_->GetObject().UpdateCameraForDraw(activeCamera);
+	}
+}
+
+void Stage1::UpdateReflectionCameras()
+{
+	Camera* sourceCamera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
+	if (!sourceCamera) {
 		return;
 	}
 
-	// 通常カメラの位置を鏡面の反対側へ移します。
-	const Vector3 reflectionPosition = mirror_.ReflectPoint(mainCamera->GetTranslate());
+	const Vector3 sourceForward = GetCameraForward(*sourceCamera);
+	for (const auto& fixedMirror : fixedMirrors_) {
+		if (fixedMirror) {
+			fixedMirror->UpdateReflectionCamera(*sourceCamera, sourceForward);
+		}
+	}
+}
 
-	// 通常カメラが見る方向も、鏡で跳ね返した方向へ変更します。
-	const Vector3 reflectionForward = mirror_.ReflectDirection(GetCameraForward(*mainCamera));
-	const float clampedY = std::clamp(reflectionForward.y, -1.0f, 1.0f);
-	const float reflectionPitch = -std::asin(clampedY);
-	const float reflectionYaw = std::atan2(reflectionForward.x, reflectionForward.z);
+void Stage1::UpdateMirrorGameplay()
+{
+	if (!player_ || !carryableMirror_) {
+		return;
+	}
 
-	reflectionCamera_->SetTranslate(reflectionPosition);
-	reflectionCamera_->SetRotate({ reflectionPitch, reflectionYaw, 0.0f });
-	reflectionCamera_->Update();
+	const bool interactPressed =
+		ImGuiManager::GetInstance()->IsGameViewActive() &&
+		Input::GetInstance()->TriggerKey(DIK_E);
+	carryableMirror_->Update(
+		player_->GetPosition(),
+		player_->GetFacingYaw(),
+		interactPressed);
+
+	// レーザー側は鏡の種類を知らず、共通のMirror面として二種類を扱います。
+	std::vector<const Mirror*> laserMirrors;
+	laserMirrors.reserve(fixedMirrors_.size() + 1);
+	for (const auto& fixedMirror : fixedMirrors_) {
+		if (fixedMirror) {
+			laserMirrors.push_back(&fixedMirror->GetMirror());
+		}
+	}
+	laserMirrors.push_back(&carryableMirror_->GetMirror());
+	laser_.SetOrigin(laserOrigin_);
+	laser_.SetDirection(laserDirection_);
+	laser_.Update(laserMirrors);
+
+	// 鏡で分割された各Laser線分と、Playerの球Colliderを3D空間で判定する
+	isPlayerHitByLaser_ = false;
+	const Sphere playerSphere = player_->GetCollider();
+	for (const LaserSegment& segment : laser_.GetSegments()) {
+		if (Collision::SegmentSphere(
+			segment.start,
+			segment.end,
+			playerSphere,
+			laserCollisionRadius_).isHit) {
+			isPlayerHitByLaser_ = true;
+			break;
+		}
+	}
+}
+
+void Stage1::InitializeGameplaySmoke()
+{
+	gameplaySmokeEnabled_ = IsEnvironmentEnabled("CG2_STAGE1_GAMEPLAY_SMOKE");
+	if (!gameplaySmokeEnabled_ || !player_ || !carryableMirror_) {
+		return;
+	}
+
+	gameplaySmokeStartY_ = player_->GetPosition().y;
+	const Vector3 mirrorPosition = carryableMirror_->GetMirror().GetCenter();
+
+	// 鏡の中心にPlayerがいる条件を渡し、Eキーと同じ拾う処理を直接確認します。
+	carryableMirror_->Update(mirrorPosition, 0.0f, true);
+	gameplaySmokePickedUpMirror_ = carryableMirror_->IsCarried();
+	// 持った状態のままPlayer正面へ移動させてから、反射判定を行います。
+	carryableMirror_->Update(mirrorPosition, 0.0f, false);
+
+	// 携帯中の鏡へ正面から光を当て、衝突後に反射線分が作られることを確認します。
+	const Mirror& carryMirror = carryableMirror_->GetMirror();
+	const Vector3 mirrorNormal = carryMirror.GetNormal();
+	Laser carryMirrorProbe;
+	carryMirrorProbe.SetOrigin({
+		carryMirror.GetCenter().x + mirrorNormal.x * 3.0f,
+		carryMirror.GetCenter().y + mirrorNormal.y * 3.0f,
+		carryMirror.GetCenter().z + mirrorNormal.z * 3.0f,
+	});
+	carryMirrorProbe.SetDirection({ -mirrorNormal.x, -mirrorNormal.y, -mirrorNormal.z });
+	carryMirrorProbe.SetMaxDistance(8.0f);
+	carryMirrorProbe.SetMaxReflectionCount(1);
+	carryMirrorProbe.Update({ &carryMirror });
+	const std::vector<LaserSegment>& probeSegments = carryMirrorProbe.GetSegments();
+	gameplaySmokeCarryMirrorReflectedLaser_ =
+		probeSegments.size() >= 2 && probeSegments.front().hitMirror;
+
+	const auto laserHitsSphere = [&](const Laser& testLaser, const Sphere& sphere) {
+		return std::any_of(
+			testLaser.GetSegments().begin(),
+			testLaser.GetSegments().end(),
+			[&](const LaserSegment& segment)
+			{
+				return Collision::SegmentSphere(
+					segment.start,
+					segment.end,
+					sphere,
+					laserCollisionRadius_).isHit;
+			});
+	};
+	// 実際に持っている鏡をPlayer正面へ構え、鏡なしなら当たる光が遮られることを確認する。
+	const Sphere carriedPlayerSphere{ mirrorPosition, 1.2f };
+	const Vector3 carriedTestOrigin{
+		mirrorPosition.x,
+		mirrorPosition.y + 1.8f,
+		mirrorPosition.z + 2.5f,
+	};
+	const Vector3 carriedTestDirection{ 0.0f, -1.8f, -2.5f };
+	Laser carriedUnblockedLaser;
+	carriedUnblockedLaser.SetOrigin(carriedTestOrigin);
+	carriedUnblockedLaser.SetDirection(carriedTestDirection);
+	carriedUnblockedLaser.SetMaxDistance(12.0f);
+	carriedUnblockedLaser.Update({});
+	Laser carriedBlockedLaser;
+	carriedBlockedLaser.SetOrigin(carriedTestOrigin);
+	carriedBlockedLaser.SetDirection(carriedTestDirection);
+	carriedBlockedLaser.SetMaxDistance(12.0f);
+	carriedBlockedLaser.SetMaxReflectionCount(1);
+	carriedBlockedLaser.Update({ &carryMirror });
+	gameplaySmokeCarriedMirrorBlocksPlayer_ =
+		laserHitsSphere(carriedUnblockedLaser, carriedPlayerSphere) &&
+		carriedBlockedLaser.GetSegments().size() >= 2 &&
+		!laserHitsSphere(carriedBlockedLaser, carriedPlayerSphere);
+	carryableMirror_->Update(mirrorPosition, 0.0f, true);
+	gameplaySmokeDroppedMirror_ = !carryableMirror_->IsCarried();
+
+	// 鏡がない時はPlayerへ届き、途中に鏡がある時は入射線が鏡で止まることを確認します。
+	const Sphere testPlayerSphere{ { 0.0f, -0.8f, 5.0f }, 1.2f };
+	Laser unblockedLaser;
+	unblockedLaser.SetOrigin(laserOrigin_);
+	unblockedLaser.SetDirection(laserDirection_);
+	unblockedLaser.SetMaxDistance(30.0f);
+	unblockedLaser.Update({});
+	gameplaySmokeLaserHitsPlayer_ = laserHitsSphere(unblockedLaser, testPlayerSphere);
+
+	const Vector3 normalizedLaserDirection = Normalize(laserDirection_);
+	const Mirror shieldMirror(
+		{
+			laserOrigin_.x + normalizedLaserDirection.x * 1.2f,
+			laserOrigin_.y + normalizedLaserDirection.y * 1.2f,
+			laserOrigin_.z + normalizedLaserDirection.z * 1.2f,
+		},
+		Multiply(-1.0f, normalizedLaserDirection),
+		3.0f,
+		3.0f);
+	Laser blockedLaser;
+	blockedLaser.SetOrigin(laserOrigin_);
+	blockedLaser.SetDirection(laserDirection_);
+	blockedLaser.SetMaxDistance(30.0f);
+	blockedLaser.SetMaxReflectionCount(1);
+	blockedLaser.Update({ &shieldMirror });
+	gameplaySmokeMirrorBlocksPlayer_ =
+		blockedLaser.GetSegments().size() >= 2 &&
+		!laserHitsSphere(blockedLaser, testPlayerSphere);
+
+	// 描画用Cameraとは別の小さなControllerを作り、段階操作と壁制限を確認します。
+	Camera testCamera;
+	CameraController testController;
+	testController.Initialize(&testCamera, { 0.0f, 0.0f, 0.0f });
+	testController.SetAutoRecenterEnabled(false);
+
+	// 左一段目のCamera候補へ壁を置き、壁側へ回れないことを確認します。
+	constexpr float testYaw = 0.52359878f;
+	constexpr float testPitch = 0.58f;
+	constexpr float testDistance = 11.5f;
+	const Vector3 testFocus = testController.GetFocus();
+	const float horizontalDistance = testDistance * std::cos(testPitch);
+	const Vector3 blockedCameraPosition{
+		testFocus.x - std::sin(testYaw) * horizontalDistance,
+		testFocus.y + std::sin(testPitch) * testDistance,
+		testFocus.z - std::cos(testYaw) * horizontalDistance,
+	};
+	OBB testWall{};
+	testWall.center = Lerp(testFocus, blockedCameraPosition, 0.5f);
+	testWall.orientations[0] = { 1.0f, 0.0f, 0.0f };
+	testWall.orientations[1] = { 0.0f, 1.0f, 0.0f };
+	testWall.orientations[2] = { 0.0f, 0.0f, 1.0f };
+	testWall.size = { 0.75f, 0.75f, 0.75f };
+	gameplaySmokeCameraWallBlock_ =
+		!testController.TryStepOrbit(1, { testWall }) &&
+		testController.GetOrbitStepIndex() == 0;
+
+	// 一段目の直後も現在角度が目標へ瞬間移動せず、途中にあることを確認します。
+	const float yawBeforeStep = testController.GetOrbitYaw();
+	const bool firstOrbitStep = testController.TryStepOrbit(1, {});
+	testController.Update(
+		1.0f / 60.0f,
+		{ 0.0f, 0.0f, 0.0f },
+		{},
+		true,
+		{});
+	const float yawAfterOneFrame = testController.GetOrbitYaw();
+	gameplaySmokeCameraSmooth_ =
+		firstOrbitStep &&
+		yawAfterOneFrame > yawBeforeStep + 0.0001f &&
+		yawAfterOneFrame < testYaw - 0.0001f;
+
+	// 左右は中心から二段、遠近は近・中・遠の三段で止まることを確認します。
+	const bool orbitReachedPositiveLimit =
+		testController.TryStepOrbit(1, {}) &&
+		!testController.TryStepOrbit(1, {}) &&
+		testController.GetOrbitStepIndex() == 2;
+	const bool orbitReachedNegativeLimit =
+		testController.TryStepOrbit(-1, {}) &&
+		testController.TryStepOrbit(-1, {}) &&
+		testController.TryStepOrbit(-1, {}) &&
+		testController.TryStepOrbit(-1, {}) &&
+		!testController.TryStepOrbit(-1, {}) &&
+		testController.GetOrbitStepIndex() == -2;
+	const bool distanceReachedFarLimit =
+		testController.TryStepDistance(1, {}) &&
+		!testController.TryStepDistance(1, {}) &&
+		testController.GetDistanceStepIndex() == 2;
+	const bool distanceReachedNearLimit =
+		testController.TryStepDistance(-1, {}) &&
+		testController.TryStepDistance(-1, {}) &&
+		!testController.TryStepDistance(-1, {}) &&
+		testController.GetDistanceStepIndex() == 0;
+	gameplaySmokeCameraSteps_ =
+		orbitReachedPositiveLimit &&
+		orbitReachedNegativeLimit &&
+		distanceReachedFarLimit &&
+		distanceReachedNearLimit;
+}
+
+void Stage1::UpdateGameplaySmoke(float deltaTime)
+{
+	if (!gameplaySmokeEnabled_ || !player_) {
+		return;
+	}
+
+	++gameplaySmokeFrame_;
+	gameplaySmokeElapsedTime_ += (std::max)(deltaTime, 0.0f);
+	if (player_->IsGrounded()) {
+		gameplaySmokeSawGrounded_ = true;
+	}
+	for (const auto& fixedMirror : fixedMirrors_) {
+		if (fixedMirror && fixedMirror->HasReflectionCapture()) {
+			gameplaySmokeFixedMirrorReflection_ = true;
+			break;
+		}
+	}
+	if (gameplaySmokeSawGrounded_ &&
+		!player_->IsGrounded() &&
+		player_->GetPosition().x > 10.0f) {
+		gameplaySmokeLeftFloor_ = true;
+	}
+	if (gameplaySmokeLeftFloor_ &&
+		player_->GetPosition().y < gameplaySmokeStartY_ - 1.0f) {
+		gameplaySmokeFell_ = true;
+	}
+
+	const bool finishedSuccessfully =
+		gameplaySmokeFell_ && gameplaySmokeElapsedTime_ >= 3.0f;
+	const bool timedOut = gameplaySmokeElapsedTime_ >= 8.0f || gameplaySmokeFrame_ >= 1200;
+	if (!finishedSuccessfully && !timedOut) {
+		return;
+	}
+
+	const bool success =
+		gameplaySmokePickedUpMirror_ &&
+		gameplaySmokeDroppedMirror_ &&
+		gameplaySmokeCarryMirrorReflectedLaser_ &&
+		gameplaySmokeCarriedMirrorBlocksPlayer_ &&
+		gameplaySmokeLaserHitsPlayer_ &&
+		gameplaySmokeMirrorBlocksPlayer_ &&
+		gameplaySmokeFixedMirrorReflection_ &&
+		gameplaySmokeCameraSteps_ &&
+		gameplaySmokeCameraWallBlock_ &&
+		gameplaySmokeCameraSmooth_ &&
+		gameplaySmokeSawGrounded_ &&
+		gameplaySmokeLeftFloor_ &&
+		gameplaySmokeFell_;
+	std::ofstream log("logs/stage1_gameplay_smoke.log", std::ios::trunc);
+	if (log) {
+		log << (success ? "SUCCESS" : "FAILURE")
+			<< ": picked=" << gameplaySmokePickedUpMirror_
+			<< " dropped=" << gameplaySmokeDroppedMirror_
+			<< " carryLaser=" << gameplaySmokeCarryMirrorReflectedLaser_
+			<< " carriedMirrorBlocksPlayer=" << gameplaySmokeCarriedMirrorBlocksPlayer_
+			<< " laserHitsPlayer=" << gameplaySmokeLaserHitsPlayer_
+			<< " mirrorBlocksPlayer=" << gameplaySmokeMirrorBlocksPlayer_
+			<< " fixedMirrorReflection=" << gameplaySmokeFixedMirrorReflection_
+			<< " cameraSteps=" << gameplaySmokeCameraSteps_
+			<< " cameraWall=" << gameplaySmokeCameraWallBlock_
+			<< " cameraSmooth=" << gameplaySmokeCameraSmooth_
+			<< " grounded=" << gameplaySmokeSawGrounded_
+			<< " leftFloor=" << gameplaySmokeLeftFloor_
+			<< " fell=" << gameplaySmokeFell_
+			<< " position=" << player_->GetPosition().x
+			<< ',' << player_->GetPosition().y
+			<< ',' << player_->GetPosition().z
+			<< " seconds=" << gameplaySmokeElapsedTime_
+			<< '\n';
+	}
+	gameplaySmokeEnabled_ = false;
+	PostQuitMessage(success ? 0 : 1);
 }
 
 void Stage1::UpdateMainCamera()
@@ -416,31 +854,34 @@ void Stage1::UpdateMainCamera()
 	if (!player_ || !cameraController_) {
 		return;
 	}
+	UpdateCameraAreas();
 
-	//右マウスドラッグで高さを調整し、ホイールでプレイヤーとの距離を調整する
+	// 通常時のCameraは、矢印キー一回につき一段階だけ位置を変更する
 	Input* input = Input::GetInstance();
-	if (input->IsMouseButtonPressed(1)) {
-		// 横方向はPlayerの周囲を回り、縦方向はカメラの高さを変えます。
-		cameraController_->SetOrbitYaw(
-			cameraController_->GetOrbitYaw() -
-			static_cast<float>(input->GetMouseX()) * 0.005f);
-		const float height = std::clamp(
-			cameraController_->GetHeight() - static_cast<float>(input->GetMouseY()) * 0.02f,
-			1.0f,
-			12.0f);
-		cameraController_->SetHeight(height);
+	bool isCameraStepInput = false;
+	if (input->TriggerKey(DIK_LEFT)) {
+		isCameraStepInput |= cameraController_->TryStepOrbit(1, stageSolidObbs_);
+	} else if (input->TriggerKey(DIK_RIGHT)) {
+		isCameraStepInput |= cameraController_->TryStepOrbit(-1, stageSolidObbs_);
 	}
-	// ホイールはPlayerからの距離を調整します。
-	const float distance = std::clamp(
-		cameraController_->GetDistance() - static_cast<float>(input->GetMouseWheel()) * 0.005f,
-		3.0f,
-		20.0f);
-	cameraController_->SetDistance(distance);
+	if (input->TriggerKey(DIK_UP)) {
+		isCameraStepInput |= cameraController_->TryStepDistance(1, stageSolidObbs_);
+	} else if (input->TriggerKey(DIK_DOWN)) {
+		isCameraStepInput |= cameraController_->TryStepDistance(-1, stageSolidObbs_);
+	}
 
-	// Player の向きではなく、Player の位置だけを渡して CameraController が追従させる
+	// Rを押すと、Playerが最後に向いた方向の後ろへCameraをゆっくり戻す
+	if (input->TriggerKey(DIK_R)) {
+		cameraController_->ResetBehindTarget(player_->GetFacingYaw());
+	}
+
+	// Playerの進行方向だけを渡し、先読みと自動リセンターに使用する
 	cameraController_->Update(
 		DirectXCommon::GetInstance()->GetDeltaTime(),
-		player_->GetPosition());
+		player_->GetPosition(),
+		player_->GetMoveDirection(),
+		isCameraStepInput,
+		stageSolidObbs_);
 }
 
 Vector3 Stage1::GetCameraForward(const Camera& camera) const
@@ -452,9 +893,19 @@ Vector3 Stage1::GetCameraForward(const Camera& camera) const
 
 void Stage1::DrawMirrorDebugUi()
 {
+	if (fixedMirrors_.empty() || !fixedMirrors_.front()) {
+		return;
+	}
+
+	FixedMirror& fixedMirror = *fixedMirrors_.front();
+	Mirror& mirror = fixedMirror.GetMirror();
 	// ImGui の詳細は ImGuiManager へまとめ、Stage1 は変更結果だけを受け取ります。
-	if (ImGuiManager::GetInstance()->MirrorDebugWindow(mirror_, mirrorYaw_, *reflectionCamera_)) {
-		SyncMirrorVisual();
+	if (ImGuiManager::GetInstance()->MirrorDebugWindow(
+		mirror,
+		fixedMirror.GetYawForEdit(),
+		fixedMirror.GetReflectionCamera(),
+		fixedMirror.HasReflectionCapture())) {
+		fixedMirror.SyncVisualAndCollider();
 
 		// 従来の鏡Inspectorで編集した値も、Save MapできるLevelDataへ同期する
 		if (stageMapData_) {
@@ -463,10 +914,10 @@ void Stage1::DrawMirrorDebugUi()
 			{
 				for (LevelLoader::ObjectData& objectData : objects) {
 					if (objectData.tag == "Mirror") {
-						objectData.translation = mirror_.GetCenter();
-						objectData.rotation.y = mirrorYaw_;
-						objectData.scaling.x = mirror_.GetWidth() * 0.5f;
-						objectData.scaling.y = mirror_.GetHeight() * 0.5f;
+						objectData.translation = mirror.GetCenter();
+						objectData.rotation.y = fixedMirror.GetYaw();
+						objectData.scaling.x = mirror.GetWidth() * 0.5f;
+						objectData.scaling.y = mirror.GetHeight() * 0.5f;
 						stageMapReloadStatus_ =
 							"Mirror edited in memory. Press Save Map to keep it.";
 						return true;
@@ -485,7 +936,7 @@ void Stage1::DrawMirrorDebugUi()
 void Stage1::DrawCollisionDebugUi()
 {
 	//床と鏡のどちらかが未作成なら、当たり判定のデバッグ表示を行わない
-	if (!player_ || !floor_ || !mirrorVisual_) {
+	if (!player_ || !floor_) {
 		return;
 	}
 
@@ -493,8 +944,6 @@ void Stage1::DrawCollisionDebugUi()
 	const Sphere playerSphere = player_->GetCollider();
 	const Collision::CollisionInfo floorCollision =
 		Collision::SphereOBB(playerSphere, floorObb_);
-	const Collision::CollisionInfo mirrorCollision =
-		Collision::SphereOBB(playerSphere, mirrorObb_);
 
 	//床のOBBを、当たっているときは赤、当たっていないときは青で表示する
 	ImGuiManager::GetInstance()->DrawObbCollisionDebug(
@@ -503,12 +952,30 @@ void Stage1::DrawCollisionDebugUi()
 		cameraManager->GetActiveCamera(),
 		floorCollision.isCollision);
 
-	//鏡のOBBを、当たっているときは赤、当たっていないときは青で表示する
-	ImGuiManager::GetInstance()->DrawObbCollisionDebug(
-		mirrorObb_,
-		playerSphere,
-		cameraManager->GetActiveCamera(),
-		mirrorCollision.isCollision);
+	//全ての固定鏡を、当たっているときは赤、当たっていないときは青で表示する
+	for (const auto& fixedMirror : fixedMirrors_) {
+		if (!fixedMirror) {
+			continue;
+		}
+		const Collision::CollisionInfo mirrorCollision =
+			Collision::SphereOBB(playerSphere, fixedMirror->GetCollider());
+		ImGuiManager::GetInstance()->DrawObbCollisionDebug(
+			fixedMirror->GetCollider(),
+			playerSphere,
+			cameraManager->GetActiveCamera(),
+			mirrorCollision.isCollision);
+	}
+
+	// 持てる小型鏡は、置かれている時だけPlayerとの衝突状態を表示します。
+	if (carryableMirror_ && !carryableMirror_->IsCarried()) {
+		const Collision::CollisionInfo carryableCollision =
+			Collision::SphereOBB(playerSphere, carryableMirror_->GetCollider());
+		ImGuiManager::GetInstance()->DrawObbCollisionDebug(
+			carryableMirror_->GetCollider(),
+			playerSphere,
+			cameraManager->GetActiveCamera(),
+			carryableCollision.isCollision);
+	}
 
 	// JSONから追加したBOXコライダーも、同じ赤・青のワイヤーで確認する
 	for (const StageMapRuntimeObject& runtimeObject : stageMapRuntimeObjects_) {
@@ -583,11 +1050,15 @@ void Stage1::DrawStageEditViewport()
 		options.objects.push_back({ sourceName, object });
 	};
 
+	size_t fixedMirrorIndex = 0;
 	for (const LevelLoader::ObjectData& objectData : stageMapData_->objects) {
 		if (objectData.tag == "Floor") {
 			addObject(objectData.name, floor_);
 		} else if (objectData.tag == "Mirror") {
-			addObject(objectData.name, mirrorVisual_.get());
+			if (fixedMirrorIndex < fixedMirrors_.size() && fixedMirrors_[fixedMirrorIndex]) {
+				addObject(objectData.name, &fixedMirrors_[fixedMirrorIndex]->GetObject());
+			}
+			++fixedMirrorIndex;
 		}
 	}
 	for (StageMapRuntimeObject& runtimeObject : stageMapRuntimeObjects_) {
@@ -706,15 +1177,16 @@ bool Stage1::SaveStageMap()
 
 bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 {
-	if (!stageMapData_ || !floor_ || !mirrorVisual_) {
+	if (!stageMapData_ || !floor_) {
 		return false;
 	}
 
 	const LevelLoader::ObjectData* floorData = nullptr;
-	const LevelLoader::ObjectData* mirrorData = nullptr;
+	std::vector<const LevelLoader::ObjectData*> mirrorDataList;
 	std::vector<const LevelLoader::ObjectData*> additionalObjects;
 	std::vector<const LevelLoader::ObjectData*> eventTriggerDataList;
 	std::vector<const LevelLoader::ObjectData*> eventCameraDataList;
+	std::vector<const LevelLoader::ObjectData*> cameraAreaDataList;
 	std::function<void(const std::vector<LevelLoader::ObjectData>&)> collectObjects;
 	collectObjects = [&](const std::vector<LevelLoader::ObjectData>& objects)
 	{
@@ -722,11 +1194,13 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 			if (objectData.tag == "Floor") {
 				floorData = &objectData;
 			} else if (objectData.tag == "Mirror") {
-				mirrorData = &objectData;
+				mirrorDataList.push_back(&objectData);
 			} else if (objectData.objectType == "EVENT_TRIGGER") {
 				eventTriggerDataList.push_back(&objectData);
 			} else if (objectData.objectType == "EVENT_CAMERA") {
 				eventCameraDataList.push_back(&objectData);
+			} else if (objectData.objectType == "CAMERA_AREA" && objectData.hasCameraArea) {
+				cameraAreaDataList.push_back(&objectData);
 			} else if (objectData.type == "MESH" && !objectData.fileName.empty()) {
 				additionalObjects.push_back(&objectData);
 			}
@@ -736,14 +1210,50 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 	collectObjects(stageMapData_->objects);
 
 	// Stage1で必須の床と鏡がなければ、何も変更しない
-	if (!floorData || !mirrorData) {
+	if (!floorData || mirrorDataList.empty()) {
 		return false;
+	}
+
+	// Mirrorタグの数だけ固定鏡を作るため、JSONへMirrorを追加すれば複数配置できます。
+	const bool rebuildFixedMirrors =
+		rebuildRuntimeObjects || fixedMirrors_.size() != mirrorDataList.size();
+	std::vector<std::unique_ptr<FixedMirror>> rebuiltFixedMirrors;
+	if (rebuildFixedMirrors) {
+		rebuiltFixedMirrors.reserve(mirrorDataList.size());
+		for (const LevelLoader::ObjectData* mirrorData : mirrorDataList) {
+			auto fixedMirror = std::make_unique<FixedMirror>();
+			if (!fixedMirror->Initialize(
+				object3dCommon,
+				DirectXCommon::GetInstance(),
+				SrvManager::GetInstance(),
+				mirrorData->fileName.empty() ? "plane.obj" : mirrorData->fileName,
+				mirrorData->translation,
+				mirrorData->rotation.y,
+				std::abs(mirrorData->scaling.x) * 2.0f,
+				std::abs(mirrorData->scaling.y) * 2.0f,
+				512)) {
+				return false;
+			}
+			fixedMirror->GetObject().SetDirectionalLight(directionalLight_);
+			fixedMirror->GetObject().SetPointLight(pointLight_);
+			if (mirrorData->hasCollider && mirrorData->collider.type == "BOX") {
+				fixedMirror->SetColliderShape(
+					mirrorData->collider.center,
+					{
+						std::abs(mirrorData->collider.size.x) * 0.5f,
+						std::abs(mirrorData->collider.size.y) * 0.5f,
+						std::abs(mirrorData->collider.size.z) * 0.5f,
+					});
+			}
+			rebuiltFixedMirrors.push_back(std::move(fixedMirror));
+		}
 	}
 
 	// モデル追加・削除時だけObject3dの一覧を作り直す
 	std::vector<StageMapRuntimeObject> rebuiltObjects;
 	std::vector<StageEventTrigger> rebuiltEventTriggers;
 	std::vector<StageEventCamera> rebuiltEventCameras;
+	std::vector<StageCameraArea> rebuiltCameraAreas;
 	if (rebuildRuntimeObjects) {
 		rebuiltObjects.reserve(additionalObjects.size());
 		for (const LevelLoader::ObjectData* objectData : additionalObjects) {
@@ -804,6 +1314,31 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 			UpdateStageEventCamera(eventCamera, *objectData);
 			rebuiltEventCameras.push_back(std::move(eventCamera));
 		}
+
+		rebuiltCameraAreas.reserve(cameraAreaDataList.size());
+		for (const LevelLoader::ObjectData* objectData : cameraAreaDataList) {
+			StageCameraArea cameraArea{};
+			cameraArea.sourceName = objectData->name;
+			cameraArea.transform = {
+				objectData->scaling,
+				objectData->rotation,
+				objectData->translation,
+			};
+			if (objectData->hasCollider && objectData->collider.type == "BOX") {
+				cameraArea.colliderLocalCenter = objectData->collider.center;
+				cameraArea.colliderLocalHalfSize = {
+					std::abs(objectData->collider.size.x) * 0.5f,
+					std::abs(objectData->collider.size.y) * 0.5f,
+					std::abs(objectData->collider.size.z) * 0.5f,
+				};
+			}
+			cameraArea.settings = {
+				objectData->cameraArea.distance,
+				objectData->cameraArea.pitch,
+				objectData->cameraArea.fovY,
+			};
+			rebuiltCameraAreas.push_back(std::move(cameraArea));
+		}
 	}
 
 	// ---------- 床データの反映 ----------
@@ -820,21 +1355,30 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 	}
 
 	// ---------- 鏡データの反映 ----------
-	mirrorYaw_ = mirrorData->rotation.y;
-	mirror_.SetCenter(mirrorData->translation);
-	mirror_.SetSize(
-		std::abs(mirrorData->scaling.x) * 2.0f,
-		std::abs(mirrorData->scaling.y) * 2.0f);
-	mirror_.SetNormal({ std::sin(mirrorYaw_), 0.0f, std::cos(mirrorYaw_) });
-	if (mirrorData->hasCollider && mirrorData->collider.type == "BOX") {
-		mirrorColliderLocalCenter_ = mirrorData->collider.center;
-		mirrorLocalHalfSize_ = {
-			std::abs(mirrorData->collider.size.x) * 0.5f,
-			std::abs(mirrorData->collider.size.y) * 0.5f,
-			std::abs(mirrorData->collider.size.z) * 0.5f,
-		};
+	if (rebuildFixedMirrors) {
+		fixedMirrors_ = std::move(rebuiltFixedMirrors);
+	} else {
+		for (size_t index = 0; index < mirrorDataList.size(); ++index) {
+			const LevelLoader::ObjectData& mirrorData = *mirrorDataList[index];
+			FixedMirror& fixedMirror = *fixedMirrors_[index];
+			fixedMirror.GetYawForEdit() = mirrorData.rotation.y;
+			fixedMirror.GetMirror().SetCenter(mirrorData.translation);
+			fixedMirror.GetMirror().SetSize(
+				std::abs(mirrorData.scaling.x) * 2.0f,
+				std::abs(mirrorData.scaling.y) * 2.0f);
+			if (mirrorData.hasCollider && mirrorData.collider.type == "BOX") {
+				fixedMirror.SetColliderShape(
+					mirrorData.collider.center,
+					{
+						std::abs(mirrorData.collider.size.x) * 0.5f,
+						std::abs(mirrorData.collider.size.y) * 0.5f,
+						std::abs(mirrorData.collider.size.z) * 0.5f,
+					});
+			} else {
+				fixedMirror.SyncVisualAndCollider();
+			}
+		}
 	}
-	SyncMirrorVisual();
 
 	if (rebuildRuntimeObjects) {
 		stageMapRuntimeObjects_ = std::move(rebuiltObjects);
@@ -847,7 +1391,12 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 		}
 		stageEventCameras_ = std::move(rebuiltEventCameras);
 		stageEventTriggers_ = std::move(rebuiltEventTriggers);
+		stageCameraAreas_ = std::move(rebuiltCameraAreas);
 		activeEventCameraName_.clear();
+		activeCameraAreaName_.clear();
+		if (cameraController_) {
+			cameraController_->ClearAreaSettings();
+		}
 		if (cameraManager) {
 			for (const StageEventCamera& eventCamera : stageEventCameras_) {
 				cameraManager->AddCamera(
@@ -929,6 +1478,37 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 			if (found != eventCameraDataList.end()) {
 				UpdateStageEventCamera(eventCamera, **found);
 			}
+		}
+		for (StageCameraArea& cameraArea : stageCameraAreas_) {
+			const auto found = std::find_if(
+				cameraAreaDataList.begin(),
+				cameraAreaDataList.end(),
+				[&](const LevelLoader::ObjectData* objectData)
+				{
+					return objectData->name == cameraArea.sourceName;
+				});
+			if (found == cameraAreaDataList.end()) {
+				continue;
+			}
+			const LevelLoader::ObjectData& objectData = **found;
+			cameraArea.transform = {
+				objectData.scaling,
+				objectData.rotation,
+				objectData.translation,
+			};
+			if (objectData.hasCollider && objectData.collider.type == "BOX") {
+				cameraArea.colliderLocalCenter = objectData.collider.center;
+				cameraArea.colliderLocalHalfSize = {
+					std::abs(objectData.collider.size.x) * 0.5f,
+					std::abs(objectData.collider.size.y) * 0.5f,
+					std::abs(objectData.collider.size.z) * 0.5f,
+				};
+			}
+			cameraArea.settings = {
+				objectData.cameraArea.distance,
+				objectData.cameraArea.pitch,
+				objectData.cameraArea.fovY,
+			};
 		}
 	}
 
@@ -1195,6 +1775,55 @@ bool Stage1::AddStageMapEventPair()
 	return true;
 }
 
+bool Stage1::AddStageMapCameraArea()
+{
+	if (!stageMapData_) {
+		stageMapReloadStatus_ = "Add failed. No map data is loaded.";
+		return false;
+	}
+
+	// 既存のArea名と重ならない連番の名前を作る
+	int number = 1;
+	std::string areaName;
+	do {
+		areaName = "CameraArea" + std::to_string(number++);
+	} while (std::any_of(
+		stageMapData_->objects.begin(),
+		stageMapData_->objects.end(),
+		[&](const LevelLoader::ObjectData& objectData)
+		{
+			return objectData.name == areaName;
+		}));
+
+	const Vector3 playerPosition = player_ ? player_->GetPosition() : Vector3{};
+	LevelLoader::ObjectData areaData{};
+	areaData.type = "EMPTY";
+	areaData.name = areaName;
+	areaData.tag = "CameraArea";
+	areaData.objectType = "CAMERA_AREA";
+	areaData.translation = playerPosition;
+	areaData.scaling = { 1.0f, 1.0f, 1.0f };
+	areaData.hasCollider = true;
+	areaData.collider.type = "BOX";
+	areaData.collider.center = { 0.0f, 0.0f, 0.0f };
+	areaData.collider.size = { 8.0f, 6.0f, 8.0f };
+	areaData.hasCameraArea = true;
+	areaData.cameraArea.distance = 11.5f;
+	areaData.cameraArea.pitch = 0.58f;
+	areaData.cameraArea.fovY = 0.48f;
+
+	stageMapData_->objects.push_back(std::move(areaData));
+	selectedStageMapObjectIndex_ = static_cast<int>(stageMapData_->objects.size()) - 1;
+	if (!ApplyStageMapData(true)) {
+		stageMapData_->objects.pop_back();
+		stageMapReloadStatus_ = "Add failed. Camera Area could not be created.";
+		return false;
+	}
+
+	stageMapReloadStatus_ = "Added Camera Area. Adjust it in the Inspector.";
+	return true;
+}
+
 void Stage1::UpdateStageEvents()
 {
 	if (!player_ || !cameraManager) {
@@ -1230,16 +1859,134 @@ void Stage1::UpdateStageEvents()
 
 	if (!requestedCameraName.empty()) {
 		if (activeEventCameraName_ != requestedCameraName) {
+			const auto cameraFound = std::find_if(
+				stageEventCameras_.begin(),
+				stageEventCameras_.end(),
+				[&](const StageEventCamera& eventCamera)
+				{
+					return eventCamera.sourceName == requestedCameraName;
+				});
+			if (cameraFound == stageEventCameras_.end() || !cameraFound->camera) {
+				return;
+			}
+
+			// JSONで置いたEvent Cameraの位置を、Player周囲を回る手動Cameraの初期位置にする
+			const Vector3 initialFocus{
+				player_->GetPosition().x,
+				player_->GetPosition().y + 1.0f,
+				player_->GetPosition().z,
+			};
+			const Vector3 cameraOffset{
+				cameraFound->camera->GetTranslate().x - initialFocus.x,
+				cameraFound->camera->GetTranslate().y - initialFocus.y,
+				cameraFound->camera->GetTranslate().z - initialFocus.z,
+			};
+			const float distance = (std::max)(Length(cameraOffset), 3.0f);
+			const float yaw = std::atan2(-cameraOffset.x, -cameraOffset.z);
+			const float pitch = std::asin(std::clamp(cameraOffset.y / distance, -1.0f, 1.0f));
+			cameraFound->manualController = std::make_unique<CameraController>();
+			cameraFound->manualController->Initialize(
+				cameraFound->camera.get(),
+				player_->GetPosition(),
+				distance,
+				yaw,
+				pitch);
+			// Event CameraゾーンではPlayerが自由にCameraを操作するため、自動リセンターを止める
+			cameraFound->manualController->SetAutoRecenterEnabled(false);
+
 			cameraManager->SetActiveCamera(requestedCameraName);
 			activeEventCameraName_ = requestedCameraName;
 			stageMapReloadStatus_ =
-				"Event Camera active: " + requestedCameraName;
+				"Event Manual Camera active: " + requestedCameraName;
 		}
 	} else if (!activeEventCameraName_.empty()) {
 		// すべてのTriggerから出たら、通常の追従Cameraへ戻す
+		const auto activeCameraFound = std::find_if(
+			stageEventCameras_.begin(),
+			stageEventCameras_.end(),
+			[this](const StageEventCamera& eventCamera)
+			{
+				return eventCamera.sourceName == activeEventCameraName_;
+			});
+		if (activeCameraFound != stageEventCameras_.end()) {
+			activeCameraFound->manualController.reset();
+		}
 		cameraManager->SetActiveCamera("MainCamera");
 		activeEventCameraName_.clear();
 		stageMapReloadStatus_ = "Event finished. MainCamera restored.";
+	}
+}
+
+void Stage1::UpdateEventManualCamera()
+{
+	if (activeEventCameraName_.empty() || !player_) {
+		return;
+	}
+
+	const auto activeCameraFound = std::find_if(
+		stageEventCameras_.begin(),
+		stageEventCameras_.end(),
+		[this](const StageEventCamera& eventCamera)
+		{
+			return eventCamera.sourceName == activeEventCameraName_;
+		});
+	if (activeCameraFound == stageEventCameras_.end() || !activeCameraFound->manualController) {
+		return;
+	}
+
+	// Event Cameraゾーン内だけ、右マウス操作でPlayerの周囲を自由に回せる
+	Input* input = Input::GetInstance();
+	const bool isOrbitInput = input->IsMouseButtonPressed(1);
+	if (isOrbitInput) {
+		activeCameraFound->manualController->AddOrbitYaw(
+			-static_cast<float>(input->GetMouseX()) * 0.005f);
+		activeCameraFound->manualController->AddOrbitPitch(
+			-static_cast<float>(input->GetMouseY()) * 0.003f);
+	}
+	const float distance = std::clamp(
+		activeCameraFound->manualController->GetDistance() -
+			static_cast<float>(input->GetMouseWheel()) * 0.005f,
+		3.0f,
+		20.0f);
+	activeCameraFound->manualController->SetDistance(distance);
+	activeCameraFound->manualController->Update(
+		DirectXCommon::GetInstance()->GetDeltaTime(),
+		player_->GetPosition(),
+		player_->GetMoveDirection(),
+		isOrbitInput,
+		stageSolidObbs_);
+}
+
+void Stage1::UpdateCameraAreas()
+{
+	if (!player_ || !cameraController_) {
+		return;
+	}
+
+	const Sphere playerSphere = player_->GetCollider();
+	StageCameraArea* requestedArea = nullptr;
+	for (StageCameraArea& cameraArea : stageCameraAreas_) {
+		cameraArea.collider = Collision::MakeOBB(
+			cameraArea.transform,
+			cameraArea.colliderLocalCenter,
+			cameraArea.colliderLocalHalfSize);
+		cameraArea.isPlayerInside =
+			Collision::SphereOBB(playerSphere, cameraArea.collider).isCollision;
+		if (cameraArea.isPlayerInside && !requestedArea) {
+			requestedArea = &cameraArea;
+		}
+	}
+
+	if (requestedArea) {
+		if (activeCameraAreaName_ != requestedArea->sourceName) {
+			cameraController_->SetAreaSettings(requestedArea->settings);
+			activeCameraAreaName_ = requestedArea->sourceName;
+			stageMapReloadStatus_ = "Camera Area active: " + activeCameraAreaName_;
+		}
+	} else if (!activeCameraAreaName_.empty()) {
+		cameraController_->ClearAreaSettings();
+		activeCameraAreaName_.clear();
+		stageMapReloadStatus_ = "Camera Area finished. Automatic camera restored.";
 	}
 }
 
