@@ -33,6 +33,8 @@ public:
 		width_ = (width > 0.01f) ? width : 0.01f;
 		height_ = (height > 0.01f) ? height : 0.01f;
 	}
+	// falseにすると、法線が向いている表側から来たRayだけを反射します。
+	void SetReflectBackface(bool isReflectBackface) { isReflectBackface_ = isReflectBackface; }
 
 	const Vector3& GetCenter() const { return center_; }
 	const Vector3& GetNormal() const { return normal_; }
@@ -80,6 +82,10 @@ public:
 
 		const float denominator = MyMath::Dot(normalizedDirection, normal_);
 		if (std::abs(denominator) <= 0.0001f) {
+			return {};
+		}
+		// 大型Mirrorは裏面をただの板として扱い、裏側からのLaserでは反射しない。
+		if (!isReflectBackface_ && denominator >= -0.0001f) {
 			return {};
 		}
 
@@ -132,4 +138,5 @@ private:
 	Vector3 normal_{ 0.0f, 0.0f, 1.0f };
 	float width_ = 4.0f;
 	float height_ = 4.0f;
+	bool isReflectBackface_ = true;
 };

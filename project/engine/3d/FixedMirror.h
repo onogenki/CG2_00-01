@@ -11,7 +11,7 @@ class DirectXCommon;
 class Object3dCommon;
 class SrvManager;
 
-// 部屋やPlayerを映す、動かない大型Mirrorです。
+	// 部屋やPlayerを映す、大型Mirrorです。
 // 一枚ごとに専用の反射Cameraと描画先Textureを持ちます。
 class FixedMirror
 {
@@ -38,6 +38,8 @@ public:
 	void EndReflection();
 	// 専用Textureを板へ貼り、鏡面を描画します。
 	void DrawSurface();
+	// Cameraが鏡の表側にいる時だけ、反射Textureを表示します。
+	void DrawSurface(const Camera& camera);
 
 	Object3d& GetObject() { return object_; }
 	const Object3d& GetObject() const { return object_; }
@@ -48,6 +50,9 @@ public:
 	const MyMath::OBB& GetCollider() const { return collider_; }
 	float GetYaw() const { return yaw_; }
 	float& GetYawForEdit() { return yaw_; }
+	float GetPitch() const { return pitch_; }
+	// 回転ギミック用に、鏡をX軸方向へ倒す角度を設定します。
+	void SetPitch(float pitch) { pitch_ = pitch; }
 	bool IsReady() const { return reflectionTarget_.IsInitialized(); }
 	bool HasReflectionCapture() const { return hasReflectionCapture_; }
 
@@ -59,6 +64,7 @@ private:
 	MyMath::OBB collider_{};
 	Vector3 colliderLocalCenter_{};
 	Vector3 colliderLocalHalfSize_{ 1.0f, 1.0f, 0.05f };
+	float pitch_ = 0.0f;
 	float yaw_ = 0.0f;
 	Matrix4x4 capturedViewProjection_{};
 	bool hasReflectionCapture_ = false;

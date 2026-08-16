@@ -93,6 +93,10 @@ private:
 	void RestoreSceneCameraMatrices();
 	// 持てる鏡の拾う・置く処理と、全鏡を使うレーザー経路を更新します。
 	void UpdateMirrorGameplay();
+	// 反射したレーザーがSwitchへ届く時間を計測し、Doorを滑らかに開きます。
+	void UpdateLightPuzzle(float deltaTime);
+	// 時間に合わせて動く4種類の危険Lightと、床へ出す予告表示を更新します。
+	void UpdateHazardLights(float deltaTime);
 	// Playerを自動追尾する通常Cameraを更新します。
 	void UpdateMainCamera();
 	// Event Cameraゾーン内だけ、右マウスで操作できる手動Cameraを更新します。
@@ -101,6 +105,8 @@ private:
 	Vector3 GetCameraForward(const Camera& camera) const;
 	// ImGuiManager に鏡の設定用 UI の表示を依頼し、変更を板へ反映します。
 	void DrawMirrorDebugUi();
+	// Lightの位置・方向と、反射Puzzleの状態をImGuiManagerへ表示します。
+	void DrawLightPuzzleDebugUi();
 	//床のOBBを、衝突状態に応じた色のワイヤーで表示します。
 	void DrawCollisionDebugUi();
 	// Edit Viewで床・鏡・追加モデルをクリック編集し、LevelDataへ同期します。
@@ -148,17 +154,74 @@ private:
 	size_t reflectionUpdateCursor_ = 0;
 	// 景色は映さず、PlayerがEキーで持ち運べるレーザー反射用の小型鏡です。
 	std::unique_ptr<CarryableMirror> carryableMirror_;
-	// 固定鏡と小型鏡の両方で反射するテスト用レーザーです。
+	// 携帯MirrorでCharge Switchへ送る、シアン色の充電用Laserです。
 	Laser laser_;
 	std::unique_ptr<LaserRenderer> laserRenderer_;
-	// 光の発射位置を見分けるために置く、小さな白い球です。
+	// Charge Laserの発射位置を見分けるために置く、小さな白い球です。
 	Object3d* laserEmitter_ = nullptr;
-	// 初期状態のPlayer正面から光を当て、正面に構えた携帯鏡で受けられる位置にする。
-	Vector3 laserOrigin_{ 0.0f, 1.0f, 7.5f };
-	Vector3 laserDirection_{ 0.0f, -1.8f, -2.5f };
+	// Player正面の携帯鏡へ入射し、大型Mirrorの表側へ届く初期Laserです。
+	Vector3 laserOrigin_{ 0.0f, 2.0f, 7.5f };
+	Vector3 laserDirection_{ 0.0f, -0.85f, -1.2f };
 	// 描画幅0.12の半分を、Playerとの線分判定にも使用します。
 	float laserCollisionRadius_ = 0.06f;
+	// 当たり判定とは別に、画面で見やすくするためのLaser描画幅です。
+	float laserVisualWidth_ = 0.32f;
 	bool isPlayerHitByLaser_ = false;
+	// 大型Mirrorの回転後にDoor Switchへ送る、オレンジ色の専用Laserです。
+	Laser doorLaser_;
+	std::unique_ptr<LaserRenderer> doorLaserRenderer_;
+	Object3d* doorLaserEmitter_ = nullptr;
+	Vector3 doorLaserOrigin_{ -6.0f, 1.0f, 8.0f };
+	Vector3 doorLaserDirection_{ 1.0f, 0.0f, 0.0f };
+	// ---------- 時間制御で動く危険Light ----------
+	// 上の発射点を固定し、床へ当たる先端だけを左右へ振るLightです。
+	std::vector<LaserSegment> ceilingSweepLightSegments_;
+	std::unique_ptr<LaserRenderer> ceilingSweepLightRenderer_;
+	Vector3 ceilingSweepStart_{ -6.0f, 4.5f, 2.0f };
+	float ceilingSweepDistance_ = 5.0f;
+	// 横一直線のLightを、停止とイージング移動を繰り返しながら奥へ動かします。
+	std::vector<LaserSegment> horizontalMoveLightSegments_;
+	std::unique_ptr<LaserRenderer> horizontalMoveLightRenderer_;
+	Vector3 horizontalMoveNearStart_{ 7.0f, 0.30f, -2.0f };
+	Vector3 horizontalMoveFarStart_{ 7.0f, 0.30f, 9.0f };
+	// 下から出るLightと、出現三秒前に床へ出す赤い予告範囲です。
+	std::vector<LaserSegment> bottomPulseLightSegments_;
+	std::vector<LaserSegment> bottomPulseWarningSegments_;
+	std::unique_ptr<LaserRenderer> bottomPulseLightRenderer_;
+	std::unique_ptr<LaserRenderer> bottomPulseWarningRenderer_;
+	Vector3 bottomPulsePosition_{ 5.0f, -1.98f, 12.0f };
+	// 三本が円を描きながら、半径を広げたり閉じたりする上からのLightです。
+	std::vector<LaserSegment> orbitLightSegments_;
+	std::unique_ptr<LaserRenderer> orbitLightRenderer_;
+	Vector3 orbitLightCenter_{ 0.0f, 0.0f, 5.0f };
+	float hazardLightTime_ = 0.0f;
+	bool isPlayerHitByHazardLight_ = false;
+	// 携帯鏡で反射したLaserを受け、一定時間で大型Mirrorを起動する充電Switchです。
+	Object3d* chargeSwitch_ = nullptr;
+	// 初期Laserの経路上に置き、Playerが少し動いても充電しやすい位置です。
+	Vector3 chargeSwitchPosition_{ 0.0f, 0.65f, 7.00f };
+	float chargeSwitchRadius_ = 0.45f;
+	bool isChargeSwitchReceivingLight_ = false;
+	float mirrorCharge_ = 0.0f;
+	bool isLargeMirrorCharged_ = false;
+	// 充電完了後に大型Mirrorを床と平行に横へ振る、0～1の回転進行度です。
+	float largeMirrorRotationAmount_ = 0.0f;
+	// 初期状態は正面を向き、充電後に90度横へ回します。
+	float largeMirrorBaseYaw_ = 3.14159265f;
+	float largeMirrorTargetYawOffset_ = 1.57079633f;
+	// 横向きになった大型Mirrorの反射Laserを受け、Doorを開けるSwitchです。
+	Object3d* doorSwitch_ = nullptr;
+	// Door LaserはX=-6から大型Mirrorの中心へ進み、90度回転後は-Xへ反射する。
+	Vector3 doorSwitchPosition_{ -3.0f, 1.0f, 8.0f };
+	float doorSwitchRadius_ = 0.80f;
+	bool isDoorSwitchReceivingLight_ = false;
+	// Door Switchへ光が当たっている間だけ上へ移動するDoorです。開いたDoorはPlayerの衝突一覧から外します。
+	Object3d* lightDoor_ = nullptr;
+	Vector3 doorClosedPosition_{ -4.5f, -0.5f, 10.0f };
+	Vector3 doorColliderLocalHalfSize_{ 10.0f, 1.5f, 10.0f };
+	OBB doorCollider_{};
+	float doorOpenHeight_ = 4.5f;
+	float doorOpenAmount_ = 0.0f;
 	//WASD移動とジャンプを行う球のプレイヤーです。
 	std::unique_ptr<Player> player_;
 	//見た目とOBBを共有する床モデルです。
@@ -173,6 +236,8 @@ private:
 	std::unique_ptr<CameraController> cameraController_;
 	// PlayerとCameraが共通で使う、床・壁・鏡などの衝突判定用OBBです。
 	std::vector<OBB> stageSolidObbs_;
+	// Lightが通り抜けてはいけない床・Door・壁用のOBBです。Mirrorは反射計算を優先するため含めません。
+	std::vector<OBB> stageLightBlockingObbs_;
 	// Stage1の外部マップファイルが保存された瞬間を検出します。
 	FileHotReload stageMapHotReload_;
 	// Stage1のJSONをゲーム内で編集できる形で保持します。

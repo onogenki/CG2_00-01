@@ -188,8 +188,77 @@ void Stage1::Initialize()
 	if (!laserRenderer_->Initialize(dxCommon, 32)) {
 		laserRenderer_.reset();
 	} else {
-		laserRenderer_->SetBeamWidth(laserCollisionRadius_ * 2.0f);
+		laserRenderer_->SetBeamWidth(laserVisualWidth_);
+		laserRenderer_->SetColor({ 0.05f, 0.95f, 1.00f, 1.0f });
 	}
+	// Door Laserは大型Mirrorが90度回転した後の反射先を、オレンジ色で見せます。
+	auto doorLaserEmitter = CreateObject("sphere.obj");
+	doorLaserEmitter->SetTranslate(doorLaserOrigin_);
+	doorLaserEmitter->SetScale({ 0.65f, 0.65f, 0.65f });
+	doorLaserEmitter->SetTextureOverride("resources/white.png");
+	doorLaserEmitter_ = doorLaserEmitter.get();
+	sceneObjects_.push_back(std::move(doorLaserEmitter));
+	doorLaser_.SetOrigin(doorLaserOrigin_);
+	doorLaser_.SetDirection(doorLaserDirection_);
+	doorLaser_.SetMaxDistance(20.0f);
+	doorLaser_.SetMaxReflectionCount(2);
+	doorLaserRenderer_ = std::make_unique<LaserRenderer>();
+	if (!doorLaserRenderer_->Initialize(dxCommon, 8)) {
+		doorLaserRenderer_.reset();
+	} else {
+		doorLaserRenderer_->SetBeamWidth(laserVisualWidth_);
+		doorLaserRenderer_->SetColor({ 1.00f, 0.38f, 0.05f, 1.0f });
+	}
+
+	// ---------- 時間制御で動く危険Lightの描画準備 ----------
+	// すべてLaserRendererを使うことで、反射PuzzleのLaserと同じ3D空間の太い光として描画します。
+	auto createHazardLightRenderer = [dxCommon](
+		std::unique_ptr<LaserRenderer>& renderer,
+		const Vector4& color,
+		float beamWidth,
+		size_t maximumSegmentCount) {
+		renderer = std::make_unique<LaserRenderer>();
+		if (!renderer->Initialize(dxCommon, maximumSegmentCount)) {
+			renderer.reset();
+			return;
+		}
+		renderer->SetColor(color);
+		renderer->SetBeamWidth(beamWidth);
+	};
+	createHazardLightRenderer(ceilingSweepLightRenderer_, { 0.95f, 0.20f, 1.00f, 1.0f }, 0.42f, 1);
+	createHazardLightRenderer(horizontalMoveLightRenderer_, { 1.00f, 0.82f, 0.10f, 1.0f }, 0.38f, 1);
+	createHazardLightRenderer(bottomPulseLightRenderer_, { 0.15f, 0.55f, 1.00f, 1.0f }, 0.50f, 1);
+	createHazardLightRenderer(bottomPulseWarningRenderer_, { 1.00f, 0.05f, 0.05f, 0.80f }, 2.40f, 1);
+	createHazardLightRenderer(orbitLightRenderer_, { 0.20f, 1.00f, 0.35f, 1.0f }, 0.48f, 3);
+
+	// ---------- 反射Laserで動く充電SwitchとDoorの作成 ----------
+	// 二つのSwitchはSphere、Doorは厚みのあるfloor.objを縮小して表現します。
+	auto chargeSwitch = CreateObject("sphere.obj");
+	chargeSwitch->SetTranslate(chargeSwitchPosition_);
+	chargeSwitch->SetScale({
+		chargeSwitchRadius_ * 2.0f,
+		chargeSwitchRadius_ * 2.0f,
+		chargeSwitchRadius_ * 2.0f,
+	});
+	chargeSwitch->SetTextureOverride("resources/white.png");
+	chargeSwitch_ = chargeSwitch.get();
+	sceneObjects_.push_back(std::move(chargeSwitch));
+
+	auto doorSwitch = CreateObject("sphere.obj");
+	doorSwitch->SetTranslate(doorSwitchPosition_);
+	doorSwitch->SetScale({ doorSwitchRadius_ * 2.0f, doorSwitchRadius_ * 2.0f, doorSwitchRadius_ * 2.0f });
+	doorSwitch->SetTextureOverride("resources/white.png");
+	doorSwitch_ = doorSwitch.get();
+	sceneObjects_.push_back(std::move(doorSwitch));
+
+	auto lightDoor = CreateObject("floor.obj");
+	lightDoor->SetTranslate(doorClosedPosition_);
+	lightDoor->SetScale({ 0.20f, 1.00f, 0.05f });
+	lightDoor_ = lightDoor.get();
+	doorCollider_ = Collision::MakeOBB(
+		lightDoor_->GetTransform(),
+		doorColliderLocalHalfSize_);
+	sceneObjects_.push_back(std::move(lightDoor));
 
 	// 外部ファイルを最初に読み、以降は保存された時だけ再読込する
 	stageMapHotReload_.SetFilePath(kStageMapFilePath);
@@ -219,9 +288,19 @@ void Stage1::Finalize()
 	stageMapData_.reset();
 	floor_ = nullptr;
 	laserEmitter_ = nullptr;
+	doorLaserEmitter_ = nullptr;
+	chargeSwitch_ = nullptr;
+	doorSwitch_ = nullptr;
+	lightDoor_ = nullptr;
 	fixedMirrors_.clear();
 	carryableMirror_.reset();
 	laserRenderer_.reset();
+	doorLaserRenderer_.reset();
+	ceilingSweepLightRenderer_.reset();
+	horizontalMoveLightRenderer_.reset();
+	bottomPulseLightRenderer_.reset();
+	bottomPulseWarningRenderer_.reset();
+	orbitLightRenderer_.reset();
 	cameraController_.reset();
 	player_.reset();
 }
@@ -243,10 +322,17 @@ void Stage1::Update()
 			floorLocalHalfSize_);
 		// 床・鏡・JSONで追加したオブジェクトを、PlayerとCameraが使うOBBとしてまとめる
 		stageSolidObbs_ = { floorObb_ };
+		// Light用はMirrorを除き、床・Door・壁だけを遮るOBBとして別にまとめます。
+		stageLightBlockingObbs_ = { floorObb_ };
 		for (const auto& fixedMirror : fixedMirrors_) {
 			if (fixedMirror) {
 				stageSolidObbs_.push_back(fixedMirror->GetCollider());
 			}
+		}
+		// Doorが開き切るまでは、Playerが通れない壁としてOBBへ加えます。
+		if (lightDoor_ && doorOpenAmount_ < 0.95f) {
+			stageSolidObbs_.push_back(doorCollider_);
+			stageLightBlockingObbs_.push_back(doorCollider_);
 		}
 		// 持っている間はPlayer自身へ当たらないよう、小型鏡を衝突一覧から外します。
 		if (carryableMirror_ && !carryableMirror_->IsCarried()) {
@@ -261,6 +347,7 @@ void Stage1::Update()
 				runtimeObject.colliderLocalCenter,
 				runtimeObject.colliderLocalHalfSize);
 			stageSolidObbs_.push_back(runtimeObject.collider);
+			stageLightBlockingObbs_.push_back(runtimeObject.collider);
 		}
 		if (gameplaySmokeEnabled_) {
 			// 自動検証ではCameraに影響されない世界+X方向へ歩かせます。
@@ -272,6 +359,12 @@ void Stage1::Update()
 				{ 0.0f, 0.0f, 1.0f },
 				smokeControl);
 		} else if (ImGuiManager::GetInstance()->IsGameViewActive()) {
+			// 左クリックで携帯Mirrorを構えている間は、Playerの向きを固定したまま移動・Jumpを弱めます。
+			const bool isMirrorGuarding =
+				carryableMirror_ &&
+				carryableMirror_->IsCarried() &&
+				Input::GetInstance()->IsMouseButtonPressed(0);
+			player_->SetMirrorGuardMode(isMirrorGuarding);
 			// 現在画面に映しているCameraの正面を渡し、WASDを画面基準の移動へ変換する
 			Vector3 cameraForward{ 0.0f, 0.0f, 1.0f };
 			if (Camera* activeCamera = cameraManager->GetActiveCamera()) {
@@ -285,6 +378,8 @@ void Stage1::Update()
 	}
 	UpdateGameplaySmoke(DirectXCommon::GetInstance()->GetDeltaTime());
 	UpdateMirrorGameplay();
+	UpdateLightPuzzle(DirectXCommon::GetInstance()->GetDeltaTime());
+	UpdateHazardLights(DirectXCommon::GetInstance()->GetDeltaTime());
 
 	// ---------- カメラとデバッグ UI の更新 ----------
 	if (ImGuiManager::GetInstance()->IsGameViewActive()) {
@@ -305,8 +400,9 @@ void Stage1::Update()
 			player_->GetCollider(),
 			cameraManager->GetActiveCamera(),
 			player_->IsColliding(),
-			isPlayerHitByLaser_);
+			isPlayerHitByLaser_ || isPlayerHitByHazardLight_);
 	}
+	DrawLightPuzzleDebugUi();
 	if (ImGuiManager::GetInstance()->IsEditViewActive()) {
 		DrawMirrorDebugUi();
 		DrawCollisionDebugUi();
@@ -405,7 +501,7 @@ void Stage1::Draw()
 		if (!fixedMirror) {
 			continue;
 		}
-		fixedMirror->DrawSurface();
+		fixedMirror->DrawSurface(*cameraManager->GetActiveCamera());
 		object3dCommon->SetCommonDrawSetting();
 	}
 	if (carryableMirror_) {
@@ -416,6 +512,24 @@ void Stage1::Draw()
 	}
 	if (laserRenderer_ && cameraManager && cameraManager->GetActiveCamera()) {
 		laserRenderer_->Draw(laser_.GetSegments(), *cameraManager->GetActiveCamera());
+	}
+	if (doorLaserRenderer_ && cameraManager && cameraManager->GetActiveCamera()) {
+		doorLaserRenderer_->Draw(doorLaser_.GetSegments(), *cameraManager->GetActiveCamera());
+	}
+	if (ceilingSweepLightRenderer_ && cameraManager && cameraManager->GetActiveCamera()) {
+		ceilingSweepLightRenderer_->Draw(ceilingSweepLightSegments_, *cameraManager->GetActiveCamera());
+	}
+	if (horizontalMoveLightRenderer_ && cameraManager && cameraManager->GetActiveCamera()) {
+		horizontalMoveLightRenderer_->Draw(horizontalMoveLightSegments_, *cameraManager->GetActiveCamera());
+	}
+	if (bottomPulseLightRenderer_ && cameraManager && cameraManager->GetActiveCamera()) {
+		bottomPulseLightRenderer_->Draw(bottomPulseLightSegments_, *cameraManager->GetActiveCamera());
+	}
+	if (bottomPulseWarningRenderer_ && cameraManager && cameraManager->GetActiveCamera()) {
+		bottomPulseWarningRenderer_->Draw(bottomPulseWarningSegments_, *cameraManager->GetActiveCamera());
+	}
+	if (orbitLightRenderer_ && cameraManager && cameraManager->GetActiveCamera()) {
+		orbitLightRenderer_->Draw(orbitLightSegments_, *cameraManager->GetActiveCamera());
 	}
 
 	//Post Effectが有効なときは、SceneのRenderTextureへ効果を適用してからGame Viewへ表示する
@@ -513,6 +627,24 @@ void Stage1::DrawFixedMirrorReflections()
 		if (laserRenderer_) {
 			laserRenderer_->Draw(laser_.GetSegments(), reflectionCamera);
 		}
+		if (doorLaserRenderer_) {
+			doorLaserRenderer_->Draw(doorLaser_.GetSegments(), reflectionCamera);
+		}
+		if (ceilingSweepLightRenderer_) {
+			ceilingSweepLightRenderer_->Draw(ceilingSweepLightSegments_, reflectionCamera);
+		}
+		if (horizontalMoveLightRenderer_) {
+			horizontalMoveLightRenderer_->Draw(horizontalMoveLightSegments_, reflectionCamera);
+		}
+		if (bottomPulseLightRenderer_) {
+			bottomPulseLightRenderer_->Draw(bottomPulseLightSegments_, reflectionCamera);
+		}
+		if (bottomPulseWarningRenderer_) {
+			bottomPulseWarningRenderer_->Draw(bottomPulseWarningSegments_, reflectionCamera);
+		}
+		if (orbitLightRenderer_) {
+			orbitLightRenderer_->Draw(orbitLightSegments_, reflectionCamera);
+		}
 
 		fixedMirror->EndReflection();
 		RestoreSceneCameraMatrices();
@@ -571,23 +703,39 @@ void Stage1::UpdateMirrorGameplay()
 	const bool interactPressed =
 		ImGuiManager::GetInstance()->IsGameViewActive() &&
 		Input::GetInstance()->TriggerKey(DIK_E);
+	// Game Viewで左クリックを長押ししている間だけ、Mouse操作でMirrorを左右へ構えます。
+	const bool isMirrorAiming =
+		ImGuiManager::GetInstance()->IsGameViewActive() &&
+		carryableMirror_->IsCarried() &&
+		Input::GetInstance()->IsMouseButtonPressed(0);
+	const float mirrorAimMouseX = isMirrorAiming
+		? static_cast<float>(Input::GetInstance()->GetMouseX())
+		: 0.0f;
 	carryableMirror_->Update(
+		DirectXCommon::GetInstance()->GetDeltaTime(),
 		player_->GetPosition(),
 		player_->GetFacingYaw(),
-		interactPressed);
+		interactPressed,
+		isMirrorAiming,
+		mirrorAimMouseX);
 
-	// レーザー側は鏡の種類を知らず、共通のMirror面として二種類を扱います。
-	std::vector<const Mirror*> laserMirrors;
-	laserMirrors.reserve(fixedMirrors_.size() + 1);
+	// Charge Laserも携帯Mirror・大型Mirrorの両方で、表側へ当たれば常に反射します。
+	std::vector<const Mirror*> chargeLaserMirrors;
+	chargeLaserMirrors.reserve(fixedMirrors_.size() + 1);
 	for (const auto& fixedMirror : fixedMirrors_) {
 		if (fixedMirror) {
-			laserMirrors.push_back(&fixedMirror->GetMirror());
+			chargeLaserMirrors.push_back(&fixedMirror->GetMirror());
 		}
 	}
-	laserMirrors.push_back(&carryableMirror_->GetMirror());
+	chargeLaserMirrors.push_back(&carryableMirror_->GetMirror());
 	laser_.SetOrigin(laserOrigin_);
 	laser_.SetDirection(laserDirection_);
-	laser_.Update(laserMirrors);
+	laser_.Update(chargeLaserMirrors);
+	laser_.ClipByObbs(stageLightBlockingObbs_, laserVisualWidth_ * 0.5f);
+	if (laserEmitter_) {
+		// ImGuiで動かした発射装置の見た目も、計算に使用するOriginと同じ位置へ置く。
+		laserEmitter_->SetTranslate(laserOrigin_);
+	}
 
 	// 鏡で分割された各Laser線分と、Playerの球Colliderを3D空間で判定する
 	isPlayerHitByLaser_ = false;
@@ -604,6 +752,258 @@ void Stage1::UpdateMirrorGameplay()
 	}
 }
 
+void Stage1::UpdateLightPuzzle(float deltaTime)
+{
+	if (!carryableMirror_ || !chargeSwitch_ || !doorSwitch_ || !lightDoor_ ||
+		fixedMirrors_.empty() || !fixedMirrors_.front()) {
+		return;
+	}
+
+	const std::vector<LaserSegment>& segments = laser_.GetSegments();
+	// ---------- 第1段階: 携帯鏡の反射光で大型Mirrorを充電 ----------
+	isChargeSwitchReceivingLight_ = false;
+	const Sphere chargeSwitchSphere{ chargeSwitchPosition_, chargeSwitchRadius_ };
+	for (const LaserSegment& segment : segments) {
+		// Switchは直射光でも反射光でも、光線が届けば反応します。
+		if (Collision::SegmentSphere(
+			segment.start,
+			segment.end,
+			chargeSwitchSphere,
+			laserCollisionRadius_).isHit) {
+			isChargeSwitchReceivingLight_ = true;
+			break;
+		}
+	}
+	if (!isLargeMirrorCharged_) {
+		// 反射光を当て続けると蓄積し、外れると徐々に減る充電式Switchです。
+		const float chargeTarget = isChargeSwitchReceivingLight_ ? 1.0f : 0.0f;
+		const float chargeSpeed = isChargeSwitchReceivingLight_ ? 6.0f : 2.0f;
+		const float chargeRate = (std::min)(chargeSpeed * (std::max)(deltaTime, 0.0f), 1.0f);
+		mirrorCharge_ += (chargeTarget - mirrorCharge_) * chargeRate;
+		if (mirrorCharge_ >= 0.98f) {
+			mirrorCharge_ = 1.0f;
+			isLargeMirrorCharged_ = true;
+		}
+	}
+
+	// 充電完了後、大型MirrorをY軸へ横方向に振り、反射先をDoor Switchへ変えます。
+	const float mirrorRotationTarget = isLargeMirrorCharged_ ? 1.0f : 0.0f;
+	const float mirrorRotationRate = (std::min)(1.8f * (std::max)(deltaTime, 0.0f), 1.0f);
+	largeMirrorRotationAmount_ +=
+		(mirrorRotationTarget - largeMirrorRotationAmount_) * mirrorRotationRate;
+	FixedMirror& largeMirror = *fixedMirrors_.front();
+	largeMirror.SetPitch(0.0f);
+	largeMirror.GetYawForEdit() =
+		largeMirrorBaseYaw_ +
+		largeMirrorTargetYawOffset_ * largeMirrorRotationAmount_;
+	largeMirror.SyncVisualAndCollider();
+
+	// ---------- 第2段階: 横向き大型Mirrorの反射光でDoorを開閉 ----------
+	isDoorSwitchReceivingLight_ = false;
+	// Door Laserは大型Mirrorだけを対象にし、携帯Mirrorの位置へ影響されません。
+	const std::vector<const Mirror*> doorLaserMirrors{
+		&largeMirror.GetMirror(),
+	};
+	doorLaser_.SetOrigin(doorLaserOrigin_);
+	doorLaser_.SetDirection(doorLaserDirection_);
+	doorLaser_.Update(doorLaserMirrors);
+	doorLaser_.ClipByObbs(stageLightBlockingObbs_, laserVisualWidth_ * 0.5f);
+	if (doorLaserEmitter_) {
+		doorLaserEmitter_->SetTranslate(doorLaserOrigin_);
+	}
+	const std::vector<LaserSegment>& doorSegments = doorLaser_.GetSegments();
+	const Sphere doorSwitchSphere{ doorSwitchPosition_, doorSwitchRadius_ };
+	for (const LaserSegment& segment : doorSegments) {
+		// Door Switchも、直射光・大型Mirrorでの反射光のどちらでも反応します。
+		if (Collision::SegmentSphere(
+			segment.start,
+			segment.end,
+			doorSwitchSphere,
+			laserCollisionRadius_).isHit) {
+			isDoorSwitchReceivingLight_ = true;
+			break;
+		}
+	}
+
+	// Doorは大型Mirrorの反射光が当たっている間だけ、滑らかに開きます。
+	const float doorTarget = isDoorSwitchReceivingLight_ ? 1.0f : 0.0f;
+	const float doorRate = (std::min)(3.0f * (std::max)(deltaTime, 0.0f), 1.0f);
+	doorOpenAmount_ += (doorTarget - doorOpenAmount_) * doorRate;
+	lightDoor_->SetTranslate({
+		doorClosedPosition_.x,
+		doorClosedPosition_.y + doorOpenHeight_ * doorOpenAmount_,
+		doorClosedPosition_.z,
+	});
+	doorCollider_ = Collision::MakeOBB(
+		lightDoor_->GetTransform(),
+		doorColliderLocalHalfSize_);
+
+	// 二つのSwitchは、充電量または受光中に少し大きくして画面上でも見分けられるようにする。
+	const float chargeSwitchScale = chargeSwitchRadius_ * 2.0f * (1.0f + mirrorCharge_ * 0.35f);
+	chargeSwitch_->SetTranslate(chargeSwitchPosition_);
+	chargeSwitch_->SetScale({ chargeSwitchScale, chargeSwitchScale, chargeSwitchScale });
+	const float doorSwitchScale = doorSwitchRadius_ * 2.0f * (isDoorSwitchReceivingLight_ ? 1.20f : 1.0f);
+	doorSwitch_->SetTranslate(doorSwitchPosition_);
+	doorSwitch_->SetScale({ doorSwitchScale, doorSwitchScale, doorSwitchScale });
+}
+
+void Stage1::UpdateHazardLights(float deltaTime)
+{
+	const float safeDeltaTime = (std::max)(deltaTime, 0.0f);
+	hazardLightTime_ += safeDeltaTime;
+	const auto easeInOutSine = [](float progress) {
+		const float clampedProgress = std::clamp(progress, 0.0f, 1.0f);
+		return -(std::cos(clampedProgress * std::numbers::pi_v<float>) - 1.0f) * 0.5f;
+	};
+	const auto easeOutSine = [](float progress) {
+		const float clampedProgress = std::clamp(progress, 0.0f, 1.0f);
+		return std::sin(clampedProgress * std::numbers::pi_v<float> * 0.5f);
+	};
+	const auto easeInSine = [](float progress) {
+		const float clampedProgress = std::clamp(progress, 0.0f, 1.0f);
+		return 1.0f - std::cos(clampedProgress * std::numbers::pi_v<float> * 0.5f);
+	};
+
+	// ---------- 1. 上の始点を固定し、床へ当たる先端だけを左右へ振るLight ----------
+	const float ceilingEndOffset = std::sin(hazardLightTime_ * 1.30f) * ceilingSweepDistance_;
+	ceilingSweepLightSegments_ = {
+		{
+			ceilingSweepStart_,
+			{ ceilingSweepStart_.x + ceilingEndOffset, -4.00f, ceilingSweepStart_.z },
+			false,
+			0,
+		},
+	};
+
+	// ---------- 2. 横一直線のLightを、三秒停止してから奥・手前へ往復させる ----------
+	const float horizontalCycleTime = std::fmod(hazardLightTime_, 10.0f);
+	float horizontalMoveProgress = 0.0f;
+	if (horizontalCycleTime < 3.0f) {
+		horizontalMoveProgress = 0.0f;
+	} else if (horizontalCycleTime < 5.0f) {
+		horizontalMoveProgress = easeInOutSine((horizontalCycleTime - 3.0f) / 2.0f);
+	} else if (horizontalCycleTime < 8.0f) {
+		horizontalMoveProgress = 1.0f;
+	} else {
+		horizontalMoveProgress = 1.0f - easeInOutSine((horizontalCycleTime - 8.0f) / 2.0f);
+	}
+	const Vector3 horizontalStart{
+		horizontalMoveNearStart_.x + (horizontalMoveFarStart_.x - horizontalMoveNearStart_.x) * horizontalMoveProgress,
+		horizontalMoveNearStart_.y + (horizontalMoveFarStart_.y - horizontalMoveNearStart_.y) * horizontalMoveProgress,
+		horizontalMoveNearStart_.z + (horizontalMoveFarStart_.z - horizontalMoveNearStart_.z) * horizontalMoveProgress,
+	};
+	horizontalMoveLightSegments_ = {
+		{
+			horizontalStart,
+			{ horizontalStart.x - 14.0f, horizontalStart.y, horizontalStart.z },
+			false,
+			0,
+		},
+	};
+
+	// ---------- 3. 下から出るLightは五秒表示・十秒停止、出現三秒前だけ床を赤く予告 ----------
+	const float bottomPulseCycleTime = std::fmod(hazardLightTime_, 15.0f);
+	const bool isBottomPulseActive = bottomPulseCycleTime < 5.0f;
+	const bool isBottomPulseWarning = bottomPulseCycleTime >= 12.0f;
+	bottomPulseLightSegments_.clear();
+	bottomPulseWarningSegments_.clear();
+	if (isBottomPulseActive) {
+		bottomPulseLightSegments_.push_back({
+			bottomPulsePosition_,
+			{ bottomPulsePosition_.x, 4.50f, bottomPulsePosition_.z },
+			false,
+			0,
+		});
+	}
+	if (isBottomPulseWarning) {
+		// 床上の太い赤線を、Lightが出る危険範囲として三秒間だけ表示します。
+		bottomPulseWarningSegments_.push_back({
+			{ bottomPulsePosition_.x - 1.40f, -1.96f, bottomPulsePosition_.z },
+			{ bottomPulsePosition_.x + 1.40f, -1.96f, bottomPulsePosition_.z },
+			false,
+			0,
+		});
+	}
+
+	// ---------- 4. 三本の上向きLightを、回転しながら広げたり閉じたりさせる ----------
+	const float orbitCycleProgress = std::fmod(hazardLightTime_, 4.0f) / 4.0f;
+	const bool isOrbitClosing = orbitCycleProgress >= 0.5f;
+	const float orbitRadiusProgress = isOrbitClosing
+		? 1.0f - easeInSine((orbitCycleProgress - 0.5f) * 2.0f)
+		: easeOutSine(orbitCycleProgress * 2.0f);
+	const float orbitRadius = 1.20f + (5.00f - 1.20f) * orbitRadiusProgress;
+	const float orbitBeamWidth = isOrbitClosing
+		? 0.24f + (0.48f - 0.24f) * orbitRadiusProgress
+		: 0.48f;
+	if (orbitLightRenderer_) {
+		// 閉じるほど細くして、Light全体が小さくなったように見せます。
+		orbitLightRenderer_->SetBeamWidth(orbitBeamWidth);
+	}
+	orbitLightSegments_.clear();
+	const float orbitBaseAngle = hazardLightTime_ * 1.80f;
+	for (int lightIndex = 0; lightIndex < 3; ++lightIndex) {
+		const float angle = orbitBaseAngle + std::numbers::pi_v<float> * 2.0f * static_cast<float>(lightIndex) / 3.0f;
+		const Vector3 orbitPosition{
+			orbitLightCenter_.x + std::cos(angle) * orbitRadius,
+			4.50f,
+			orbitLightCenter_.z + std::sin(angle) * orbitRadius,
+		};
+		orbitLightSegments_.push_back({
+			orbitPosition,
+			{ orbitPosition.x, -4.00f, orbitPosition.z },
+			false,
+			0,
+		});
+	}
+
+	// 床・Door・JSONでColliderを設定した壁へ最初に当たった位置で、危険Lightを切り詰めます。
+	// MirrorはstageLightBlockingObbs_へ入れていないため、反射PuzzleのLaser処理とは干渉しません。
+	const auto clipLightByStageObbs = [&](std::vector<LaserSegment>& segments) {
+		for (LaserSegment& segment : segments) {
+			float nearestT = 1.0f;
+			for (const OBB& blockingObb : stageLightBlockingObbs_) {
+				const Collision::SegmentHit hit = Collision::SegmentOBB(
+					segment.start,
+					segment.end,
+					blockingObb);
+				if (hit.isHit && hit.t < nearestT) {
+					nearestT = hit.t;
+				}
+			}
+			if (nearestT < 1.0f) {
+				segment.end = {
+					segment.start.x + (segment.end.x - segment.start.x) * nearestT,
+					segment.start.y + (segment.end.y - segment.start.y) * nearestT,
+					segment.start.z + (segment.end.z - segment.start.z) * nearestT,
+				};
+			}
+		}
+	};
+	clipLightByStageObbs(ceilingSweepLightSegments_);
+	clipLightByStageObbs(horizontalMoveLightSegments_);
+	clipLightByStageObbs(bottomPulseLightSegments_);
+	clipLightByStageObbs(orbitLightSegments_);
+
+	// 有効な危険LightだけPlayerの球Colliderと判定し、既存の赤いHit Debug表示へ渡します。
+	isPlayerHitByHazardLight_ = false;
+	if (player_) {
+		const Sphere playerSphere = player_->GetCollider();
+		const auto isHitBySegments = [&](const std::vector<LaserSegment>& segments) {
+			for (const LaserSegment& segment : segments) {
+				if (Collision::SegmentSphere(segment.start, segment.end, playerSphere, 0.16f).isHit) {
+					return true;
+				}
+			}
+			return false;
+		};
+		isPlayerHitByHazardLight_ =
+			isHitBySegments(ceilingSweepLightSegments_) ||
+			isHitBySegments(horizontalMoveLightSegments_) ||
+			isHitBySegments(bottomPulseLightSegments_) ||
+			isHitBySegments(orbitLightSegments_);
+	}
+}
+
 void Stage1::InitializeGameplaySmoke()
 {
 	gameplaySmokeEnabled_ = IsEnvironmentEnabled("CG2_STAGE1_GAMEPLAY_SMOKE");
@@ -615,10 +1015,10 @@ void Stage1::InitializeGameplaySmoke()
 	const Vector3 mirrorPosition = carryableMirror_->GetMirror().GetCenter();
 
 	// 鏡の中心にPlayerがいる条件を渡し、Eキーと同じ拾う処理を直接確認します。
-	carryableMirror_->Update(mirrorPosition, 0.0f, true);
+	carryableMirror_->Update(1.0f, mirrorPosition, 0.0f, true);
 	gameplaySmokePickedUpMirror_ = carryableMirror_->IsCarried();
 	// 持った状態のままPlayer正面へ移動させてから、反射判定を行います。
-	carryableMirror_->Update(mirrorPosition, 0.0f, false);
+	carryableMirror_->Update(1.0f, mirrorPosition, 0.0f, false);
 
 	// 携帯中の鏡へ正面から光を当て、衝突後に反射線分が作られることを確認します。
 	const Mirror& carryMirror = carryableMirror_->GetMirror();
@@ -673,7 +1073,7 @@ void Stage1::InitializeGameplaySmoke()
 		laserHitsSphere(carriedUnblockedLaser, carriedPlayerSphere) &&
 		carriedBlockedLaser.GetSegments().size() >= 2 &&
 		!laserHitsSphere(carriedBlockedLaser, carriedPlayerSphere);
-	carryableMirror_->Update(mirrorPosition, 0.0f, true);
+	carryableMirror_->Update(1.0f, mirrorPosition, 0.0f, true);
 	gameplaySmokeDroppedMirror_ = !carryableMirror_->IsCarried();
 
 	// 鏡がない時はPlayerへ届き、途中に鏡がある時は入射線が鏡で止まることを確認します。
@@ -929,6 +1329,50 @@ void Stage1::DrawMirrorDebugUi()
 				return false;
 			};
 			syncMirrorData(stageMapData_->objects);
+		}
+	}
+}
+
+void Stage1::DrawLightPuzzleDebugUi()
+{
+	if (!carryableMirror_ || !chargeSwitch_ || !doorSwitch_ || !lightDoor_) {
+		return;
+	}
+
+	// ImGui の描画と入力は ImGuiManager に集約し、Stage1 はゲーム用の値だけを渡します。
+	if (ImGuiManager::GetInstance()->LightPuzzleDebugWindow(
+		laserOrigin_,
+		laserDirection_,
+		doorLaserOrigin_,
+		doorLaserDirection_,
+		laserVisualWidth_,
+		chargeSwitchPosition_,
+		doorSwitchPosition_,
+		largeMirrorTargetYawOffset_,
+		carryableMirror_->IsCarried(),
+		isChargeSwitchReceivingLight_,
+		mirrorCharge_,
+		isLargeMirrorCharged_,
+		largeMirrorRotationAmount_,
+		isDoorSwitchReceivingLight_,
+		doorOpenAmount_)) {
+		// Laserは方向ベクトルの長さではなく向きだけを使うため、編集後に正規化します。
+		if (Length(laserDirection_) > 0.0001f) {
+			laserDirection_ = Normalize(laserDirection_);
+		} else {
+			// 全て0にした場合は、前フレームの代わりに安全な正面方向へ戻します。
+			laserDirection_ = { 0.0f, 0.0f, -1.0f };
+		}
+		if (Length(doorLaserDirection_) > 0.0001f) {
+			doorLaserDirection_ = Normalize(doorLaserDirection_);
+		} else {
+			doorLaserDirection_ = { 1.0f, 0.0f, 0.0f };
+		}
+		if (laserRenderer_) {
+			laserRenderer_->SetBeamWidth(laserVisualWidth_);
+		}
+		if (doorLaserRenderer_) {
+			doorLaserRenderer_->SetBeamWidth(laserVisualWidth_);
 		}
 	}
 }

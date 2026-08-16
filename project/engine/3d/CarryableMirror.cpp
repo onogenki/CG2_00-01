@@ -25,9 +25,12 @@ void CarryableMirror::Initialize(
 }
 
 void CarryableMirror::Update(
+	float deltaTime,
 	const Vector3& playerPosition,
 	float playerFacingYaw,
-	bool interactPressed)
+	bool interactPressed,
+	bool isAiming,
+	float horizontalAimInput)
 {
 	if (interactPressed) {
 		if (isCarried_) {
@@ -40,15 +43,27 @@ void CarryableMirror::Update(
 			};
 			if (Length(difference) <= pickupDistance_) {
 				isCarried_ = true;
+				aimYawOffset_ = 0.0f;
 			}
 		}
 	}
 
 	if (isCarried_) {
+		if (isAiming) {
+			// Mouseを右へ動かすとMirrorもPlayerの右前方へ動きます。
+			aimYawOffset_ += horizontalAimInput * aimSensitivity_;
+			aimYawOffset_ = std::clamp(aimYawOffset_, -maxAimYawOffset_, maxAimYawOffset_);
+		} else {
+			// 構える操作を終えると、MirrorはPlayerの正面へ滑らかに戻ります。
+			const float returnRate = 1.0f - std::exp(-holdTurnFollowSpeed_ * (std::max)(deltaTime, 0.0f));
+			aimYawOffset_ += (0.0f - aimYawOffset_) * returnRate;
+		}
+
+		const float heldYaw = playerFacingYaw + aimYawOffset_;
 		const Vector3 playerForward{
-			std::sin(playerFacingYaw),
+			std::sin(heldYaw),
 			0.0f,
-			std::cos(playerFacingYaw),
+			std::cos(heldYaw),
 		};
 		const Vector3 heldPosition{
 			playerPosition.x + playerForward.x * holdDistance_,
@@ -56,7 +71,14 @@ void CarryableMirror::Update(
 			playerPosition.z + playerForward.z * holdDistance_,
 		};
 		// 板の表側がPlayerと反対方向を向くよう、Playerの正面へ180度足します。
-		ApplyTransform(heldPosition, playerFacingYaw + 3.14159265f);
+		const float targetYaw = heldYaw + 3.14159265f;
+		// 角度の差を-π～πへ収めると、359度から0度へ回る時も遠回りしません。
+		const float yawDifference = std::remainder(targetYaw - yaw_, 2.0f * 3.14159265f);
+		// 指数補間で、フレームレートに依存せず自然に鏡の向きだけを追従させます。
+		const float followSpeed = isAiming ? holdTurnFollowSpeed_ * 2.5f : holdTurnFollowSpeed_;
+		const float followRate = 1.0f - std::exp(-followSpeed * (std::max)(deltaTime, 0.0f));
+		const float smoothedYaw = yaw_ + yawDifference * followRate;
+		ApplyTransform(heldPosition, smoothedYaw);
 	} else {
 		// 落とした後もColliderを現在のTransformへ追従させます。
 		collider_ = Collision::MakeOBB(object_.GetTransform(), colliderLocalHalfSize_);

@@ -96,6 +96,24 @@ public:
 		float& mirrorYaw,
 		const Camera& reflectionCamera,
 		bool hasReflectionCapture);
+	// 反射Laserの発射位置・方向と、Switch・Doorの進行状態を表示します。
+	// 発射位置または方向が変更されたフレームだけtrueを返します。
+	bool LightPuzzleDebugWindow(
+		Vector3& laserOrigin,
+		Vector3& laserDirection,
+		Vector3& doorLaserOrigin,
+		Vector3& doorLaserDirection,
+		float& laserVisualWidth,
+		Vector3& chargeSwitchPosition,
+		Vector3& doorSwitchPosition,
+		float& largeMirrorTargetYawOffset,
+		bool isMirrorCarried,
+		bool isChargeSwitchReceivingLight,
+		float mirrorCharge,
+		bool isLargeMirrorCharged,
+		float largeMirrorRotationAmount,
+		bool isDoorSwitchReceivingLight,
+		float doorOpenAmount);
 	//OBBをゲーム画面へワイヤー表示し、衝突中は赤、非衝突時は青で描画する
 	void DrawObbCollisionDebug(const MyMath::OBB& obb, const MyMath::Sphere& sphere, const Camera* camera, bool isColliding);
 	// Playerの球Colliderを表示する。物体接触中は青、Laser接触中は優先して黄色にする。

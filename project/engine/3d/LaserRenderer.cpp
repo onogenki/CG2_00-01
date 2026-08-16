@@ -16,7 +16,8 @@ bool LaserRenderer::Initialize(DirectXCommon* dxCommon, size_t maximumSegmentCou
 	maximumSegmentCount_ = (std::max)(maximumSegmentCount, size_t{ 1 });
 
 	vertexResource_ = dxCommon_->CreateBufferResource(
-		sizeof(Vertex) * maximumSegmentCount_ * 6);
+		// 一本のLightを二枚の板で交差させ、どの方向から見ても円柱に近い太さに見せます。
+		sizeof(Vertex) * maximumSegmentCount_ * 12);
 	constantResource_ = dxCommon_->CreateBufferResource(sizeof(ConstantData));
 	if (!vertexResource_ || !constantResource_) {
 		return false;
@@ -28,7 +29,7 @@ bool LaserRenderer::Initialize(DirectXCommon* dxCommon, size_t maximumSegmentCou
 	}
 
 	vertexBufferView_.BufferLocation = vertexResource_->GetGPUVirtualAddress();
-	vertexBufferView_.SizeInBytes = static_cast<UINT>(sizeof(Vertex) * maximumSegmentCount_ * 6);
+	vertexBufferView_.SizeInBytes = static_cast<UINT>(sizeof(Vertex) * maximumSegmentCount_ * 12);
 	vertexBufferView_.StrideInBytes = sizeof(Vertex);
 	return CreateRootSignature() && CreateGraphicsPipeline();
 }
@@ -74,41 +75,50 @@ void LaserRenderer::Draw(const std::vector<LaserSegment>& segments, const Camera
 		const float halfWidth = (std::max)(beamWidth_, 0.001f) * 0.5f;
 		side = Multiply(halfWidth, side);
 
-		const Vector3 startLeft{
-			segment.start.x - side.x,
-			segment.start.y - side.y,
-			segment.start.z - side.z,
-		};
-		const Vector3 startRight{
-			segment.start.x + side.x,
-			segment.start.y + side.y,
-			segment.start.z + side.z,
-		};
-		const Vector3 endLeft{
-			segment.end.x - side.x,
-			segment.end.y - side.y,
-			segment.end.z - side.z,
-		};
-		const Vector3 endRight{
-			segment.end.x + side.x,
-			segment.end.y + side.y,
-			segment.end.z + side.z,
-		};
-		const Vector3 quadVertices[6]{
-			startLeft,
-			startRight,
-			endRight,
-			startLeft,
-			endRight,
-			endLeft,
-		};
-		for (const Vector3& position : quadVertices) {
-			mappedVertices_[drawVertexCount++].position = {
-				position.x,
-				position.y,
-				position.z,
-				1.0f,
+		auto appendQuad = [&](const Vector3& quadSide) {
+			const Vector3 startLeft{
+				segment.start.x - quadSide.x,
+				segment.start.y - quadSide.y,
+				segment.start.z - quadSide.z,
 			};
+			const Vector3 startRight{
+				segment.start.x + quadSide.x,
+				segment.start.y + quadSide.y,
+				segment.start.z + quadSide.z,
+			};
+			const Vector3 endLeft{
+				segment.end.x - quadSide.x,
+				segment.end.y - quadSide.y,
+				segment.end.z - quadSide.z,
+			};
+			const Vector3 endRight{
+				segment.end.x + quadSide.x,
+				segment.end.y + quadSide.y,
+				segment.end.z + quadSide.z,
+			};
+			const Vector3 quadVertices[6]{
+				startLeft,
+				startRight,
+				endRight,
+				startLeft,
+				endRight,
+				endLeft,
+			};
+			for (const Vector3& position : quadVertices) {
+				mappedVertices_[drawVertexCount++].position = {
+					position.x,
+					position.y,
+					position.z,
+					1.0f,
+				};
+			}
+		};
+		appendQuad(side);
+		// 一枚目に対して直角の板を足し、平面の線ではなく円柱状のLightに近づけます。
+		Vector3 crossSide = Cross(beamDirection, side);
+		if (Length(crossSide) > 0.0001f) {
+			crossSide = Multiply(halfWidth, Normalize(crossSide));
+			appendQuad(crossSide);
 		}
 	}
 	mappedConstantData_->viewProjection = camera.GetViewProjectionMatrix();

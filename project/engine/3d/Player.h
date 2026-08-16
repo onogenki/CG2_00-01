@@ -35,6 +35,9 @@ public:
 		const std::vector<OBB>& solidObbs,
 		const Vector3& cameraForward,
 		const ControlInput& controlInput);
+	// 携帯Mirrorを構えている間は、移動中でもPlayerの向きを固定します。
+	void SetMirrorGuardMode(bool isMirrorGuardMode) { isMirrorGuardMode_ = isMirrorGuardMode; }
+	bool IsMirrorGuardMode() const { return isMirrorGuardMode_; }
 
 	//Stage1の共通描画処理で使用する3Dオブジェクトを取得する
 	Object3d& GetObject() { return object_; }
@@ -63,10 +66,16 @@ private:
 	float radius_ = 1.0f;
 	//WASDで移動する速さ
 	float moveSpeed_ = 4.0f;
+	// Mirrorを構えている間に掛ける移動速度の倍率です。
+	float mirrorGuardMoveSpeedRate_ = 0.55f;
 	//毎秒ごとにY方向へ加える重力
 	float gravity_ = -18.0f;
 	//ジャンプした瞬間に与える上向きの速さ
 	float jumpSpeed_ = 7.0f;
+	// Mirrorを構えている間に掛けるジャンプ速度の倍率です。
+	float mirrorGuardJumpSpeedRate_ = 0.70f;
+	// 左クリックでMirrorを構えている間だけtrueになり、移動してもPlayerの向きを変えません。
+	bool isMirrorGuardMode_ = false;
 	//床に立っているかどうか
 	bool isGrounded_ = false;
 	//床のOBBと重なっているかどうか
