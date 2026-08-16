@@ -1,5 +1,6 @@
 #include "Laser.h"
 
+#include "Collision.h"
 #include "MyMath.h"
 #include <limits>
 
@@ -63,5 +64,37 @@ void Laser::Update(const std::vector<const Mirror*>& mirrors)
 			nearestHit.position.z + rayDirection.z * kSurfaceOffset,
 		};
 		remainingDistance -= kSurfaceOffset;
+	}
+}
+
+void Laser::ClipByObbs(const std::vector<OBB>& blockingObbs, float padding)
+{
+	for (size_t segmentIndex = 0; segmentIndex < segments_.size(); ++segmentIndex) {
+		LaserSegment& segment = segments_[segmentIndex];
+		float nearestT = 1.0f;
+		for (const OBB& blockingObb : blockingObbs) {
+			const Collision::SegmentHit hit = Collision::SegmentOBB(
+				segment.start,
+				segment.end,
+				blockingObb,
+				padding);
+			if (hit.isHit && hit.t < nearestT) {
+				nearestT = hit.t;
+			}
+		}
+		if (nearestT >= 0.9999f) {
+			continue;
+		}
+
+		// 鏡へ届く前に床・壁へ当たったため、反射せずその位置でLightを止めます。
+		segment.end = {
+			segment.start.x + (segment.end.x - segment.start.x) * nearestT,
+			segment.start.y + (segment.end.y - segment.start.y) * nearestT,
+			segment.start.z + (segment.end.z - segment.start.z) * nearestT,
+		};
+		segment.hitMirror = false;
+		segment.mirrorIndex = 0;
+		segments_.erase(segments_.begin() + static_cast<std::ptrdiff_t>(segmentIndex + 1), segments_.end());
+		return;
 	}
 }

@@ -29,6 +29,8 @@ bool FixedMirror::Initialize(
 	const float safeHeight = (std::max)(height, 0.1f);
 	yaw_ = yaw;
 	mirror_ = Mirror(center, { std::sin(yaw_), 0.0f, std::cos(yaw_) }, safeWidth, safeHeight);
+	// 大型Mirrorの裏面は反射せず、通常の板として扱います。
+	mirror_.SetReflectBackface(false);
 
 	object_.Initialize(object3dCommon);
 	object_.SetModel(modelName);
@@ -64,8 +66,17 @@ void FixedMirror::SyncVisualAndCollider()
 	// plane.objは-1から+1の板なので、幅と高さの半分をScaleへ設定します。
 	object_.SetTranslate(mirror_.GetCenter());
 	object_.SetScale({ mirror_.GetWidth() * 0.5f, mirror_.GetHeight() * 0.5f, 1.0f });
-	object_.SetRotate({ 0.0f, yaw_, 0.0f });
-	mirror_.SetNormal({ std::sin(yaw_), 0.0f, std::cos(yaw_) });
+	object_.SetRotate({ pitch_, yaw_, 0.0f });
+	// 3D回転後のローカル+Zを取り出し、Laserと反射Cameraで使う鏡面法線にします。
+	const Matrix4x4 rotationMatrix = MakeAffineMatrix(
+		{ 1.0f, 1.0f, 1.0f },
+		{ pitch_, yaw_, 0.0f },
+		{ 0.0f, 0.0f, 0.0f });
+	mirror_.SetNormal({
+		rotationMatrix.m[2][0],
+		rotationMatrix.m[2][1],
+		rotationMatrix.m[2][2],
+	});
 	collider_ = Collision::MakeOBB(
 		object_.GetTransform(),
 		colliderLocalCenter_,
@@ -98,6 +109,27 @@ void FixedMirror::EndReflection()
 
 void FixedMirror::DrawSurface()
 {
+	if (!reflectionTarget_.IsInitialized() || !hasReflectionCapture_) {
+		object_.Draw();
+		return;
+	}
+	object_.DrawMirror(
+		reflectionTarget_.GetSrvIndex(),
+		capturedViewProjection_);
+}
+
+void FixedMirror::DrawSurface(const Camera& camera)
+{
+	const Vector3 cameraFromMirror{
+		camera.GetTranslate().x - mirror_.GetCenter().x,
+		camera.GetTranslate().y - mirror_.GetCenter().y,
+		camera.GetTranslate().z - mirror_.GetCenter().z,
+	};
+	// 裏面から見た大型Mirrorは、反射Textureではなく元の板モデルを描画します。
+	if (Dot(cameraFromMirror, mirror_.GetNormal()) <= 0.0f) {
+		object_.Draw();
+		return;
+	}
 	if (!reflectionTarget_.IsInitialized() || !hasReflectionCapture_) {
 		object_.Draw();
 		return;

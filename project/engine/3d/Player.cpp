@@ -78,17 +78,30 @@ void Player::UpdateWithControl(
 	// 斜め移動だけ速くならないよう、方向だけを正規化する
 	if (Length(moveDirection_) > 0.0f) {
 		moveDirection_ = Normalize(moveDirection_);
-		position_.x += moveDirection_.x * moveSpeed_ * deltaTime;
-		position_.z += moveDirection_.z * moveSpeed_ * deltaTime;
+		// 構え中は盾を構えたまま歩くように移動を遅くします。
+		float currentMoveSpeed = moveSpeed_;
+		if (isMirrorGuardMode_) {
+			currentMoveSpeed *= mirrorGuardMoveSpeedRate_;
+		} else {
+			// 既に向いている前方へ進む時だけ、少しだけ歩行を速くします。
+			const Vector3 facingForward{ std::sin(facingYaw_), 0.0f, std::cos(facingYaw_) };
+			if (Dot(facingForward, moveDirection_) > 0.85f) {
+				currentMoveSpeed *= 1.12f;
+			}
+		}
+		position_.x += moveDirection_.x * currentMoveSpeed * deltaTime;
+		position_.z += moveDirection_.z * currentMoveSpeed * deltaTime;
 
-		// 移動方向からY軸の回転角を作り、球の模様が進行方向を向くようにする
-		facingYaw_ = std::atan2(moveDirection_.x, moveDirection_.z);
-		object_.SetRotate({ 0.0f, facingYaw_, 0.0f });
+		// 構えていない時だけ、球の見た目を移動方向へ向けます。
+		if (!isMirrorGuardMode_) {
+			facingYaw_ = std::atan2(moveDirection_.x, moveDirection_.z);
+			object_.SetRotate({ 0.0f, facingYaw_, 0.0f });
+		}
 	}
 
 	//床に立っているときだけ、Spaceで上向きの速さを与える
 	if (isGrounded_ && controlInput.jumpPressed) {
-		velocity_.y = jumpSpeed_;
+		velocity_.y = jumpSpeed_ * (isMirrorGuardMode_ ? mirrorGuardJumpSpeedRate_ : 1.0f);
 		isGrounded_ = false;
 	}
 

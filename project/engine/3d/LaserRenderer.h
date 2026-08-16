@@ -18,6 +18,8 @@ public:
 	void Draw(const std::vector<LaserSegment>& segments, const Camera& camera);
 	// 3D空間における光線の幅を設定する。
 	void SetBeamWidth(float width) { beamWidth_ = width; }
+	// 背景と区別しやすい色へ、Laser全体の描画色を設定する。
+	void SetColor(const Vector4& color) { color_ = color; }
 
 private:
 	struct Vertex

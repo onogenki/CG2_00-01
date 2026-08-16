@@ -11,6 +11,7 @@
 #include "CaptureManager.h"
 #include "Mirror.h"
 #include "Laser.h"
+#include <algorithm>
 #include <cmath>
 #include <numbers>
 #ifdef USE_IMGUI
@@ -2180,6 +2181,113 @@ bool ImGuiManager::MirrorDebugWindow(
 	(void)mirrorYaw;
 	(void)reflectionCamera;
 	(void)hasReflectionCapture;
+	return false;
+#endif
+}
+
+bool ImGuiManager::LightPuzzleDebugWindow(
+	Vector3& laserOrigin,
+	Vector3& laserDirection,
+	Vector3& doorLaserOrigin,
+	Vector3& doorLaserDirection,
+	float& laserVisualWidth,
+	Vector3& chargeSwitchPosition,
+	Vector3& doorSwitchPosition,
+	float& largeMirrorTargetYawOffset,
+	bool isMirrorCarried,
+	bool isChargeSwitchReceivingLight,
+	float mirrorCharge,
+	bool isLargeMirrorCharged,
+	float largeMirrorRotationAmount,
+	bool isDoorSwitchReceivingLight,
+	float doorOpenAmount)
+{
+#ifdef USE_IMGUI
+	if (inspectorDockId_ != 0) {
+		ImGui::SetNextWindowDockID(inspectorDockId_, ImGuiCond_Always);
+	}
+	if (!ImGui::Begin("Light Reflection Puzzle", &showModelWindow_)) {
+		ImGui::End();
+		return false;
+	}
+
+	// ---------- Lightの調整 ----------
+	ImGui::Text("Laser Source Settings");
+	ImGui::TextWrapped("The cyan Charge Laser is reflected by the carried mirror. The orange Door Laser is reflected by the large mirror after its 90 degree turn.");
+	bool isChanged = false;
+	if (ImGui::DragFloat3("Charge Laser Origin", &laserOrigin.x, 0.05f)) {
+		isChanged = true;
+	}
+	if (ImGui::DragFloat3("Charge Laser Direction", &laserDirection.x, 0.02f)) {
+		isChanged = true;
+	}
+	if (ImGui::DragFloat3("Door Laser Origin", &doorLaserOrigin.x, 0.05f)) {
+		isChanged = true;
+	}
+	if (ImGui::DragFloat3("Door Laser Direction", &doorLaserDirection.x, 0.02f)) {
+		isChanged = true;
+	}
+	if (ImGui::SliderFloat("Laser Visual Width", &laserVisualWidth, 0.04f, 0.80f)) {
+		isChanged = true;
+	}
+	if (ImGui::DragFloat3("Charge Switch Position", &chargeSwitchPosition.x, 0.05f)) {
+		isChanged = true;
+	}
+	if (ImGui::DragFloat3("Door Switch Position", &doorSwitchPosition.x, 0.05f)) {
+		isChanged = true;
+	}
+	if (ImGui::SliderAngle("Large Mirror Yaw Offset", &largeMirrorTargetYawOffset, 0.0f, 90.0f)) {
+		isChanged = true;
+	}
+
+	// ---------- 二段Puzzleの状態 ----------
+	ImGui::Separator();
+	ImGui::Text("Puzzle Status: Step 1 - Charge Large Mirror");
+	ImGui::Text("Carry Mirror: %s", isMirrorCarried ? "CARRIED" : "ON FLOOR (Press E nearby)");
+	ImGui::TextColored(
+		isChargeSwitchReceivingLight
+			? ImVec4(1.0f, 0.85f, 0.20f, 1.0f)
+			: ImVec4(0.70f, 0.70f, 0.70f, 1.0f),
+		"Charge Light: %s",
+		isChargeSwitchReceivingLight ? "HITTING SWITCH" : "NOT HITTING");
+	ImGui::ProgressBar(
+		std::clamp(mirrorCharge, 0.0f, 1.0f),
+		ImVec2(-1.0f, 0.0f),
+		"Mirror Charge");
+	ImGui::Text("Large Mirror: %s (%.0f%% rotated)",
+		isLargeMirrorCharged ? "CHARGED" : "WAITING FOR CHARGE",
+		std::clamp(largeMirrorRotationAmount, 0.0f, 1.0f) * 100.0f);
+
+	ImGui::Separator();
+	ImGui::Text("Puzzle Status: Step 2 - Open Door");
+	ImGui::TextColored(
+		isDoorSwitchReceivingLight
+			? ImVec4(0.35f, 1.0f, 0.55f, 1.0f)
+			: ImVec4(0.70f, 0.70f, 0.70f, 1.0f),
+		"Large Mirror Reflection: %s",
+		isDoorSwitchReceivingLight ? "HITTING DOOR SWITCH" : "NOT HITTING");
+	ImGui::Text("Door: %s (%.0f%%)",
+		isDoorSwitchReceivingLight ? "OPENING / OPEN" : "CLOSING / CLOSED",
+		std::clamp(doorOpenAmount, 0.0f, 1.0f) * 100.0f);
+	ImGui::TextWrapped("The large mirror always reflects on its front side. Charge it to swing the mirror sideways and redirect the reflected light to the door switch.");
+	ImGui::End();
+	return isChanged;
+#else
+	(void)laserOrigin;
+	(void)laserDirection;
+	(void)doorLaserOrigin;
+	(void)doorLaserDirection;
+	(void)laserVisualWidth;
+	(void)chargeSwitchPosition;
+	(void)doorSwitchPosition;
+	(void)largeMirrorTargetYawOffset;
+	(void)isMirrorCarried;
+	(void)isChargeSwitchReceivingLight;
+	(void)mirrorCharge;
+	(void)isLargeMirrorCharged;
+	(void)largeMirrorRotationAmount;
+	(void)isDoorSwitchReceivingLight;
+	(void)doorOpenAmount;
 	return false;
 #endif
 }

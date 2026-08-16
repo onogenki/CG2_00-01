@@ -25,6 +25,8 @@ public:
 
 	// fixedMirrorとcarryableMirrorを同じ一覧で受け取り、最も近い鏡から反射します。
 	void Update(const std::vector<const Mirror*>& mirrors);
+	// 床・壁などのOBBへ先に当たった場合、そこから先のLaser線分を消します。
+	void ClipByObbs(const std::vector<MyMath::OBB>& blockingObbs, float padding = 0.0f);
 
 	const std::vector<LaserSegment>& GetSegments() const { return segments_; }
 
