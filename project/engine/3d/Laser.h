@@ -25,6 +25,12 @@ public:
 
 	// fixedMirrorとcarryableMirrorを同じ一覧で受け取り、最も近い鏡から反射します。
 	void Update(const std::vector<const Mirror*>& mirrors);
+	// 鏡だけでなく、床・壁・Doorも含めて最初に当たった面でLightを止めます。
+	// blockingObbsはMirrorより優先されるため、壁の向こう側のMirrorへ反射しません。
+	void Update(
+		const std::vector<const Mirror*>& mirrors,
+		const std::vector<MyMath::OBB>& blockingObbs,
+		float blockingPadding = 0.0f);
 	// 床・壁などのOBBへ先に当たった場合、そこから先のLaser線分を消します。
 	void ClipByObbs(const std::vector<MyMath::OBB>& blockingObbs, float padding = 0.0f);
 

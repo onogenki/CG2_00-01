@@ -25,6 +25,9 @@ private:
 	struct Vertex
 	{
 		Vector4 position;
+		// 光の帯の左右端を0と1で渡し、PixelShaderで中心と縁の透明度を変えます。
+		float texcoordX = 0.0f;
+		float texcoordY = 0.0f;
 	};
 
 	struct ConstantData

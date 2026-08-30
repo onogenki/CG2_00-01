@@ -91,7 +91,7 @@ void CaptureManager::Initialize()
 	}
 	smokeFinished_ = false;
 	smokeFrame_ = 0;
-	smokeGamePlayFrame_ = 0;
+	smokeDebugFrame_ = 0;
 	smokeCaptureAttempts_ = 0;
 	smokeVisibleCaptures_ = 0;
 	smokeSavedPhotos_ = 0;
@@ -201,23 +201,23 @@ void CaptureManager::UpdateSmokeBeforeCapture()
 		if (smokeFrame_ >= 6 && smokeFrame_ <= 13) {
 			photoRequested_ = true;
 		}
-		if (smokeFrame_ == 20 && !SceneManager::GetInstance()->ChangeScene("GAMEPLAY")) {
-			FinishSmoke(false, "Could not request TITLE to GAMEPLAY scene change.");
+		if (smokeFrame_ == 20 && !SceneManager::GetInstance()->ChangeScene("DEBUG")) {
+			FinishSmoke(false, "Could not request TITLE to DEBUG scene change.");
 		}
 		return;
 	}
 
 	if (sceneName == "STAGE1") {
-		++smokeGamePlayFrame_;
+		++smokeDebugFrame_;
 		// 最初の静止状態と、Playerが移動した後の状態をそれぞれ保存します。
 		const bool captureInitialState =
-			smokeGamePlayFrame_ >= 5 && smokeGamePlayFrame_ <= 8;
+			smokeDebugFrame_ >= 5 && smokeDebugFrame_ <= 8;
 		const bool captureMovedState =
-			smokeGamePlayFrame_ >= 60 && smokeGamePlayFrame_ <= 63;
+			smokeDebugFrame_ >= 60 && smokeDebugFrame_ <= 63;
 		if (captureInitialState || captureMovedState) {
 			photoRequested_ = true;
 		}
-		if (smokeGamePlayFrame_ == 90) {
+		if (smokeDebugFrame_ == 90) {
 			std::error_code errorCode;
 			bool filesExist = !smokePhotoPaths_.empty();
 			for (const std::filesystem::path& path : smokePhotoPaths_) {
@@ -240,23 +240,23 @@ void CaptureManager::UpdateSmokeBeforeCapture()
 		return;
 	}
 
-	if (sceneName == "GAMEPLAY") {
-		++smokeGamePlayFrame_;
-		if (smokeGamePlayFrame_ <= 8) {
+	if (sceneName == "DEBUG") {
+		++smokeDebugFrame_;
+		if (smokeDebugFrame_ <= 8) {
 			photoRequested_ = true;
 		}
-		if (smokeGamePlayFrame_ == 45 && isRecording_) {
+		if (smokeDebugFrame_ == 45 && isRecording_) {
 			smokeVideoFrameCount_ = recordingFrameIndex_;
 			StopRecording("Capture smoke stopped the cross-scene video.");
 			smokeMainVideoPath_ = lastVideoPath_;
 		}
-		if (smokeGamePlayFrame_ == 48) {
+		if (smokeDebugFrame_ == 48) {
 			if (!SaveReplayClip()) {
 				FinishSmoke(false, "Could not save the shared replay buffer.");
 				return;
 			}
 		}
-		if (smokeGamePlayFrame_ == 55) {
+		if (smokeDebugFrame_ == 55) {
 			WaitForReplaySave();
 			smokeReplayPath_ = lastReplayPath_;
 			std::error_code errorCode;
@@ -378,7 +378,7 @@ void CaptureManager::UpdateSmokeBeforeCapture()
 				smokeVisibleCaptures_ == smokeCaptureAttempts_ &&
 				smokeVideoFrameCount_ >= 2;
 			std::ostringstream message;
-			message << "scene=GAMEPLAY photos=" << smokeSavedPhotos_
+			message << "scene=DEBUG photos=" << smokeSavedPhotos_
 				<< " visible=" << smokeVisibleCaptures_ << '/' << smokeCaptureAttempts_
 				<< " videoFrames=" << smokeVideoFrameCount_
 				<< " directError=" << directError
@@ -1761,15 +1761,15 @@ void CaptureManager::UpdateAfterDraw()
 	}
 	if (performanceBaselineEnabled_) {
 		const std::string& performanceScene = SceneManager::GetInstance()->GetCurrentSceneName();
-		if (performanceScene == "GAMEPLAY" || performanceScene == "STAGE1") {
-			++smokeGamePlayFrame_;
+		if (performanceScene == "DEBUG" || performanceScene == "STAGE1") {
+			++smokeDebugFrame_;
 			const float deltaTime = DirectXCommon::GetInstance()->GetDeltaTime();
-			if (smokeGamePlayFrame_ > 8 && smokeGamePlayFrame_ < 69) {
+			if (smokeDebugFrame_ > 8 && smokeDebugFrame_ < 69) {
 				++smokePerformanceFrameCount_;
 				smokePerformanceTime_ += deltaTime;
 				smokeMaximumDeltaTime_ = (std::max)(smokeMaximumDeltaTime_, deltaTime);
 			}
-			if (smokeGamePlayFrame_ == 69) {
+			if (smokeDebugFrame_ == 69) {
 				const float averageFps = smokePerformanceTime_ > 0.0f
 					? static_cast<float>(smokePerformanceFrameCount_) / smokePerformanceTime_
 					: 0.0f;
@@ -1797,9 +1797,9 @@ void CaptureManager::UpdateAfterDraw()
 
 	const float deltaTime = DirectXCommon::GetInstance()->GetDeltaTime();
 	if (smokeEnabled_ &&
-		SceneManager::GetInstance()->GetCurrentSceneName() == "GAMEPLAY" &&
-		smokeGamePlayFrame_ > 8 &&
-		smokeGamePlayFrame_ < 45) {
+		SceneManager::GetInstance()->GetCurrentSceneName() == "DEBUG" &&
+		smokeDebugFrame_ > 8 &&
+		smokeDebugFrame_ < 45) {
 		++smokePerformanceFrameCount_;
 		smokePerformanceTime_ += deltaTime;
 		smokeMaximumDeltaTime_ = (std::max)(smokeMaximumDeltaTime_, deltaTime);

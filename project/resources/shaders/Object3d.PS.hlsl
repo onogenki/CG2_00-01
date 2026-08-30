@@ -16,10 +16,10 @@ struct DirectionalLight
     float32_t4 color; //ライトの色
     float32_t3 direction; //ライトの向き
     float intensity; //輝度
-    
-    float specularPower;
-    float specularStrength;
-    float32_t2 padding;
+
+    // 直接光が当たらない壁や天井を、最低限見える明るさへ保つ環境光です。
+    float32_t3 ambientColor;
+    float ambientIntensity;
 };
 
 struct PointLight
@@ -43,6 +43,11 @@ struct SpotLight
     float cosFalloffStart; //Falloff開始の角度
 };
 
+struct SpotLightSet
+{
+    SpotLight lights[16];
+};
+
 struct PixelShaderOutput
 {
     float32_t4 color : SV_TARGET0;
@@ -57,7 +62,7 @@ ConstantBuffer<Material> gMaterial : register(b0);
 ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
 ConstantBuffer<Camera> gCamera : register(b2);
 ConstantBuffer<PointLight> gPointLight : register(b3);
-ConstantBuffer<SpotLight> gSpotLight : register(b4);
+ConstantBuffer<SpotLightSet> gSpotLights : register(b4);
 
 Texture2D<float32_t4> gTexture : register(t0);
 SamplerState gSampler : register(s0);
@@ -70,6 +75,10 @@ PixelShaderOutput main(VertexShaderOutput input)
     
     float32_t4 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
     float32_t4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
+    // 環境光は法線の向きに関係なく足し、室内の影側を真っ黒にしません。
+    float32_t3 ambientLight =
+        gMaterial.color.rgb * textureColor.rgb *
+        gDirectionalLight.ambientColor * gDirectionalLight.ambientIntensity;
     
     // 法線
     float32_t3 N = normalize(input.normal);
@@ -130,30 +139,39 @@ PixelShaderOutput main(VertexShaderOutput input)
     ///スポットライト
     ///
     
-    //ライトから頂点への方向
-    float32_t3 spotLightDirectionOnSurface = normalize(input.worldPosition - gSpotLight.position);
-    
-    //距離による減衰
-    float distanceSpot = length(gSpotLight.position - input.worldPosition);
-    float attenuationFactor = pow(saturate(-distanceSpot / gSpotLight.distance + 1.0f), gSpotLight.decay);
-    
-    //角度による減衰
-    float cosAngle = dot(spotLightDirectionOnSurface, gSpotLight.direction);
-    float falloffFactor = saturate((cosAngle - gSpotLight.cosAngle) / max(gSpotLight.cosFalloffStart - gSpotLight.cosAngle, 0.00001f));
+    // 複数本のLightを加算し、Laserの周囲が実際に明るく見えるようにします。
+    float32_t3 diffuseSpotLight = float32_t3(0.0f, 0.0f, 0.0f);
+    float32_t3 specularSpotLight = float32_t3(0.0f, 0.0f, 0.0f);
+    [unroll]
+    for (int spotIndex = 0; spotIndex < 16; ++spotIndex)
+    {
+        SpotLight spotLight = gSpotLights.lights[spotIndex];
+        if (spotLight.intensity <= 0.0f || spotLight.distance <= 0.0f)
+        {
+            continue;
+        }
 
-    //拡散反射
-    float cosSpot = saturate(dot(N, -spotLightDirectionOnSurface));
-    float32_t3 diffuseSpotLight = gMaterial.color.rgb * textureColor.rgb * gSpotLight.color.rgb * cosSpot * gSpotLight.intensity * attenuationFactor * falloffFactor;
- 
-    //鏡面反射
-    float32_t3 reflectedSpot = reflect(spotLightDirectionOnSurface, N);
-    float NDotHSpot = dot(toEye, reflectedSpot);
-    float specularPowSpot = pow(saturate(NDotHSpot), gMaterial.shininess);
-    float32_t3 specularSpotLight =
-        gSpotLight.color.rgb * gSpotLight.intensity * attenuationFactor * falloffFactor * specularPowSpot * float32_t3(1.0f, 1.0f, 1.0f);
+        // ライトから頂点への方向、距離、円錐の内側にいる割合を求めます。
+        float32_t3 spotLightDirectionOnSurface = normalize(input.worldPosition - spotLight.position);
+        float distanceSpot = length(spotLight.position - input.worldPosition);
+        float attenuationFactor = pow(saturate(-distanceSpot / spotLight.distance + 1.0f), spotLight.decay);
+        float cosAngle = dot(spotLightDirectionOnSurface, spotLight.direction);
+        float falloffFactor = saturate((cosAngle - spotLight.cosAngle) / max(spotLight.cosFalloffStart - spotLight.cosAngle, 0.00001f));
+
+        float cosSpot = saturate(dot(N, -spotLightDirectionOnSurface));
+        diffuseSpotLight +=
+            gMaterial.color.rgb * textureColor.rgb * spotLight.color.rgb *
+            cosSpot * spotLight.intensity * attenuationFactor * falloffFactor;
+
+        float32_t3 reflectedSpot = reflect(spotLightDirectionOnSurface, N);
+        float specularPowSpot = pow(saturate(dot(toEye, reflectedSpot)), gMaterial.shininess);
+        specularSpotLight +=
+            spotLight.color.rgb * spotLight.intensity * attenuationFactor * falloffFactor *
+            specularPowSpot * float32_t3(1.0f, 1.0f, 1.0f);
+    }
     
     //全ての光を合成
-    output.color.rgb = diffuseDirectionalLight + specularDirectionalLight + diffusePointLight + specularPointLight + diffuseSpotLight + specularSpotLight;
+    output.color.rgb = ambientLight + diffuseDirectionalLight + specularDirectionalLight + diffusePointLight + specularPointLight + diffuseSpotLight + specularSpotLight;
     
     
 	// 係数が0より大きいときだけキューブマップの反射光を加算する。

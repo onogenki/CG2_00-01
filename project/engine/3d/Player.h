@@ -41,6 +41,8 @@ public:
 
 	//Stage1の共通描画処理で使用する3Dオブジェクトを取得する
 	Object3d& GetObject() { return object_; }
+	// 開始演出やリスポーン時に、速度を残さずPlayerを指定位置へ移動します。
+	void SetPosition(const Vector3& position);
 	const Vector3& GetPosition() const { return position_; }
 	const Vector3& GetVelocity() const { return velocity_; }
 	// このフレームにPlayerが移動した水平方向です。Cameraの先読みと自動整列に使います。

@@ -51,6 +51,17 @@ void Player::Update(
 	UpdateWithControl(deltaTime, solidObbs, cameraForward, controlInput);
 }
 
+void Player::SetPosition(const Vector3& position)
+{
+	// 演出中に直前の落下速度や入力方向を持ち越さないよう、移動状態も初期化します。
+	position_ = position;
+	velocity_ = {};
+	moveDirection_ = {};
+	isGrounded_ = false;
+	isColliding_ = false;
+	object_.SetTranslate(position_);
+}
+
 void Player::UpdateWithControl(
 	float deltaTime,
 	const std::vector<OBB>& solidObbs,

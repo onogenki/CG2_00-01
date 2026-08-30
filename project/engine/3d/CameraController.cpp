@@ -197,16 +197,9 @@ bool CameraController::TryStepOrbit(
 	int stepDirection,
 	const std::vector<MyMath::OBB>& cameraCollisionObbs)
 {
-	// 左右キーの入力を -2 ～ +2 の五つの位置へ変換する
-	const int nextStepIndex = std::clamp(
-		orbitStepIndex_ + stepDirection,
-		-maximumOrbitStep_,
-		maximumOrbitStep_);
-	if (nextStepIndex == orbitStepIndex_) {
-		return false;
-	}
-
-	const float nextYaw = orbitAnchorYaw_ + orbitStepAngle_ * static_cast<float>(nextStepIndex);
+	// 一回の方向転換角度は維持し、何回でも押せるのでCameraを一周以上回せます。
+	const int nextStepIndex = orbitStepIndex_ + stepDirection;
+	const float nextYaw = targetOrbitYaw_ + orbitStepAngle_ * static_cast<float>(stepDirection);
 	if (!IsCameraSettingAvailable(
 		nextYaw,
 		targetOrbitPitch_,
@@ -255,6 +248,40 @@ void CameraController::ResetBehindTarget(float targetFacingYaw)
 	// 位置は補間するため、Rを押してもCameraは滑らかに後方へ戻る
 	targetOrbitYaw_ = targetFacingYaw;
 	orbitAnchorYaw_ = targetFacingYaw;
+	orbitStepIndex_ = 0;
+	autoRecenterTimer_ = 0.0f;
+}
+
+void CameraController::SynchronizeToCamera(const Vector3& targetPosition)
+{
+	if (!camera_) {
+		return;
+	}
+
+	// 演出で表示していたCamera座標を保持し、通常追従へ切り替わる瞬間の移動をなくします。
+	focus_ = {
+		targetPosition.x + focusOffset_.x,
+		targetPosition.y + focusOffset_.y,
+		targetPosition.z + focusOffset_.z,
+	};
+	lookAt_ = focus_;
+	cameraPosition_ = camera_->GetTranslate();
+
+	const Vector3 cameraOffset{
+		cameraPosition_.x - focus_.x,
+		cameraPosition_.y - focus_.y,
+		cameraPosition_.z - focus_.z,
+	};
+	const float distance = (std::max)(Length(cameraOffset), 0.1f);
+	distance_ = distance;
+	manualDistance_ = distance;
+	targetDistance_ = distance;
+	orbitPitch_ = std::asin(std::clamp(cameraOffset.y / distance, -1.0f, 1.0f));
+	manualOrbitPitch_ = orbitPitch_;
+	targetOrbitPitch_ = orbitPitch_;
+	orbitYaw_ = std::atan2(-cameraOffset.x, -cameraOffset.z);
+	targetOrbitYaw_ = orbitYaw_;
+	orbitAnchorYaw_ = orbitYaw_;
 	orbitStepIndex_ = 0;
 	autoRecenterTimer_ = 0.0f;
 }

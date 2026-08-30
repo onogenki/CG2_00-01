@@ -14,6 +14,7 @@ using namespace MyMath;
 
 void TitleScene::ScanResourceShelf()
 {
+	// SceneEditorへ任せることで、TitleとDebugで同じresources一覧を使えます。
 	SceneEditor::ScanResourceShelf(shelfState_);
 }
 
@@ -30,6 +31,7 @@ bool TitleScene::AddModelToTitle(const std::string& fileName)
 	object->SetDirectionalLight(directionalLight_);
 	object->SetPointLight(pointLight_);
 	object->SetSpotLight(spotLight_);
+	// 追加順にX方向へずらし、同じ場所にモデルが重なって見えない状態を防ぎます。
 	const float offset = static_cast<float>(normalObjects.size() + animationObjects_.size()) * 1.4f;
 	object->SetTranslate({ -2.0f + offset, 0.0f, 6.0f });
 	object->SetScale({ 1.0f, 1.0f, 1.0f });
@@ -52,12 +54,14 @@ bool TitleScene::AddTextureToTitle(const std::string& textureFilePath)
 	sprite->Initialize(spriteCommon, textureFilePath);
 	sprite->SetAnchorPoint({ 0.5f, 0.5f });
 	const Vector2 originalSize = sprite->GetSize();
+	// 縦横比は保ったまま、長辺だけを180px以内へ縮小します。
 	const float largestSide = (std::max)(originalSize.x, originalSize.y);
 	if (largestSide > 180.0f && largestSide > 0.0f) {
 		const float scale = 180.0f / largestSide;
 		sprite->SetSize({ originalSize.x * scale, originalSize.y * scale });
 	}
 	//初期スプライトを数えず、追加したテクスチャだけを並べる
+	// 追加分だけを0番から数え、4列ごとのグリッド位置へ並べます。
 	const size_t addedSpriteIndex = addedSprites_.size() - baseSpriteCount_;
 	const float x = 180.0f + static_cast<float>(addedSpriteIndex % 4) * 190.0f;
 	const float y = 160.0f + static_cast<float>(addedSpriteIndex / 4) * 160.0f;
@@ -102,6 +106,7 @@ void TitleScene::DrawTitleInspectorImGui()
 	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
 		return;
 	}
+	// 追加直後の数フレームだけInspectorへ選択番号を渡し、自動で対象タブを開きます。
 	const int forcedSpriteIndex = hasSelectedTitleSprite_ &&
 		inspectorAutoSelectSpriteFrames_ > 0 &&
 		selectedTitleSpriteIndex_ < addedSprites_.size()
@@ -163,6 +168,7 @@ void TitleScene::DrawTitleEditViewport()
 			: "Title Model";
 		options.objects.push_back({ name + " [" + std::to_string(index) + "]", object });
 	}
+	// Viewportは通常モデルとAnimationモデルを一つの一覧で扱うため、境界番号を保存します。
 	const size_t animationOffset = options.objects.size();
 	for (size_t index = 0; index < animationObjects_.size(); ++index) {
 		Object3d* object = animationObjects_[index].get();
@@ -186,6 +192,7 @@ void TitleScene::DrawTitleEditViewport()
 		}
 		hasSelectedTitleObject_ = true;
 		hasSelectedTitleSprite_ = false;
+		// 境界より前は通常モデル、後ろはAnimationモデルとして元の配列番号へ戻します。
 		selectedTitleObjectIsAnimation_ = static_cast<size_t>(index) >= animationOffset;
 		selectedTitleObjectIndex_ = selectedTitleObjectIsAnimation_
 			? static_cast<size_t>(index) - animationOffset
@@ -239,6 +246,7 @@ void TitleScene::HandleTitleShelfDropOnEditView()
 
 void TitleScene::Initialize()
 {
+	// Title専用のCameraManagerを作り、ほかのSceneのCamera状態を持ち込まないようにします。
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
 	PostEffect::GetInstance()->SetGrayscale(false);
 	PostEffect::GetInstance()->SetSepia(false);
@@ -269,6 +277,7 @@ void TitleScene::Initialize()
 	spotLight_.intensity = 4.0f;
 	spotLight_.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	spotLight_.distance = 7.0f;
+	// SpotLightの方向は長さが1である前提なので、必ず正規化します。
 	spotLight_.direction = Normalize({ -1.0f, -1.0f, 0.0f });
 	spotLight_.decay = 2.0f;
 	spotLight_.cosAngle = std::cos(0.45f);
@@ -324,8 +333,10 @@ void TitleScene::Update()
 	//カメラの更新
 	cameraManager->Update();
 
+	// すべてのTitleモデルへ、同じCameraと3種類のLightを渡してから行列を更新します。
 	for (auto& object3d : normalObjects) {
 		object3d->SetCamera(cameraManager->GetActiveCamera());
+		// 方向が0だとLight計算ができないため、安全な下向きへ戻します。
 		float length = Length(directionalLight_.direction);
 		if (length > 0.0f) {
 			directionalLight_.direction = Normalize(directionalLight_.direction);
@@ -345,7 +356,7 @@ void TitleScene::Update()
 		object3d->Update();
 	}
 
-	//カメラのビュープロジェクション行列を渡して更新
+	// CameraのView行列とProjection行列を掛けると、3D座標を画面へ映す行列になります。
 	Matrix4x4 viewMatrix = cameraManager->GetActiveCamera()->GetViewMatrix();
 	Matrix4x4 projectionMatrix = cameraManager->GetActiveCamera()->GetProjectionMatrix();
 	Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
@@ -371,7 +382,7 @@ void TitleScene::Update()
 		(Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->IsPadButtonPressed(0, 1)))
 	{
 		//シーン切り替え
-		SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
+		SceneManager::GetInstance()->ChangeScene("DEBUG");
 	}
 
 	//ステージシーンへ

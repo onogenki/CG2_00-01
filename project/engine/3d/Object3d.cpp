@@ -392,18 +392,21 @@ void Object3d::CreatePointLightData()
 
 void Object3d::CreateSpotLightData()
 {
-	spotLightResource = object3dCommon->GetDxCommon()->CreateBufferResource(sizeof(SpotLight));
+	spotLightResource = object3dCommon->GetDxCommon()->CreateBufferResource(sizeof(SpotLightSet));
 	spotLightResource->Map(0, nullptr, reinterpret_cast<void**>(&spotLightData));
 
-	// 資料通りの初期値
-	spotLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	spotLightData->position = { 2.0f, 1.25f, 0.0f };
-	spotLightData->distance = 7.0f;
-	spotLightData->direction = Normalize({ -1.0f, -1.0f, 0.0f });
-	spotLightData->intensity = 4.0f;
-	spotLightData->decay = 2.0f;
-	spotLightData->cosAngle = std::cos(std::numbers::pi_v<float> / 3.0f);// 限界の角度 (60度)
-	spotLightData->cosFalloffStart = 1.0f;//1.0 = 中心(0度)から減衰が始まる
+	// 未設定の配列要素は強さ0にして、意図しない場所が明るくならないようにします。
+	spotLightData->lights.fill({});
+	// 既存SceneがSetSpotLightを使う場合に備え、先頭一つだけ従来と同じ初期値を入れます。
+	SpotLight& defaultLight = spotLightData->lights[0];
+	defaultLight.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	defaultLight.position = { 2.0f, 1.25f, 0.0f };
+	defaultLight.distance = 7.0f;
+	defaultLight.direction = Normalize({ -1.0f, -1.0f, 0.0f });
+	defaultLight.intensity = 4.0f;
+	defaultLight.decay = 2.0f;
+	defaultLight.cosAngle = std::cos(std::numbers::pi_v<float> / 3.0f);// 限界の角度 (60度)
+	defaultLight.cosFalloffStart = 1.0f;//1.0 = 中心(0度)から減衰が始まる
 }
 
 void Object3d::SetEnvironmentCoefficient(float coefficient) {

@@ -8,9 +8,9 @@ class Camera;
 // 狭い通路やボス部屋など、場所ごとに変更するCameraの基本設定
 struct CameraAreaSettings
 {
-	float distance = 11.5f;
-	float pitch = 0.58f;
-	float fovY = 0.48f;
+	float distance = 14.0f;
+	float pitch = 0.32f;
+	float fovY = 0.60f;
 };
 
 // Player や敵などの対象を、少し遅れて追いかける三人称カメラ用の操作クラス
@@ -50,6 +50,8 @@ public:
 		const std::vector<MyMath::OBB>& cameraCollisionObbs);
 	// Playerが向いている方向の後ろへ、カメラをゆっくり戻す
 	void ResetBehindTarget(float targetFacingYaw);
+	// 開始演出などで動かしたCamera位置を、通常追従Cameraの現在値として引き継ぎます。
+	void SynchronizeToCamera(const Vector3& targetPosition);
 	// Areaへ入った時だけ、Cameraの距離・縦角度・視野角を変更する
 	void SetAreaSettings(const CameraAreaSettings& settings);
 	void ClearAreaSettings();
@@ -106,54 +108,55 @@ private:
 	// Player の中心より少し上を見続けるためのずれ
 	Vector3 focusOffset_{ 0.0f, 1.2f, 0.0f };
 	// Focusとの直線距離。ホイールで変更する
-	float distance_ = 11.5f;
+	float distance_ = 14.0f;
 	// Areaの外でプレイヤーがホイール・縦ドラッグにより変更した設定
-	float manualDistance_ = 11.5f;
-	float manualOrbitPitch_ = 0.58f;
+	float manualDistance_ = 14.0f;
+	float manualOrbitPitch_ = 0.32f;
 	// 現在値がゆっくり近づく、距離と縦角度の目標値
-	float targetDistance_ = 11.5f;
+	float targetDistance_ = 14.0f;
 	// Player の向きとは独立した、カメラ配置用の Y 軸角度
 	float orbitYaw_ = 0.0f;
 	float targetOrbitYaw_ = 0.0f;
 	// 左右段階の中心となる角度です。RキーでPlayer後方へ更新します。
 	float orbitAnchorYaw_ = 0.0f;
+	// 左右キーを押した回数です。上限を設けず、一周以上の周回にも使います。
 	int orbitStepIndex_ = 0;
-	int maximumOrbitStep_ = 2;
 	float orbitStepAngle_ = 0.52359878f;
 	// Focusの周囲を上下へ回すX軸角度
-	float orbitPitch_ = 0.58f;
-	float targetOrbitPitch_ = 0.58f;
+	float orbitPitch_ = 0.32f;
+	float targetOrbitPitch_ = 0.32f;
 	float minimumOrbitPitch_ = -0.15f;
 	float maximumOrbitPitch_ = 1.15f;
 	// Player が Focus の周辺にいる間、Focus を止める半径
-	float deadZoneRadius_ = 1.25f;
+	float deadZoneRadius_ = 0.45f;
 	// Focus と Camera の追従速度
-	float focusFollowSpeed_ = 3.2f;
-	float lookAtFollowSpeed_ = 2.4f;
-	float cameraFollowSpeed_ = 1.8f;
-	float orbitFollowSpeed_ = 6.0f;
+	float focusFollowSpeed_ = 7.0f;
+	float lookAtFollowSpeed_ = 5.5f;
+	float cameraFollowSpeed_ = 4.5f;
+	// 矢印キーで選んだ方向へ、ロボットが向きを変えるよう素早く移動します。
+	float orbitFollowSpeed_ = 24.0f;
 	// Playerが移動している方向の少し先へFocusをずらす距離
-	float lookAheadDistance_ = 0.75f;
+	float lookAheadDistance_ = 0.45f;
 	// 走り続けた時に、自動でPlayerの後ろへ戻り始めるまでの時間
 	float autoRecenterDelay_ = 0.8f;
 	float autoRecenterTimer_ = 0.0f;
 	float autoRecenterSpeed_ = 2.0f;
 	bool isAutoRecenterEnabled_ = true;
 	// 上下キーで選ぶ近・中・遠の三段階です。
-	float minimumManualDistance_ = 9.5f;
+	float minimumManualDistance_ = 10.0f;
 	float manualDistanceStep_ = 2.0f;
-	int distanceStepIndex_ = 1;
-	int maximumDistanceStep_ = 2;
+	int distanceStepIndex_ = 2;
+	int maximumDistanceStep_ = 3;
 	// 候補位置までの経路がこの割合より短くなる場合、壁側への操作を拒否します。
 	float minimumAvailablePathRatio_ = 0.82f;
 	// 走行中だけ少し広くする、視野角の値と追従速度
-	float baseFovY_ = 0.48f;
-	float movingFovY_ = 0.52f;
-	float currentFovY_ = 0.48f;
+	float baseFovY_ = 0.60f;
+	float movingFovY_ = 0.64f;
+	float currentFovY_ = 0.60f;
 	float fovFollowSpeed_ = 2.0f;
 	// Areaに入っている間だけ有効にする、Camera基本設定
 	bool hasAreaSettings_ = false;
-	float areaBaseFovY_ = 0.48f;
+	float areaBaseFovY_ = 0.60f;
 	// Cameraを小さな球として扱い、壁の近くで少し手前へ止めるための値
 	float cameraCollisionRadius_ = 0.3f;
 	float cameraCollisionMargin_ = 0.1f;

@@ -10,7 +10,7 @@
 #include "Transform.h"
 #include "Framework.h"
 #include "TitleScene.h"
-#include "GamePlayScene.h"
+#include "DebugScene.h"
 #include <string>
 
 class WinApp;
@@ -26,7 +26,7 @@ class SpriteCommon;
 // 現在Gameが管理する大まかな画面状態。
 enum class SceneType {
 	TITLE,
-	GAMEPLAY
+	DEBUG
 };
 
 class Game : public Framework
@@ -51,7 +51,7 @@ private:
 	int selectedUI = 0;
 
 	bool sceneStressEnabled_ = false;
-	std::string sceneStressTarget_ = "GAMEPLAY";
+	std::string sceneStressTarget_ = "DEBUG";
 	int sceneStressRequestedRestarts_ = 0;
 	int sceneStressCompletedRestarts_ = 0;
 	int sceneStressIntervalFrames_ = 8;

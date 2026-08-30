@@ -28,14 +28,14 @@ struct TransformComponent {
 };
 
 struct ModelComponent {
-	// Non-owning pointer; GamePlayScene owns the Object3d instance.
+	// Non-owning pointer; DebugScene owns the Object3d instance.
 	Object3d* object = nullptr;
 	std::string sourceFile;
 	bool isAnimated = false;
 };
 
 struct SpriteComponent {
-	// Non-owning pointer; GamePlayScene owns the Sprite instance.
+	// Non-owning pointer; DebugScene owns the Sprite instance.
 	Sprite* sprite = nullptr;
 	std::string sourceFile;
 };

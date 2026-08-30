@@ -14,6 +14,22 @@ namespace
 		return nlohmann::json::array({ value.x, value.y, value.z });
 	}
 
+	Vector3 LoadVector3(const nlohmann::json& value, bool usesEngineCoordinates)
+	{
+		if (usesEngineCoordinates) {
+			return {
+				value[0].get<float>(),
+				value[1].get<float>(),
+				value[2].get<float>(),
+			};
+		}
+		return {
+			value[0].get<float>(),
+			value[2].get<float>(),
+			value[1].get<float>(),
+		};
+	}
+
 	nlohmann::json SaveObjectData(
 		const LevelLoader::ObjectData& objectData,
 		bool usesEngineCoordinates)
@@ -171,6 +187,54 @@ std::unique_ptr<LevelLoader::LevelData> LevelLoader::Load(const std::string& fil
 	const bool usesEngineCoordinates = levelData->coordinateSystem == "engine";
 
 	try {
+		if (deserialized.contains("stage_start")) {
+			const nlohmann::json& stageStart = deserialized["stage_start"];
+			levelData->hasStageStart = true;
+			levelData->stageStart.duration = stageStart.value("duration", 2.5f);
+			levelData->stageStart.playerAirHeight = stageStart.value("player_air_height", 8.0f);
+			levelData->stageStart.cameraFrontDistance = stageStart.value("camera_front_distance", 10.0f);
+			levelData->stageStart.cameraFrontHeight = stageStart.value("camera_front_height", 6.0f);
+			levelData->stageStart.cameraOrbitAngle = stageStart.value("camera_orbit_angle", 3.14159265f);
+			levelData->stageStart.cameraHandoffDuration = stageStart.value("camera_handoff_duration", 0.8f);
+		}
+		if (deserialized.contains("lighting")) {
+			const nlohmann::json& lighting = deserialized["lighting"];
+			levelData->hasLighting = true;
+			if (lighting.contains("directional")) {
+				const nlohmann::json& directional = lighting["directional"];
+				levelData->lighting.directionalColor = LoadVector3(directional["color"], usesEngineCoordinates);
+				levelData->lighting.directionalDirection = LoadVector3(directional["direction"], usesEngineCoordinates);
+				levelData->lighting.directionalIntensity = directional.value("intensity", 0.3f);
+				if (directional.contains("ambient")) {
+					const nlohmann::json& ambient = directional["ambient"];
+					levelData->lighting.ambientColor = LoadVector3(ambient["color"], usesEngineCoordinates);
+					levelData->lighting.ambientIntensity = ambient.value("intensity", 0.0f);
+				}
+			}
+			if (lighting.contains("point")) {
+				const nlohmann::json& point = lighting["point"];
+				levelData->lighting.pointColor = LoadVector3(point["color"], usesEngineCoordinates);
+				levelData->lighting.pointPosition = LoadVector3(point["position"], usesEngineCoordinates);
+				levelData->lighting.pointIntensity = point.value("intensity", 5.0f);
+				levelData->lighting.pointRadius = point.value("radius", 20.0f);
+				levelData->lighting.pointDecay = point.value("decay", 1.0f);
+			}
+			if (lighting.contains("spot_lights")) {
+				for (const nlohmann::json& spotLight : lighting["spot_lights"]) {
+					SpotLightData spotLightData{};
+					spotLightData.name = spotLight.value("name", "SpotLight");
+					spotLightData.color = LoadVector3(spotLight["color"], usesEngineCoordinates);
+					spotLightData.position = LoadVector3(spotLight["position"], usesEngineCoordinates);
+					spotLightData.intensity = spotLight.value("intensity", 0.0f);
+					spotLightData.direction = LoadVector3(spotLight["direction"], usesEngineCoordinates);
+					spotLightData.distance = spotLight.value("distance", 0.0f);
+					spotLightData.decay = spotLight.value("decay", 1.0f);
+					spotLightData.cosAngle = spotLight.value("cos_angle", 0.5f);
+					spotLightData.cosFalloffStart = spotLight.value("cos_falloff_start", 0.8f);
+					levelData->lighting.spotLights.push_back(std::move(spotLightData));
+				}
+			}
+		}
 		LoadObjects(deserialized["objects"], levelData->objects, usesEngineCoordinates);
 	} catch (const nlohmann::json::exception&) {
 		return nullptr;
@@ -188,6 +252,50 @@ bool LevelLoader::Save(const std::string& fileName, const LevelData& levelData)
 	nlohmann::json serialized;
 	serialized["name"] = "scene";
 	serialized["coordinate_system"] = levelData.coordinateSystem;
+	if (levelData.hasStageStart) {
+		serialized["stage_start"] = {
+			{ "duration", levelData.stageStart.duration },
+			{ "player_air_height", levelData.stageStart.playerAirHeight },
+			{ "camera_front_distance", levelData.stageStart.cameraFrontDistance },
+			{ "camera_front_height", levelData.stageStart.cameraFrontHeight },
+			{ "camera_orbit_angle", levelData.stageStart.cameraOrbitAngle },
+			{ "camera_handoff_duration", levelData.stageStart.cameraHandoffDuration },
+		};
+	}
+	if (levelData.hasLighting) {
+		nlohmann::json lighting;
+		lighting["directional"] = {
+			{ "color", SaveVector3(levelData.lighting.directionalColor) },
+			{ "direction", SaveVector3(levelData.lighting.directionalDirection) },
+			{ "intensity", levelData.lighting.directionalIntensity },
+			{ "ambient", {
+				{ "color", SaveVector3(levelData.lighting.ambientColor) },
+				{ "intensity", levelData.lighting.ambientIntensity },
+			} },
+		};
+		lighting["point"] = {
+			{ "color", SaveVector3(levelData.lighting.pointColor) },
+			{ "position", SaveVector3(levelData.lighting.pointPosition) },
+			{ "intensity", levelData.lighting.pointIntensity },
+			{ "radius", levelData.lighting.pointRadius },
+			{ "decay", levelData.lighting.pointDecay },
+		};
+		lighting["spot_lights"] = nlohmann::json::array();
+		for (const SpotLightData& spotLight : levelData.lighting.spotLights) {
+			lighting["spot_lights"].push_back({
+				{ "name", spotLight.name },
+				{ "color", SaveVector3(spotLight.color) },
+				{ "position", SaveVector3(spotLight.position) },
+				{ "intensity", spotLight.intensity },
+				{ "direction", SaveVector3(spotLight.direction) },
+				{ "distance", spotLight.distance },
+				{ "decay", spotLight.decay },
+				{ "cos_angle", spotLight.cosAngle },
+				{ "cos_falloff_start", spotLight.cosFalloffStart },
+			});
+		}
+		serialized["lighting"] = std::move(lighting);
+	}
 	serialized["objects"] = nlohmann::json::array();
 	for (const ObjectData& objectData : levelData.objects) {
 		serialized["objects"].push_back(SaveObjectData(objectData, usesEngineCoordinates));

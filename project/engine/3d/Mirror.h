@@ -9,6 +9,8 @@ class Mirror {
 public:
 	struct RayHit {
 		bool isHit = false;
+		// trueの時だけ、この面でRayを反射できます。falseなら裏面へ当たった停止点です。
+		bool canReflect = false;
 		float distance = 0.0f;
 		Vector3 position{};
 		Vector3 normal{};
@@ -84,11 +86,6 @@ public:
 		if (std::abs(denominator) <= 0.0001f) {
 			return {};
 		}
-		// 大型Mirrorは裏面をただの板として扱い、裏側からのLaserでは反射しない。
-		if (!isReflectBackface_ && denominator >= -0.0001f) {
-			return {};
-		}
-
 		const Vector3 fromOriginToCenter{
 			center_.x - origin.x,
 			center_.y - origin.y,
@@ -126,6 +123,8 @@ public:
 
 		RayHit result{};
 		result.isHit = true;
+		// 裏面はRayを通過させず、反射しない停止面として扱います。
+		result.canReflect = isReflectBackface_ || denominator < -0.0001f;
 		result.distance = hitDistance;
 		result.position = hitPosition;
 		// Rayが裏側から来た場合も、Ray側を向く法線を返します。
