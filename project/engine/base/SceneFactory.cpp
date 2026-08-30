@@ -1,6 +1,6 @@
 #include "SceneFactory.h"
 #include "TitleScene.h"    
-#include "GamePlayScene.h"
+#include "DebugScene.h"
 #include "Stage1.h"
 #include <utility>
 
@@ -8,7 +8,7 @@ SceneFactory::SceneFactory()
 {
 	// 新しいシーンは生成関数と名前をここへ登録する。
 	RegisterScene("TITLE", []() { return std::make_unique<TitleScene>(); });
-	RegisterScene("GAMEPLAY", []() { return std::make_unique<GamePlayScene>(); });
+	RegisterScene("DEBUG", []() { return std::make_unique<DebugScene>(); });
 	RegisterScene("STAGE1", []() { return std::make_unique<Stage1>(); });
 }
 

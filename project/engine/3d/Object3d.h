@@ -8,6 +8,7 @@
 #include "TimePlayback.h"
 #include <vector>
 #include <string>
+#include <array>
 #include <d3d12.h>
 #include <wrl.h>
 
@@ -17,6 +18,8 @@ class Object3dCommon;
 class Object3d
 {
 public:
+	// 一つのSceneで同時に使用できる、実際に面を照らすSpotLightの本数です。
+	static constexpr size_t kMaximumSpotLightCount = 16;
 
 	//座標変換行列データ
 	struct TransformationMatrix
@@ -29,8 +32,12 @@ public:
 	// 平行光源データ
 	struct DirectionalLight {
 		Vector4 color{};
-		Vector3 direction{};//ハイライトの位置
+		// 物体の面から光源を見る方向です。上から照らす場合はYを正にします。
+		Vector3 direction{};
 		float intensity = 0.0f;//明るさの強さ
+		// 光が直接届かない面も完全な黒にしない、間接光風の最低限の明るさです。
+		Vector3 ambientColor{};
+		float ambientIntensity = 0.0f;
 	};
 
 	struct PointLight
@@ -55,6 +62,14 @@ public:
 		float cosFalloffStart = 0.0f;
 		float padding[1]{};
 	};
+
+	// HLSLのSpotLight配列と同じ並びでConstant Bufferへ渡すデータです。
+	struct SpotLightSet
+	{
+		std::array<SpotLight, kMaximumSpotLightCount> lights{};
+	};
+	// HLSLのSpotLight配列は一要素64byteなので、CPU側の並びも同じ大きさを保証します。
+	static_assert(sizeof(SpotLight) == 64);
 
 	struct CameraForGPU
 	{
@@ -139,7 +154,12 @@ public:
 		*pointLightData = light;
 	}
 	void SetSpotLight(const SpotLight& light) {
-		*spotLightData = light;
+		spotLightData->lights.fill({});
+		spotLightData->lights[0] = light;
+	}
+	// 複数のLightを同時に設定し、暗い部屋でもそれぞれのLightが周囲を照らせるようにします。
+	void SetSpotLights(const std::array<SpotLight, kMaximumSpotLightCount>& lights) {
+		spotLightData->lights = lights;
 	}
 	void SetEnvironmentCoefficient(float coefficient);
 	// このObject3dだけ、Model本来の画像とは別のTextureを使用する
@@ -205,7 +225,7 @@ private:
 	// スポットライト作成関数
 	void CreateSpotLightData();
 	Microsoft::WRL::ComPtr<ID3D12Resource> spotLightResource;
-	SpotLight* spotLightData = nullptr;
+	SpotLightSet* spotLightData = nullptr;
 
 	//アニメーション
 	Model::Animation currentAnimation_;//アニメーション読み込み

@@ -130,6 +130,8 @@ void Stage1::Initialize()
 	directionalLight_.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	directionalLight_.direction = Normalize({ 0.5f, -1.0f, 0.5f });
 	directionalLight_.intensity = 0.3f;
+	directionalLight_.ambientColor = { 1.0f, 1.0f, 1.0f };
+	directionalLight_.ambientIntensity = 0.0f;
 	pointLight_.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	pointLight_.position = { 0.0f, 3.0f, -2.0f };
 	pointLight_.intensity = 5.0f;
@@ -155,24 +157,38 @@ void Stage1::Initialize()
 	floor_ = floor.get();
 	sceneObjects_.push_back(std::move(floor));
 
-	// ---------- プレイヤーの作成 ----------
-	//球をプレイヤーとして使用し、床の上から開始します。
-	player_ = std::make_unique<Player>();
-	player_->Initialize(object3dCommon, "sphere.obj", { 0.0f, -0.8f, 5.0f }, 1.2f);
-	// Camera 本体とは別の Controller に、Player を追従するルールを任せる
-	cameraController_ = std::make_unique<CameraController>();
-	cameraController_->Initialize(mainCamera.get(), player_->GetPosition());
-	// 通常Cameraの向きはPlayerの移動方向へ勝手に回さず、矢印キーで選んだ位置を保つ
-	cameraController_->SetAutoRecenterEnabled(false);
-
 	// ---------- 持てる小型鏡とレーザーの作成 ----------
 	carryableMirror_ = std::make_unique<CarryableMirror>();
 	carryableMirror_->Initialize(
 		object3dCommon,
 		"plane.obj",
 		{ -2.5f, -0.8f, 4.5f },
-		3.0f,
-		3.0f);
+		3.6f,
+		3.6f);
+
+	// ---------- 鏡床の作成 ----------
+	// 通常床とは別に、Playerが持てない正方形の鏡床ギミックを配置します。
+	mirrorFloor_ = std::make_unique<FixedMirror>();
+	if (mirrorFloor_->Initialize(
+		object3dCommon,
+		dxCommon,
+		SrvManager::GetInstance(),
+		"plane.obj",
+		mirrorFloorPosition_,
+		0.0f,
+		mirrorFloorWidth_,
+		mirrorFloorHeight_,
+		256)) {
+		// plane.objを寝かせると、上側から床の反射Textureを表示できます。
+		mirrorFloor_->SetPitch(-1.57079633f);
+		mirrorFloor_->SyncVisualAndCollider();
+		// 鏡床は上下どちらから来たLightも反射する特殊ギミックです。
+		mirrorFloor_->GetMirror().SetReflectBackface(true);
+		mirrorFloor_->GetObject().SetDirectionalLight(directionalLight_);
+		mirrorFloor_->GetObject().SetPointLight(pointLight_);
+	} else {
+		mirrorFloor_.reset();
+	}
 	// 白い小球をLaserの発射装置として置き、光がどこから出るか見えるようにする
 	auto laserEmitter = CreateObject("sphere.obj");
 	laserEmitter->SetTranslate(laserOrigin_);
@@ -225,11 +241,12 @@ void Stage1::Initialize()
 		renderer->SetColor(color);
 		renderer->SetBeamWidth(beamWidth);
 	};
-	createHazardLightRenderer(ceilingSweepLightRenderer_, { 0.95f, 0.20f, 1.00f, 1.0f }, 0.42f, 1);
-	createHazardLightRenderer(horizontalMoveLightRenderer_, { 1.00f, 0.82f, 0.10f, 1.0f }, 0.38f, 1);
-	createHazardLightRenderer(bottomPulseLightRenderer_, { 0.15f, 0.55f, 1.00f, 1.0f }, 0.50f, 1);
+	// 危険Lightは判定半径を変えず、まず視認性確認用に半透明ビームだけを太くします。
+	createHazardLightRenderer(ceilingSweepLightRenderer_, { 0.95f, 0.20f, 1.00f, 1.0f }, 0.70f, 4);
+	createHazardLightRenderer(horizontalMoveLightRenderer_, { 1.00f, 0.82f, 0.10f, 1.0f }, 0.68f, 4);
+	createHazardLightRenderer(bottomPulseLightRenderer_, { 0.15f, 0.55f, 1.00f, 1.0f }, 0.78f, 4);
 	createHazardLightRenderer(bottomPulseWarningRenderer_, { 1.00f, 0.05f, 0.05f, 0.80f }, 2.40f, 1);
-	createHazardLightRenderer(orbitLightRenderer_, { 0.20f, 1.00f, 0.35f, 1.0f }, 0.48f, 3);
+	createHazardLightRenderer(orbitLightRenderer_, { 0.20f, 1.00f, 0.35f, 1.0f }, 0.74f, 12);
 
 	// ---------- 反射Laserで動く充電SwitchとDoorの作成 ----------
 	// 二つのSwitchはSphere、Doorは厚みのあるfloor.objを縮小して表現します。
@@ -264,6 +281,28 @@ void Stage1::Initialize()
 	stageMapHotReload_.SetFilePath(kStageMapFilePath);
 	ReloadStageMap();
 	stageMapHotReload_.Synchronize();
+
+	// ---------- プレイヤーと通常Cameraの作成 ----------
+	// stage1.jsonのPlayerStartを使い、開始用の床の上へPlayerを置きます。
+	const Vector3 playerStartPosition = hasStagePlayerStart_
+		? stagePlayerStartPosition_
+		: Vector3{ 0.0f, -0.8f, 5.0f };
+	player_ = std::make_unique<Player>();
+	player_->Initialize(object3dCommon, "sphere.obj", playerStartPosition, 1.2f);
+	// Camera 本体とは別の Controller に、Player を追従するルールを任せます。
+	cameraController_ = std::make_unique<CameraController>();
+	cameraController_->Initialize(mainCamera.get(), player_->GetPosition());
+	// 通常Cameraの向きはPlayerの移動方向へ勝手に回さず、矢印キーで選んだ位置を保ちます。
+	cameraController_->SetAutoRecenterEnabled(false);
+	// 通常Cameraの完成位置を保存してから、開始演出用の前上方Cameraへ切り替えます。
+	stageStart_ = std::make_unique<StageStart>();
+	stageStart_->Begin(
+		*player_,
+		*mainCamera,
+		playerStartPosition,
+		mainCamera->GetTranslate(),
+		mainCamera->GetRotate(),
+		stageStartSettings_);
 	SceneEditor::ScanResourceShelf(stageShelfState_);
 	InitializeGameplaySmoke();
 }
@@ -293,6 +332,7 @@ void Stage1::Finalize()
 	doorSwitch_ = nullptr;
 	lightDoor_ = nullptr;
 	fixedMirrors_.clear();
+	mirrorFloor_.reset();
 	carryableMirror_.reset();
 	laserRenderer_.reset();
 	doorLaserRenderer_.reset();
@@ -301,6 +341,7 @@ void Stage1::Finalize()
 	bottomPulseLightRenderer_.reset();
 	bottomPulseWarningRenderer_.reset();
 	orbitLightRenderer_.reset();
+	stageStart_.reset();
 	cameraController_.reset();
 	player_.reset();
 }
@@ -314,6 +355,7 @@ void Stage1::Update()
 	}
 
 	// ---------- プレイヤーの移動と重力 ----------
+	bool isStageStartPlaying = false;
 	if (player_ && floor_) {
 		//floor.objの大きさとTransformから、見た目と一致するOBBを作る
 		floorObb_ = Collision::MakeOBB(
@@ -349,7 +391,17 @@ void Stage1::Update()
 			stageSolidObbs_.push_back(runtimeObject.collider);
 			stageLightBlockingObbs_.push_back(runtimeObject.collider);
 		}
-		if (gameplaySmokeEnabled_) {
+		const bool isGameViewActive = ImGuiManager::GetInstance()->IsGameViewActive();
+		isStageStartPlaying =
+			isGameViewActive &&
+			stageStart_ &&
+			stageStart_->Update(
+				DirectXCommon::GetInstance()->GetDeltaTime(),
+				*player_,
+				*mainCamera);
+		if (isStageStartPlaying) {
+			// 開始演出中はPlayer入力・Jump・Mirror操作を受け付けません。
+		} else if (gameplaySmokeEnabled_) {
 			// 自動検証ではCameraに影響されない世界+X方向へ歩かせます。
 			Player::ControlInput smokeControl{};
 			smokeControl.right = 1.0f;
@@ -359,11 +411,12 @@ void Stage1::Update()
 				{ 0.0f, 0.0f, 1.0f },
 				smokeControl);
 		} else if (ImGuiManager::GetInstance()->IsGameViewActive()) {
-			// 左クリックで携帯Mirrorを構えている間は、Playerの向きを固定したまま移動・Jumpを弱めます。
+			// Mouse左右クリックで携帯Mirrorを構えている間は、Playerの移動・Jumpを弱めます。
 			const bool isMirrorGuarding =
 				carryableMirror_ &&
 				carryableMirror_->IsCarried() &&
-				Input::GetInstance()->IsMouseButtonPressed(0);
+				(Input::GetInstance()->IsMouseButtonPressed(0) ||
+					Input::GetInstance()->IsMouseButtonPressed(1));
 			player_->SetMirrorGuardMode(isMirrorGuarding);
 			// 現在画面に映しているCameraの正面を渡し、WASDを画面基準の移動へ変換する
 			Vector3 cameraForward{ 0.0f, 0.0f, 1.0f };
@@ -377,13 +430,23 @@ void Stage1::Update()
 		}
 	}
 	UpdateGameplaySmoke(DirectXCommon::GetInstance()->GetDeltaTime());
-	UpdateMirrorGameplay();
+	if (!isStageStartPlaying) {
+		UpdateMirrorGameplay();
+	}
 	UpdateLightPuzzle(DirectXCommon::GetInstance()->GetDeltaTime());
 	UpdateHazardLights(DirectXCommon::GetInstance()->GetDeltaTime());
+	// 見た目だけの線ではなく、反射後の経路も周囲を照らすSpotLightへ反映します。
+	UpdateLaserSpotLights();
 
 	// ---------- カメラとデバッグ UI の更新 ----------
-	if (ImGuiManager::GetInstance()->IsGameViewActive()) {
+	if (ImGuiManager::GetInstance()->IsGameViewActive() && !isStageStartPlaying) {
 		UpdateMainCamera();
+		if (stageStart_ && stageStart_->IsCameraHandoffPlaying()) {
+			// 通常Cameraの壁回避・追従結果へ、開始演出Cameraを滑らかに近づけます。
+			stageStart_->UpdateCameraHandoff(
+				DirectXCommon::GetInstance()->GetDeltaTime(),
+				*mainCamera);
+		}
 		UpdateStageEvents();
 		UpdateEventManualCamera();
 	} else if (!activeEventCameraName_.empty()) {
@@ -451,6 +514,13 @@ void Stage1::Update()
 				SaveStageMap();
 			}
 		}
+		if (stageMapData_ && ImGuiManager::GetInstance()->StageLightingWindow(stageMapData_->lighting)) {
+			// UIが変えたLevelDataを現在の共有Lightへ反映し、Save MapでJSONへ残せる状態にします。
+			stageMapData_->hasLighting = true;
+			if (ApplyStageMapData(false)) {
+				stageMapReloadStatus_ = "Lighting edited in memory. Press Save Map to keep it.";
+			}
+		}
 		DrawStageEditViewport();
 		DrawStageModelShelf();
 		HandleStageShelfDropOnEditView();
@@ -470,6 +540,9 @@ void Stage1::Update()
 		if (fixedMirror) {
 			UpdateObject(fixedMirror->GetObject());
 		}
+	}
+	if (mirrorFloor_) {
+		UpdateObject(mirrorFloor_->GetObject());
 	}
 	if (carryableMirror_) {
 		UpdateObject(carryableMirror_->GetObject());
@@ -502,6 +575,10 @@ void Stage1::Draw()
 			continue;
 		}
 		fixedMirror->DrawSurface(*cameraManager->GetActiveCamera());
+		object3dCommon->SetCommonDrawSetting();
+	}
+	if (mirrorFloor_) {
+		mirrorFloor_->DrawSurface(*cameraManager->GetActiveCamera());
 		object3dCommon->SetCommonDrawSetting();
 	}
 	if (carryableMirror_) {
@@ -571,31 +648,45 @@ std::unique_ptr<Object3d> Stage1::CreateObject(const std::string& modelName)
 	object->SetModel(modelName);
 	object->SetDirectionalLight(directionalLight_);
 	object->SetPointLight(pointLight_);
+	object->SetSpotLights(spotLights_);
 	return object;
 }
 
 void Stage1::UpdateObject(Object3d& object)
 {
+	// Object3dは自分でSceneを知らないため、Stage1が現在のCameraと共有Lightを毎フレーム渡します。
 	// 毎フレームのカメラ位置、照明、行列を Object3d へ反映します。
 	object.SetCamera(cameraManager->GetActiveCamera());
 	object.SetDirectionalLight(directionalLight_);
 	object.SetPointLight(pointLight_);
+	object.SetSpotLights(spotLights_);
 	object.Update();
 }
 
 void Stage1::DrawFixedMirrorReflections()
 {
-	if (fixedMirrors_.empty()) {
+	// 鏡は通常Cameraでそのまま描くのではなく、鏡ごとの反射Cameraで一度Textureへ描きます。
+	std::vector<FixedMirror*> reflectionMirrors;
+	reflectionMirrors.reserve(fixedMirrors_.size() + 1);
+	for (const auto& fixedMirror : fixedMirrors_) {
+		if (fixedMirror) {
+			reflectionMirrors.push_back(fixedMirror.get());
+		}
+	}
+	if (mirrorFloor_) {
+		reflectionMirrors.push_back(mirrorFloor_.get());
+	}
+	if (reflectionMirrors.empty()) {
 		return;
 	}
 
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
 	// 鏡が増えても反射Sceneの再描画は一フレームに一枚だけ行います。
-	const size_t updateCount = fixedMirrors_.size();
+	const size_t updateCount = reflectionMirrors.size();
 	for (size_t attempt = 0; attempt < updateCount; ++attempt) {
 		const size_t mirrorIndex = reflectionUpdateCursor_ % updateCount;
 		reflectionUpdateCursor_ = (reflectionUpdateCursor_ + 1) % updateCount;
-		FixedMirror* fixedMirror = fixedMirrors_[mirrorIndex].get();
+		FixedMirror* fixedMirror = reflectionMirrors[mirrorIndex];
 		if (!fixedMirror || !fixedMirror->IsReady()) {
 			continue;
 		}
@@ -654,6 +745,7 @@ void Stage1::DrawFixedMirrorReflections()
 
 void Stage1::RestoreSceneCameraMatrices()
 {
+	// 反射Camera用に書き換えたObject3dの行列を、通常Game Camera用へ戻します。
 	Camera* activeCamera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
 	if (!activeCamera) {
 		return;
@@ -670,6 +762,9 @@ void Stage1::RestoreSceneCameraMatrices()
 		if (fixedMirror) {
 			fixedMirror->GetObject().UpdateCameraForDraw(activeCamera);
 		}
+	}
+	if (mirrorFloor_) {
+		mirrorFloor_->GetObject().UpdateCameraForDraw(activeCamera);
 	}
 	if (carryableMirror_) {
 		carryableMirror_->GetObject().UpdateCameraForDraw(activeCamera);
@@ -692,24 +787,42 @@ void Stage1::UpdateReflectionCameras()
 			fixedMirror->UpdateReflectionCamera(*sourceCamera, sourceForward);
 		}
 	}
+	if (mirrorFloor_) {
+		mirrorFloor_->UpdateReflectionCamera(*sourceCamera, sourceForward);
+	}
 }
 
 void Stage1::UpdateMirrorGameplay()
 {
+	// Eキー・Mouse入力をCarryableMirrorへ渡し、鏡のTransformとLaser反射経路を同じフレームで更新します。
 	if (!player_ || !carryableMirror_) {
 		return;
 	}
 
+	Input* input = Input::GetInstance();
+	const Vector2 mouseScreen = input->GetMouseScreen();
+	// ImGuiのInspectorやSliderを右クリックしても、Game View外ならMirror操作へ渡しません。
+	const bool isMouseOverGameView =
+		ImGuiManager::GetInstance()->IsGameViewActive() &&
+		ImGuiManager::GetInstance()->IsMouseOverGameView(mouseScreen.x, mouseScreen.y);
 	const bool interactPressed =
 		ImGuiManager::GetInstance()->IsGameViewActive() &&
-		Input::GetInstance()->TriggerKey(DIK_E);
-	// Game Viewで左クリックを長押ししている間だけ、Mouse操作でMirrorを左右へ構えます。
+		input->TriggerKey(DIK_E);
+	// 左クリックは縦向きの盾、右クリックの短押しは水平Mirrorの表裏切替に使用します。
 	const bool isMirrorAiming =
-		ImGuiManager::GetInstance()->IsGameViewActive() &&
+		isMouseOverGameView &&
 		carryableMirror_->IsCarried() &&
-		Input::GetInstance()->IsMouseButtonPressed(0);
-	const float mirrorAimMouseX = isMirrorAiming
-		? static_cast<float>(Input::GetInstance()->GetMouseX())
+		input->IsMouseButtonPressed(0);
+	const bool isHorizontalMirrorHeld =
+		isMouseOverGameView &&
+		carryableMirror_->IsCarried() &&
+		input->IsMouseButtonPressed(1);
+	const float mirrorAimMouseX = (isMirrorAiming || isHorizontalMirrorHeld)
+		? static_cast<float>(input->GetMouseX())
+		: 0.0f;
+	// 右クリック中はMouse横移動で左右へ向け、Mouse縦移動で水平Mirrorを前後へ傾けます。
+	const float mirrorAimMouseY = isHorizontalMirrorHeld
+		? static_cast<float>(input->GetMouseY())
 		: 0.0f;
 	carryableMirror_->Update(
 		DirectXCommon::GetInstance()->GetDeltaTime(),
@@ -717,21 +830,19 @@ void Stage1::UpdateMirrorGameplay()
 		player_->GetFacingYaw(),
 		interactPressed,
 		isMirrorAiming,
-		mirrorAimMouseX);
+		mirrorAimMouseX,
+		isHorizontalMirrorHeld,
+		mirrorAimMouseY);
 
-	// Charge Laserも携帯Mirror・大型Mirrorの両方で、表側へ当たれば常に反射します。
-	std::vector<const Mirror*> chargeLaserMirrors;
-	chargeLaserMirrors.reserve(fixedMirrors_.size() + 1);
-	for (const auto& fixedMirror : fixedMirrors_) {
-		if (fixedMirror) {
-			chargeLaserMirrors.push_back(&fixedMirror->GetMirror());
-		}
-	}
-	chargeLaserMirrors.push_back(&carryableMirror_->GetMirror());
+	// Charge Laserも固定Mirror・携帯Mirror・鏡床の全てへ当たれば反射します。
+	const std::vector<const Mirror*> chargeLaserMirrors = GetLaserReflectors();
 	laser_.SetOrigin(laserOrigin_);
 	laser_.SetDirection(laserDirection_);
-	laser_.Update(chargeLaserMirrors);
-	laser_.ClipByObbs(stageLightBlockingObbs_, laserVisualWidth_ * 0.5f);
+	// Mirrorより先に床・壁・Doorへ当たったら、その地点でLightを止める。
+	laser_.Update(
+		chargeLaserMirrors,
+		stageLightBlockingObbs_,
+		laserVisualWidth_ * 0.5f);
 	if (laserEmitter_) {
 		// ImGuiで動かした発射装置の見た目も、計算に使用するOriginと同じ位置へ置く。
 		laserEmitter_->SetTranslate(laserOrigin_);
@@ -752,8 +863,57 @@ void Stage1::UpdateMirrorGameplay()
 	}
 }
 
+std::vector<const Mirror*> Stage1::GetLaserReflectors() const
+{
+	std::vector<const Mirror*> mirrors;
+	mirrors.reserve(fixedMirrors_.size() + 2);
+	for (const auto& fixedMirror : fixedMirrors_) {
+		if (fixedMirror) {
+			mirrors.push_back(&fixedMirror->GetMirror());
+		}
+	}
+	if (mirrorFloor_) {
+		mirrors.push_back(&mirrorFloor_->GetMirror());
+	}
+	if (carryableMirror_) {
+		mirrors.push_back(&carryableMirror_->GetMirror());
+	}
+	return mirrors;
+}
+
+std::vector<LaserSegment> Stage1::ReflectHazardLightSegments(
+	const std::vector<LaserSegment>& sourceSegments) const
+{
+	std::vector<LaserSegment> reflectedSegments;
+	const std::vector<const Mirror*> mirrors = GetLaserReflectors();
+	for (const LaserSegment& sourceSegment : sourceSegments) {
+		const Vector3 direction{
+			sourceSegment.end.x - sourceSegment.start.x,
+			sourceSegment.end.y - sourceSegment.start.y,
+			sourceSegment.end.z - sourceSegment.start.z,
+		};
+		const float distance = Length(direction);
+		if (distance <= 0.0001f) {
+			continue;
+		}
+
+		// 危険Lightも通常Laserと同じ経路計算を使い、最大3回まで反射させます。
+		Laser reflectedLight;
+		reflectedLight.SetOrigin(sourceSegment.start);
+		reflectedLight.SetDirection(direction);
+		reflectedLight.SetMaxDistance(distance);
+		reflectedLight.SetMaxReflectionCount(3);
+		// 危険Lightも、反射先を求める前に床・壁・Doorで遮られます。
+		reflectedLight.Update(mirrors, stageLightBlockingObbs_, 0.06f);
+		const std::vector<LaserSegment>& segments = reflectedLight.GetSegments();
+		reflectedSegments.insert(reflectedSegments.end(), segments.begin(), segments.end());
+	}
+	return reflectedSegments;
+}
+
 void Stage1::UpdateLightPuzzle(float deltaTime)
 {
+	// LaserがSwitchへ当たっている時間だけ充電し、0〜1の進行度をDoorと大型Mirrorへ使います。
 	if (!carryableMirror_ || !chargeSwitch_ || !doorSwitch_ || !lightDoor_ ||
 		fixedMirrors_.empty() || !fixedMirrors_.front()) {
 		return;
@@ -800,18 +960,33 @@ void Stage1::UpdateLightPuzzle(float deltaTime)
 
 	// ---------- 第2段階: 横向き大型Mirrorの反射光でDoorを開閉 ----------
 	isDoorSwitchReceivingLight_ = false;
-	// Door Laserは大型Mirrorだけを対象にし、携帯Mirrorの位置へ影響されません。
-	const std::vector<const Mirror*> doorLaserMirrors{
-		&largeMirror.GetMirror(),
-	};
+	// Door Laserも、他のLightと同じ全Mirrorへ反射するルールを使います。
+	const std::vector<const Mirror*> doorLaserMirrors = GetLaserReflectors();
 	doorLaser_.SetOrigin(doorLaserOrigin_);
 	doorLaser_.SetDirection(doorLaserDirection_);
-	doorLaser_.Update(doorLaserMirrors);
-	doorLaser_.ClipByObbs(stageLightBlockingObbs_, laserVisualWidth_ * 0.5f);
+	// Door用Lightも、壁越しにSwitchへ届かないよう同じ遮蔽判定を使う。
+	doorLaser_.Update(
+		doorLaserMirrors,
+		stageLightBlockingObbs_,
+		laserVisualWidth_ * 0.5f);
 	if (doorLaserEmitter_) {
 		doorLaserEmitter_->SetTranslate(doorLaserOrigin_);
 	}
 	const std::vector<LaserSegment>& doorSegments = doorLaser_.GetSegments();
+	// Door用Lightも通常Laserと同じ危険物なので、反射後の線分を含めてPlayerへ判定します。
+	if (player_) {
+		const Sphere playerSphere = player_->GetCollider();
+		for (const LaserSegment& segment : doorSegments) {
+			if (Collision::SegmentSphere(
+				segment.start,
+				segment.end,
+				playerSphere,
+				laserCollisionRadius_).isHit) {
+				isPlayerHitByLaser_ = true;
+				break;
+			}
+		}
+	}
 	const Sphere doorSwitchSphere{ doorSwitchPosition_, doorSwitchRadius_ };
 	for (const LaserSegment& segment : doorSegments) {
 		// Door Switchも、直射光・大型Mirrorでの反射光のどちらでも反応します。
@@ -849,6 +1024,7 @@ void Stage1::UpdateLightPuzzle(float deltaTime)
 
 void Stage1::UpdateHazardLights(float deltaTime)
 {
+	// 危険Lightの位置は毎フレーム時刻から計算します。経路を保存せず、同じ時刻なら同じ位置になります。
 	const float safeDeltaTime = (std::max)(deltaTime, 0.0f);
 	hazardLightTime_ += safeDeltaTime;
 	const auto easeInOutSine = [](float progress) {
@@ -932,9 +1108,10 @@ void Stage1::UpdateHazardLights(float deltaTime)
 		? 1.0f - easeInSine((orbitCycleProgress - 0.5f) * 2.0f)
 		: easeOutSine(orbitCycleProgress * 2.0f);
 	const float orbitRadius = 1.20f + (5.00f - 1.20f) * orbitRadiusProgress;
+	// 回転Lightもほかの危険Lightと同じ太さにし、閉じる時だけ少し細くします。
 	const float orbitBeamWidth = isOrbitClosing
-		? 0.24f + (0.48f - 0.24f) * orbitRadiusProgress
-		: 0.48f;
+		? 0.38f + (0.74f - 0.38f) * orbitRadiusProgress
+		: 0.74f;
 	if (orbitLightRenderer_) {
 		// 閉じるほど細くして、Light全体が小さくなったように見せます。
 		orbitLightRenderer_->SetBeamWidth(orbitBeamWidth);
@@ -956,33 +1133,11 @@ void Stage1::UpdateHazardLights(float deltaTime)
 		});
 	}
 
-	// 床・Door・JSONでColliderを設定した壁へ最初に当たった位置で、危険Lightを切り詰めます。
-	// MirrorはstageLightBlockingObbs_へ入れていないため、反射PuzzleのLaser処理とは干渉しません。
-	const auto clipLightByStageObbs = [&](std::vector<LaserSegment>& segments) {
-		for (LaserSegment& segment : segments) {
-			float nearestT = 1.0f;
-			for (const OBB& blockingObb : stageLightBlockingObbs_) {
-				const Collision::SegmentHit hit = Collision::SegmentOBB(
-					segment.start,
-					segment.end,
-					blockingObb);
-				if (hit.isHit && hit.t < nearestT) {
-					nearestT = hit.t;
-				}
-			}
-			if (nearestT < 1.0f) {
-				segment.end = {
-					segment.start.x + (segment.end.x - segment.start.x) * nearestT,
-					segment.start.y + (segment.end.y - segment.start.y) * nearestT,
-					segment.start.z + (segment.end.z - segment.start.z) * nearestT,
-				};
-			}
-		}
-	};
-	clipLightByStageObbs(ceilingSweepLightSegments_);
-	clipLightByStageObbs(horizontalMoveLightSegments_);
-	clipLightByStageObbs(bottomPulseLightSegments_);
-	clipLightByStageObbs(orbitLightSegments_);
+	// 4色の危険Lightも、固定Mirror・持てるMirror・鏡床で反射する経路へ変換します。
+	ceilingSweepLightSegments_ = ReflectHazardLightSegments(ceilingSweepLightSegments_);
+	horizontalMoveLightSegments_ = ReflectHazardLightSegments(horizontalMoveLightSegments_);
+	bottomPulseLightSegments_ = ReflectHazardLightSegments(bottomPulseLightSegments_);
+	orbitLightSegments_ = ReflectHazardLightSegments(orbitLightSegments_);
 
 	// 有効な危険LightだけPlayerの球Colliderと判定し、既存の赤いHit Debug表示へ渡します。
 	isPlayerHitByHazardLight_ = false;
@@ -1002,6 +1157,61 @@ void Stage1::UpdateHazardLights(float deltaTime)
 			isHitBySegments(bottomPulseLightSegments_) ||
 			isHitBySegments(orbitLightSegments_);
 	}
+}
+
+void Stage1::UpdateLaserSpotLights()
+{
+	// 見えるLaser線分と別にSpotLightを作り、光線が近くの壁・床を実際に照らすようにします。
+	// 前フレームのLightが残らないよう、まず全要素を無効化します。
+	spotLights_.fill({});
+	size_t lightIndex = 0;
+	// 最初にJSONで決めたキー・フィル・バックライトを入れ、残りの枠をLaser用に使います。
+	for (const Object3d::SpotLight& stageSpotLight : stageSpotLights_) {
+		if (lightIndex >= spotLights_.size()) {
+			break;
+		}
+		spotLights_[lightIndex++] = stageSpotLight;
+	}
+	const auto addSegmentsAsSpotLights =
+		[this, &lightIndex](
+			const std::vector<LaserSegment>& segments,
+			const Vector4& color,
+			float intensity)
+	{
+		for (const LaserSegment& segment : segments) {
+			if (lightIndex >= spotLights_.size()) {
+				return;
+			}
+			const Vector3 segmentDirection{
+				segment.end.x - segment.start.x,
+				segment.end.y - segment.start.y,
+				segment.end.z - segment.start.z,
+			};
+			const float segmentLength = Length(segmentDirection);
+			if (segmentLength <= 0.05f) {
+				continue;
+			}
+
+			// Laserの始点・方向・遮蔽物までの長さを、そのまま円錐Lightへ使います。
+			Object3d::SpotLight& spotLight = spotLights_[lightIndex++];
+			spotLight.color = color;
+			spotLight.position = segment.start;
+			spotLight.direction = Normalize(segmentDirection);
+			spotLight.intensity = intensity;
+			spotLight.distance = segmentLength + 0.35f;
+			spotLight.decay = 1.20f;
+			spotLight.cosAngle = 0.82f;
+			spotLight.cosFalloffStart = 0.96f;
+		}
+	};
+
+	// 通常のPuzzle Light、Door Light、四種類の危険Lightを同じ仕組みで照明へ反映します。
+	addSegmentsAsSpotLights(laser_.GetSegments(), { 0.05f, 0.95f, 1.00f, 1.0f }, 3.5f);
+	addSegmentsAsSpotLights(doorLaser_.GetSegments(), { 1.00f, 0.38f, 0.05f, 1.0f }, 3.5f);
+	addSegmentsAsSpotLights(ceilingSweepLightSegments_, { 0.95f, 0.20f, 1.00f, 1.0f }, 3.2f);
+	addSegmentsAsSpotLights(horizontalMoveLightSegments_, { 1.00f, 0.82f, 0.10f, 1.0f }, 3.0f);
+	addSegmentsAsSpotLights(bottomPulseLightSegments_, { 0.15f, 0.55f, 1.00f, 1.0f }, 3.4f);
+	addSegmentsAsSpotLights(orbitLightSegments_, { 0.20f, 1.00f, 0.35f, 1.0f }, 2.8f);
 }
 
 void Stage1::InitializeGameplaySmoke()
@@ -1036,6 +1246,134 @@ void Stage1::InitializeGameplaySmoke()
 	const std::vector<LaserSegment>& probeSegments = carryMirrorProbe.GetSegments();
 	gameplaySmokeCarryMirrorReflectedLaser_ =
 		probeSegments.size() >= 2 && probeSegments.front().hitMirror;
+
+	// 表側とは逆から当てたLaserは、携帯Mirrorでは反射しないことを確認します。
+	Laser carryMirrorBackfaceProbe;
+	carryMirrorBackfaceProbe.SetOrigin({
+		carryMirror.GetCenter().x - mirrorNormal.x * 3.0f,
+		carryMirror.GetCenter().y - mirrorNormal.y * 3.0f,
+		carryMirror.GetCenter().z - mirrorNormal.z * 3.0f,
+	});
+	carryMirrorBackfaceProbe.SetDirection(mirrorNormal);
+	carryMirrorBackfaceProbe.SetMaxDistance(8.0f);
+	carryMirrorBackfaceProbe.SetMaxReflectionCount(1);
+	carryMirrorBackfaceProbe.Update({ &carryMirror });
+	gameplaySmokeCarryMirrorBackfaceIgnored_ =
+		carryMirrorBackfaceProbe.GetSegments().size() == 1 &&
+		!carryMirrorBackfaceProbe.GetSegments().front().hitMirror &&
+		Length({
+			carryMirrorBackfaceProbe.GetSegments().front().end.x - carryMirrorBackfaceProbe.GetSegments().front().start.x,
+			carryMirrorBackfaceProbe.GetSegments().front().end.y - carryMirrorBackfaceProbe.GetSegments().front().start.y,
+			carryMirrorBackfaceProbe.GetSegments().front().end.z - carryMirrorBackfaceProbe.GetSegments().front().start.z,
+		}) < 3.10f;
+
+	// 短い右クリックを離す操作を二回行い、上向き・下向きの水平Mirrorになることを確認します。
+	carryableMirror_->Update(0.05f, mirrorPosition, 0.0f, false, false, 0.0f, true, 0.0f);
+	carryableMirror_->Update(0.05f, mirrorPosition, 0.0f, false, false, 0.0f, false, 0.0f);
+	const bool isHorizontalMirrorFacingUp = carryableMirror_->GetMirror().GetNormal().y > 0.90f;
+	const Vector3 horizontalMirrorOffset{
+		carryableMirror_->GetMirror().GetCenter().x - mirrorPosition.x,
+		carryableMirror_->GetMirror().GetCenter().y - mirrorPosition.y,
+		carryableMirror_->GetMirror().GetCenter().z - mirrorPosition.z,
+	};
+	const bool isHorizontalMirrorFurtherForward =
+		std::sqrt(horizontalMirrorOffset.x * horizontalMirrorOffset.x +
+			horizontalMirrorOffset.z * horizontalMirrorOffset.z) > 2.50f;
+	carryableMirror_->Update(0.05f, mirrorPosition, 0.0f, false, false, 0.0f, true, 0.0f);
+	carryableMirror_->Update(0.05f, mirrorPosition, 0.0f, false, false, 0.0f, false, 0.0f);
+	const bool isHorizontalMirrorFacingDown = carryableMirror_->GetMirror().GetNormal().y < -0.90f;
+	// 下向きの水平Mirrorを前方へ傾けると、真下からのLaserがPlayer正面へ進むことを確認します。
+	carryableMirror_->Update(0.50f, mirrorPosition, 0.0f, false, false, 0.0f, true, 100.0f);
+	Laser carryMirrorTiltProbe;
+	const Mirror& tiltedCarryMirror = carryableMirror_->GetMirror();
+	carryMirrorTiltProbe.SetOrigin({
+		tiltedCarryMirror.GetCenter().x,
+		tiltedCarryMirror.GetCenter().y - 3.0f,
+		tiltedCarryMirror.GetCenter().z,
+	});
+	carryMirrorTiltProbe.SetDirection({ 0.0f, 1.0f, 0.0f });
+	carryMirrorTiltProbe.SetMaxDistance(8.0f);
+	carryMirrorTiltProbe.SetMaxReflectionCount(1);
+	carryMirrorTiltProbe.Update({ &tiltedCarryMirror });
+	const std::vector<LaserSegment>& tiltedProbeSegments = carryMirrorTiltProbe.GetSegments();
+	gameplaySmokeCarryMirrorTiltRedirectsLaser_ =
+		tiltedProbeSegments.size() >= 2 &&
+		tiltedProbeSegments.front().hitMirror &&
+		tiltedProbeSegments[1].end.z - tiltedProbeSegments[1].start.z > 0.50f;
+	// 長押しを離しても、短押し扱いになって表裏が切り替わらないことを確認します。
+	carryableMirror_->Update(0.01f, mirrorPosition, 0.0f, false, false, 0.0f, false, 0.0f);
+	// 左クリックと同じ操作で、水平状態から通常の縦向きMirrorへ戻します。
+	carryableMirror_->Update(1.0f, mirrorPosition, 0.0f, false, true, 0.0f);
+	// 長押しは鏡を反転させず、構えるための操作だけとして扱います。
+	carryableMirror_->Update(0.30f, mirrorPosition, 0.0f, false, false, 0.0f, true, 0.0f);
+	carryableMirror_->Update(0.01f, mirrorPosition, 0.0f, false, false, 0.0f, false, 0.0f);
+	const bool doesLongRightMouseHoldKeepVertical =
+		std::abs(carryableMirror_->GetMirror().GetNormal().y) < 0.01f;
+	gameplaySmokeCarryMirrorHorizontalControl_ =
+		isHorizontalMirrorFacingUp &&
+		isHorizontalMirrorFacingDown &&
+		isHorizontalMirrorFurtherForward &&
+		doesLongRightMouseHoldKeepVertical;
+
+	// 鏡床は上から下へ向かうLightを、下から上へ反射することを確認します。
+	if (mirrorFloor_) {
+		Laser mirrorFloorProbe;
+		const Mirror& mirrorFloor = mirrorFloor_->GetMirror();
+		mirrorFloorProbe.SetOrigin({
+			mirrorFloor.GetCenter().x,
+			mirrorFloor.GetCenter().y + 3.0f,
+			mirrorFloor.GetCenter().z,
+		});
+		mirrorFloorProbe.SetDirection({ 0.0f, -1.0f, 0.0f });
+		mirrorFloorProbe.SetMaxDistance(8.0f);
+		mirrorFloorProbe.SetMaxReflectionCount(1);
+		mirrorFloorProbe.Update({ &mirrorFloor });
+		Laser mirrorFloorBackfaceProbe;
+		mirrorFloorBackfaceProbe.SetOrigin({
+			mirrorFloor.GetCenter().x,
+			mirrorFloor.GetCenter().y - 3.0f,
+			mirrorFloor.GetCenter().z,
+		});
+		mirrorFloorBackfaceProbe.SetDirection({ 0.0f, 1.0f, 0.0f });
+		mirrorFloorBackfaceProbe.SetMaxDistance(8.0f);
+		mirrorFloorBackfaceProbe.SetMaxReflectionCount(1);
+		mirrorFloorBackfaceProbe.Update({ &mirrorFloor });
+		gameplaySmokeMirrorFloorReflectsLaser_ =
+			mirrorFloorProbe.GetSegments().size() >= 2 &&
+			mirrorFloorProbe.GetSegments().front().hitMirror &&
+			mirrorFloorProbe.GetSegments()[1].end.y > mirrorFloorProbe.GetSegments()[1].start.y &&
+			mirrorFloorBackfaceProbe.GetSegments().size() >= 2 &&
+			mirrorFloorBackfaceProbe.GetSegments().front().hitMirror &&
+			mirrorFloorBackfaceProbe.GetSegments()[1].end.y < mirrorFloorBackfaceProbe.GetSegments()[1].start.y;
+	}
+
+	// 斜め回転した大型MirrorがDoor Switchへ光を送れることを確認します。
+	if (!fixedMirrors_.empty() && fixedMirrors_.front()) {
+		const Mirror diagonalDoorMirror(
+			fixedMirrors_.front()->GetMirror().GetCenter(),
+			{ std::sin(largeMirrorBaseYaw_ + largeMirrorTargetYawOffset_), 0.0f,
+				std::cos(largeMirrorBaseYaw_ + largeMirrorTargetYawOffset_) },
+			fixedMirrors_.front()->GetMirror().GetWidth(),
+			fixedMirrors_.front()->GetMirror().GetHeight());
+		Laser diagonalDoorLaser;
+		diagonalDoorLaser.SetOrigin(doorLaserOrigin_);
+		diagonalDoorLaser.SetDirection(doorLaserDirection_);
+		diagonalDoorLaser.SetMaxDistance(20.0f);
+		diagonalDoorLaser.SetMaxReflectionCount(1);
+		diagonalDoorLaser.Update({ &diagonalDoorMirror });
+		const Sphere diagonalDoorSwitch{ doorSwitchPosition_, doorSwitchRadius_ };
+		gameplaySmokeDoorDiagonalReflection_ = std::any_of(
+			diagonalDoorLaser.GetSegments().begin(),
+			diagonalDoorLaser.GetSegments().end(),
+			[&](const LaserSegment& segment)
+			{
+				return Collision::SegmentSphere(
+					segment.start,
+					segment.end,
+					diagonalDoorSwitch,
+					laserCollisionRadius_).isHit;
+			});
+	}
 
 	const auto laserHitsSphere = [&](const Laser& testLaser, const Sphere& sphere) {
 		return std::any_of(
@@ -1113,8 +1451,8 @@ void Stage1::InitializeGameplaySmoke()
 
 	// 左一段目のCamera候補へ壁を置き、壁側へ回れないことを確認します。
 	constexpr float testYaw = 0.52359878f;
-	constexpr float testPitch = 0.58f;
-	constexpr float testDistance = 11.5f;
+	const float testPitch = testController.GetOrbitPitch();
+	const float testDistance = testController.GetDistance();
 	const Vector3 testFocus = testController.GetFocus();
 	const float horizontalDistance = testDistance * std::cos(testPitch);
 	const Vector3 blockedCameraPosition{
@@ -1147,30 +1485,44 @@ void Stage1::InitializeGameplaySmoke()
 		yawAfterOneFrame > yawBeforeStep + 0.0001f &&
 		yawAfterOneFrame < testYaw - 0.0001f;
 
-	// 左右は中心から二段、遠近は近・中・遠の三段で止まることを確認します。
-	const bool orbitReachedPositiveLimit =
-		testController.TryStepOrbit(1, {}) &&
-		!testController.TryStepOrbit(1, {}) &&
-		testController.GetOrbitStepIndex() == 2;
-	const bool orbitReachedNegativeLimit =
-		testController.TryStepOrbit(-1, {}) &&
-		testController.TryStepOrbit(-1, {}) &&
-		testController.TryStepOrbit(-1, {}) &&
-		testController.TryStepOrbit(-1, {}) &&
-		!testController.TryStepOrbit(-1, {}) &&
-		testController.GetOrbitStepIndex() == -2;
+	// PlayerがCamera側へ後退しても、Dead Zoneを越えたFocusがすぐ追いつくことを確認します。
+	Camera backwardTestCamera;
+	CameraController backwardTestController;
+	backwardTestController.Initialize(&backwardTestCamera, { 0.0f, 0.0f, 0.0f });
+	backwardTestController.SetAutoRecenterEnabled(false);
+	backwardTestController.Update(
+		0.25f,
+		{ 0.0f, 0.0f, -8.0f },
+		{ 0.0f, 0.0f, -1.0f },
+		false,
+		{});
+	gameplaySmokeCameraBacktracks_ = backwardTestController.GetFocus().z < -5.0f;
+
+	// 左右を十二回押すと、一回30度のまま360度回り切れることを確認します。
+	Camera fullOrbitCamera;
+	CameraController fullOrbitController;
+	fullOrbitController.Initialize(&fullOrbitCamera, { 0.0f, 0.0f, 0.0f });
+	fullOrbitController.SetAutoRecenterEnabled(false);
+	bool canCompleteFullOrbit = true;
+	for (int stepIndex = 0; stepIndex < 12; ++stepIndex) {
+		canCompleteFullOrbit &= fullOrbitController.TryStepOrbit(1, {});
+	}
+	const bool canReturnFromFullOrbit =
+		fullOrbitController.TryStepOrbit(-1, {}) &&
+		fullOrbitController.GetOrbitStepIndex() == 11;
 	const bool distanceReachedFarLimit =
 		testController.TryStepDistance(1, {}) &&
 		!testController.TryStepDistance(1, {}) &&
-		testController.GetDistanceStepIndex() == 2;
+		testController.GetDistanceStepIndex() == 3;
 	const bool distanceReachedNearLimit =
+		testController.TryStepDistance(-1, {}) &&
 		testController.TryStepDistance(-1, {}) &&
 		testController.TryStepDistance(-1, {}) &&
 		!testController.TryStepDistance(-1, {}) &&
 		testController.GetDistanceStepIndex() == 0;
 	gameplaySmokeCameraSteps_ =
-		orbitReachedPositiveLimit &&
-		orbitReachedNegativeLimit &&
+		canCompleteFullOrbit &&
+		canReturnFromFullOrbit &&
 		distanceReachedFarLimit &&
 		distanceReachedNearLimit;
 }
@@ -1192,6 +1544,24 @@ void Stage1::UpdateGameplaySmoke(float deltaTime)
 			break;
 		}
 	}
+	if (mirrorFloor_ && mirrorFloor_->HasReflectionCapture()) {
+		gameplaySmokeMirrorFloorReflection_ = true;
+	}
+	const auto hasReflectedSegment = [](const std::vector<LaserSegment>& segments) {
+		return std::any_of(
+			segments.begin(),
+			segments.end(),
+			[](const LaserSegment& segment) { return segment.hitMirror; });
+	};
+	gameplaySmokeHazardLightReflection_ =
+		gameplaySmokeHazardLightReflection_ ||
+		hasReflectedSegment(ceilingSweepLightSegments_) ||
+		hasReflectedSegment(horizontalMoveLightSegments_) ||
+		hasReflectedSegment(bottomPulseLightSegments_) ||
+		hasReflectedSegment(orbitLightSegments_);
+	gameplaySmokeDoorStartsClosed_ =
+		gameplaySmokeDoorStartsClosed_ ||
+		(!isDoorSwitchReceivingLight_ && doorOpenAmount_ <= 0.01f);
 	if (gameplaySmokeSawGrounded_ &&
 		!player_->IsGrounded() &&
 		player_->GetPosition().x > 10.0f) {
@@ -1213,13 +1583,22 @@ void Stage1::UpdateGameplaySmoke(float deltaTime)
 		gameplaySmokePickedUpMirror_ &&
 		gameplaySmokeDroppedMirror_ &&
 		gameplaySmokeCarryMirrorReflectedLaser_ &&
+		gameplaySmokeCarryMirrorBackfaceIgnored_ &&
+		gameplaySmokeCarryMirrorHorizontalControl_ &&
+		gameplaySmokeCarryMirrorTiltRedirectsLaser_ &&
 		gameplaySmokeCarriedMirrorBlocksPlayer_ &&
 		gameplaySmokeLaserHitsPlayer_ &&
 		gameplaySmokeMirrorBlocksPlayer_ &&
 		gameplaySmokeFixedMirrorReflection_ &&
+		gameplaySmokeMirrorFloorReflectsLaser_ &&
+		gameplaySmokeMirrorFloorReflection_ &&
+		gameplaySmokeHazardLightReflection_ &&
+		gameplaySmokeDoorStartsClosed_ &&
+		gameplaySmokeDoorDiagonalReflection_ &&
 		gameplaySmokeCameraSteps_ &&
 		gameplaySmokeCameraWallBlock_ &&
 		gameplaySmokeCameraSmooth_ &&
+		gameplaySmokeCameraBacktracks_ &&
 		gameplaySmokeSawGrounded_ &&
 		gameplaySmokeLeftFloor_ &&
 		gameplaySmokeFell_;
@@ -1229,13 +1608,22 @@ void Stage1::UpdateGameplaySmoke(float deltaTime)
 			<< ": picked=" << gameplaySmokePickedUpMirror_
 			<< " dropped=" << gameplaySmokeDroppedMirror_
 			<< " carryLaser=" << gameplaySmokeCarryMirrorReflectedLaser_
+			<< " carryBackface=" << gameplaySmokeCarryMirrorBackfaceIgnored_
+			<< " carryHorizontal=" << gameplaySmokeCarryMirrorHorizontalControl_
+			<< " carryTiltLaser=" << gameplaySmokeCarryMirrorTiltRedirectsLaser_
 			<< " carriedMirrorBlocksPlayer=" << gameplaySmokeCarriedMirrorBlocksPlayer_
 			<< " laserHitsPlayer=" << gameplaySmokeLaserHitsPlayer_
 			<< " mirrorBlocksPlayer=" << gameplaySmokeMirrorBlocksPlayer_
 			<< " fixedMirrorReflection=" << gameplaySmokeFixedMirrorReflection_
+			<< " mirrorFloorLaser=" << gameplaySmokeMirrorFloorReflectsLaser_
+			<< " mirrorFloorReflection=" << gameplaySmokeMirrorFloorReflection_
+			<< " hazardReflection=" << gameplaySmokeHazardLightReflection_
+			<< " doorStartsClosed=" << gameplaySmokeDoorStartsClosed_
+			<< " doorDiagonal=" << gameplaySmokeDoorDiagonalReflection_
 			<< " cameraSteps=" << gameplaySmokeCameraSteps_
 			<< " cameraWall=" << gameplaySmokeCameraWallBlock_
 			<< " cameraSmooth=" << gameplaySmokeCameraSmooth_
+			<< " cameraBacktracks=" << gameplaySmokeCameraBacktracks_
 			<< " grounded=" << gameplaySmokeSawGrounded_
 			<< " leftFloor=" << gameplaySmokeLeftFloor_
 			<< " fell=" << gameplaySmokeFell_
@@ -1621,11 +2009,14 @@ bool Stage1::SaveStageMap()
 
 bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 {
+	// JSONのObjectDataを分類し、既存の床・鏡・Camera・追加モデルへ反映する中心処理です。
 	if (!stageMapData_ || !floor_) {
 		return false;
 	}
 
 	const LevelLoader::ObjectData* floorData = nullptr;
+	const LevelLoader::ObjectData* playerStartData = nullptr;
+	const LevelLoader::ObjectData* carryableMirrorData = nullptr;
 	std::vector<const LevelLoader::ObjectData*> mirrorDataList;
 	std::vector<const LevelLoader::ObjectData*> additionalObjects;
 	std::vector<const LevelLoader::ObjectData*> eventTriggerDataList;
@@ -1634,9 +2025,14 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 	std::function<void(const std::vector<LevelLoader::ObjectData>&)> collectObjects;
 	collectObjects = [&](const std::vector<LevelLoader::ObjectData>& objects)
 	{
+		// childrenも同じ扱いにするため、JSONツリーを再帰的に最後まで調べます。
 		for (const LevelLoader::ObjectData& objectData : objects) {
 			if (objectData.tag == "Floor") {
 				floorData = &objectData;
+			} else if (objectData.tag == "PlayerStart") {
+				playerStartData = &objectData;
+			} else if (objectData.objectType == "CARRYABLE_MIRROR") {
+				carryableMirrorData = &objectData;
 			} else if (objectData.tag == "Mirror") {
 				mirrorDataList.push_back(&objectData);
 			} else if (objectData.objectType == "EVENT_TRIGGER") {
@@ -1653,9 +2049,76 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 	};
 	collectObjects(stageMapData_->objects);
 
-	// Stage1で必須の床と鏡がなければ、何も変更しない
+	// Stage1で必須の床と鏡がなければ、途中まで生成した状態を残さず何も変更しない
 	if (!floorData || mirrorDataList.empty()) {
 		return false;
+	}
+
+	// PlayerStartは見えない目印で、マップ読込時に開始座標だけを記録します。
+	// ホットリロード時にはPlayerを移動させないため、実際の配置はInitializeで一度だけ行います。
+	hasStagePlayerStart_ = playerStartData != nullptr;
+	if (playerStartData) {
+		stagePlayerStartPosition_ = playerStartData->translation;
+	}
+	if (carryableMirrorData && carryableMirror_) {
+		// 持てるMirrorの置き場所は、ほかのステージ物と同じくJSONで変更します。
+		carryableMirror_->SetDroppedPosition(carryableMirrorData->translation);
+	}
+	if (stageMapData_->hasStageStart) {
+		stageStartSettings_.duration = stageMapData_->stageStart.duration;
+		stageStartSettings_.playerAirHeight = stageMapData_->stageStart.playerAirHeight;
+		stageStartSettings_.cameraFrontDistance = stageMapData_->stageStart.cameraFrontDistance;
+		stageStartSettings_.cameraFrontHeight = stageMapData_->stageStart.cameraFrontHeight;
+		stageStartSettings_.cameraOrbitAngle = stageMapData_->stageStart.cameraOrbitAngle;
+		stageStartSettings_.cameraHandoffDuration = stageMapData_->stageStart.cameraHandoffDuration;
+	}
+	stageSpotLights_.clear();
+	if (stageMapData_->hasLighting) {
+		const LevelLoader::LightingData& lighting = stageMapData_->lighting;
+		directionalLight_.color = {
+			lighting.directionalColor.x,
+			lighting.directionalColor.y,
+			lighting.directionalColor.z,
+			1.0f,
+		};
+		directionalLight_.direction = Normalize(lighting.directionalDirection);
+		directionalLight_.intensity = lighting.directionalIntensity;
+		directionalLight_.ambientColor = lighting.ambientColor;
+		directionalLight_.ambientIntensity = lighting.ambientIntensity;
+		pointLight_.color = {
+			lighting.pointColor.x,
+			lighting.pointColor.y,
+			lighting.pointColor.z,
+			1.0f,
+		};
+		pointLight_.position = lighting.pointPosition;
+		pointLight_.intensity = lighting.pointIntensity;
+		pointLight_.radius = lighting.pointRadius;
+		pointLight_.decay = lighting.pointDecay;
+		for (const LevelLoader::SpotLightData& spotLightData : lighting.spotLights) {
+			if (stageSpotLights_.size() >= kStageLightingSpotLightCount) {
+				break;
+			}
+			if (spotLightData.intensity <= 0.0f || spotLightData.distance <= 0.0f) {
+				continue;
+			}
+
+			Object3d::SpotLight spotLight{};
+			spotLight.color = {
+				spotLightData.color.x,
+				spotLightData.color.y,
+				spotLightData.color.z,
+				1.0f,
+			};
+			spotLight.position = spotLightData.position;
+			spotLight.intensity = spotLightData.intensity;
+			spotLight.direction = Normalize(spotLightData.direction);
+			spotLight.distance = spotLightData.distance;
+			spotLight.decay = spotLightData.decay;
+			spotLight.cosAngle = spotLightData.cosAngle;
+			spotLight.cosFalloffStart = spotLightData.cosFalloffStart;
+			stageSpotLights_.push_back(spotLight);
+		}
 	}
 
 	// Mirrorタグの数だけ固定鏡を作るため、JSONへMirrorを追加すれば複数配置できます。
@@ -2270,6 +2733,7 @@ bool Stage1::AddStageMapCameraArea()
 
 void Stage1::UpdateStageEvents()
 {
+	// Playerの球Colliderと各Trigger OBBを調べ、今いる場所に対応したEvent Cameraを選びます。
 	if (!player_ || !cameraManager) {
 		return;
 	}
@@ -2320,6 +2784,7 @@ void Stage1::UpdateStageEvents()
 				player_->GetPosition().y + 1.0f,
 				player_->GetPosition().z,
 			};
+			// JSONのCamera座標を、CameraControllerが使う距離・yaw・pitchへ変換します。
 			const Vector3 cameraOffset{
 				cameraFound->camera->GetTranslate().x - initialFocus.x,
 				cameraFound->camera->GetTranslate().y - initialFocus.y,
@@ -2363,6 +2828,7 @@ void Stage1::UpdateStageEvents()
 
 void Stage1::UpdateEventManualCamera()
 {
+	// Event中だけは通常Cameraではなく、このEvent Camera専用ControllerへMouse入力を渡します。
 	if (activeEventCameraName_.empty() || !player_) {
 		return;
 	}
@@ -2403,6 +2869,7 @@ void Stage1::UpdateEventManualCamera()
 
 void Stage1::UpdateCameraAreas()
 {
+	// Camera Areaは見えないOBBです。Playerが入った最初のAreaだけ通常Camera設定へ反映します。
 	if (!player_ || !cameraController_) {
 		return;
 	}
@@ -2438,6 +2905,7 @@ void Stage1::UpdateStageEventCamera(
 	StageEventCamera& eventCamera,
 	const LevelLoader::ObjectData& objectData)
 {
+	// Event Cameraは、JSONにrotationを書くか、focusを見るかの二つの書き方を選べます。
 	if (!eventCamera.camera) {
 		return;
 	}
@@ -2465,6 +2933,7 @@ void Stage1::UpdateStageEventCamera(
 
 void Stage1::UpdateStageMapPaths(float deltaTime)
 {
+	// JSONのcontrol_pointsを持つObjectだけ、経過時間から曲線上の座標を計算して移動します。
 	for (StageMapRuntimeObject& runtimeObject : stageMapRuntimeObjects_) {
 		if (!runtimeObject.visual || runtimeObject.controlPoints.size() < 2) {
 			continue;

@@ -26,6 +26,49 @@ public:
 		float fovY = 0.45f;
 	};
 
+	// ステージ開始演出で使う、Playerの落下とCamera軌道の設定です。
+	struct StageStartData
+	{
+		float duration = 2.5f;
+		float playerAirHeight = 8.0f;
+		float cameraFrontDistance = 10.0f;
+		float cameraFrontHeight = 6.0f;
+		float cameraOrbitAngle = 3.14159265f;
+		float cameraHandoffDuration = 0.8f;
+	};
+
+	// ステージ内の一方向を照らし、キー・フィル・バックライトにも使えるSpotLightの設定です。
+	struct SpotLightData
+	{
+		std::string name;
+		Vector3 color{ 1.0f, 1.0f, 1.0f };
+		Vector3 position{};
+		float intensity = 0.0f;
+		Vector3 direction{ 0.0f, -1.0f, 0.0f };
+		float distance = 0.0f;
+		float decay = 1.0f;
+		float cosAngle = 0.5f;
+		float cosFalloffStart = 0.8f;
+	};
+
+	// ステージ全体の明るさを決める、共有の平行光源・点光源・SpotLight群の設定です。
+	struct LightingData
+	{
+		Vector3 directionalColor{ 1.0f, 1.0f, 1.0f };
+		Vector3 directionalDirection{ 0.5f, 1.0f, 0.5f };
+		float directionalIntensity = 0.3f;
+		// 直接光の向きに関係なく、影側を見える明るさへ保つ環境光です。
+		Vector3 ambientColor{ 1.0f, 1.0f, 1.0f };
+		float ambientIntensity = 0.0f;
+		Vector3 pointColor{ 1.0f, 1.0f, 1.0f };
+		Vector3 pointPosition{ 0.0f, 3.0f, -2.0f };
+		float pointIntensity = 5.0f;
+		float pointRadius = 20.0f;
+		float pointDecay = 1.0f;
+		// JSONのspot_lightsへ書いた順番で、Stage1の共有SpotLightとして使用します。
+		std::vector<SpotLightData> spotLights;
+	};
+
 	struct ObjectData
 	{
 		// オブジェクト本体、Transform、子オブジェクトをまとめた再帰データ。
@@ -58,6 +101,11 @@ public:
 	{
 		// シーン直下に置かれたオブジェクト一覧。
 		std::string coordinateSystem = "blender";
+		// シーン全体に一つだけ置く、開始演出と照明の設定です。
+		bool hasStageStart = false;
+		StageStartData stageStart;
+		bool hasLighting = false;
+		LightingData lighting;
 		std::vector<ObjectData> objects;
 	};
 

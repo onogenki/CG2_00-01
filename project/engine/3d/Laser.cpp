@@ -8,6 +8,14 @@ using namespace MyMath;
 
 void Laser::Update(const std::vector<const Mirror*>& mirrors)
 {
+	Update(mirrors, {}, 0.0f);
+}
+
+void Laser::Update(
+	const std::vector<const Mirror*>& mirrors,
+	const std::vector<OBB>& blockingObbs,
+	float blockingPadding)
+{
 	segments_.clear();
 	Vector3 rayOrigin = origin_;
 	Vector3 rayDirection = Normalize(direction_);
@@ -36,6 +44,46 @@ void Laser::Update(const std::vector<const Mirror*>& mirrors)
 			}
 		}
 
+		// Mirrorを調べるだけでは、壁の後ろにあるMirrorを先に反射してしまう。
+		// 同じ線分上の床・壁・Doorも調べ、最も手前の遮蔽物を優先する。
+		float nearestBlockingDistance = (std::numeric_limits<float>::max)();
+		const Vector3 rayEnd{
+			rayOrigin.x + rayDirection.x * remainingDistance,
+			rayOrigin.y + rayDirection.y * remainingDistance,
+			rayOrigin.z + rayDirection.z * remainingDistance,
+		};
+		for (const OBB& blockingObb : blockingObbs) {
+			const Collision::SegmentHit hit = Collision::SegmentOBB(
+				rayOrigin,
+				rayEnd,
+				blockingObb,
+				blockingPadding);
+			// 発射装置が床の表面に置かれた場合のt=0は、外側へ発射できるよう無視する。
+			if (!hit.isHit || hit.t <= 0.0001f) {
+				continue;
+			}
+			nearestBlockingDistance = (std::min)(
+				nearestBlockingDistance,
+				hit.t * remainingDistance);
+		}
+
+		const bool isBlockingHit = nearestBlockingDistance <= remainingDistance;
+		const bool isBlockingBeforeMirror =
+			isBlockingHit && nearestBlockingDistance <= nearestDistance + 0.0001f;
+		if (isBlockingBeforeMirror) {
+			segments_.push_back({
+				rayOrigin,
+				{
+					rayOrigin.x + rayDirection.x * nearestBlockingDistance,
+					rayOrigin.y + rayDirection.y * nearestBlockingDistance,
+					rayOrigin.z + rayDirection.z * nearestBlockingDistance,
+				},
+				false,
+				0,
+			});
+			break;
+		}
+
 		if (!nearestHit.isHit) {
 			segments_.push_back({
 				rayOrigin,
@@ -53,9 +101,13 @@ void Laser::Update(const std::vector<const Mirror*>& mirrors)
 		segments_.push_back({
 			rayOrigin,
 			nearestHit.position,
-			true,
+			nearestHit.canReflect,
 			nearestMirrorIndex,
 		});
+		// 裏面は反射しない板です。Lightをこの位置で止め、PlayerやSwitchへ抜けさせません。
+		if (!nearestHit.canReflect) {
+			break;
+		}
 		remainingDistance -= nearestDistance;
 		rayDirection = Normalize(mirrors[nearestMirrorIndex]->ReflectDirection(rayDirection));
 		rayOrigin = {

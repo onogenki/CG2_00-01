@@ -96,21 +96,16 @@ void LaserRenderer::Draw(const std::vector<LaserSegment>& segments, const Camera
 				segment.end.y + quadSide.y,
 				segment.end.z + quadSide.z,
 			};
-			const Vector3 quadVertices[6]{
-				startLeft,
-				startRight,
-				endRight,
-				startLeft,
-				endRight,
-				endLeft,
+			const Vertex quadVertices[6]{
+				{ { startLeft.x, startLeft.y, startLeft.z, 1.0f }, 0.0f, 0.0f },
+				{ { startRight.x, startRight.y, startRight.z, 1.0f }, 1.0f, 0.0f },
+				{ { endRight.x, endRight.y, endRight.z, 1.0f }, 1.0f, 1.0f },
+				{ { startLeft.x, startLeft.y, startLeft.z, 1.0f }, 0.0f, 0.0f },
+				{ { endRight.x, endRight.y, endRight.z, 1.0f }, 1.0f, 1.0f },
+				{ { endLeft.x, endLeft.y, endLeft.z, 1.0f }, 0.0f, 1.0f },
 			};
-			for (const Vector3& position : quadVertices) {
-				mappedVertices_[drawVertexCount++].position = {
-					position.x,
-					position.y,
-					position.z,
-					1.0f,
-				};
+			for (const Vertex& vertex : quadVertices) {
+				mappedVertices_[drawVertexCount++] = vertex;
 			}
 		};
 		appendQuad(side);
@@ -170,7 +165,13 @@ bool LaserRenderer::CreateGraphicsPipeline()
 	inputElement.SemanticName = "POSITION";
 	inputElement.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
 	inputElement.AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
-	const D3D12_INPUT_LAYOUT_DESC inputLayout{ &inputElement, 1 };
+	D3D12_INPUT_ELEMENT_DESC inputElements[2]{};
+	inputElements[0] = inputElement;
+	inputElements[1].SemanticName = "TEXCOORD";
+	inputElements[1].SemanticIndex = 0;
+	inputElements[1].Format = DXGI_FORMAT_R32G32_FLOAT;
+	inputElements[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+	const D3D12_INPUT_LAYOUT_DESC inputLayout{ inputElements, _countof(inputElements) };
 
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShader = dxCommon_->CompileShader(
 		L"resources/shaders/Laser.VS.hlsl", L"vs_6_0");

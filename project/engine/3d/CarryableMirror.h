@@ -24,16 +24,20 @@ public:
 		float playerFacingYaw,
 		bool interactPressed,
 		bool isAiming = false,
-		float horizontalAimInput = 0.0f);
+		float horizontalAimInput = 0.0f,
+		bool isRightMouseHeld = false,
+		float verticalAimInput = 0.0f);
 
 	Object3d& GetObject() { return object_; }
 	const Object3d& GetObject() const { return object_; }
 	const Mirror& GetMirror() const { return mirror_; }
 	const MyMath::OBB& GetCollider() const { return collider_; }
 	bool IsCarried() const { return isCarried_; }
+	// stage1.jsonで指定した位置へ、置かれているMirrorだけを移動します。
+	void SetDroppedPosition(const Vector3& position);
 
 private:
-	void ApplyTransform(const Vector3& position, float yaw);
+	void ApplyTransform(const Vector3& position, float pitch, float yaw);
 
 	Object3d object_;
 	Mirror mirror_;
@@ -44,6 +48,8 @@ private:
 	float yaw_ = 0.0f;
 	float pickupDistance_ = 2.5f;
 	float holdDistance_ = 1.8f;
+	// 水平MirrorはPlayerから離して、前方の上下Lightを受けやすくします。
+	float horizontalHoldDistance_ = 2.70f;
 	float holdHeight_ = 0.5f;
 	// Playerが旋回した時に、鏡が目標方向へ追従する速さです。
 	float holdTurnFollowSpeed_ = 9.0f;
@@ -53,5 +59,18 @@ private:
 	float maxAimYawOffset_ = 1.00f;
 	// Playerの正面から見たMirrorの左右角度です。左クリックを離すと正面へ戻ります。
 	float aimYawOffset_ = 0.0f;
+	// 右クリックで寝かせて持つ状態です。左クリック中は通常のガード状態へ戻ります。
+	bool isHorizontalHoldMode_ = false;
+	// trueなら鏡面の表側を上へ、falseなら下へ向けます。
+	// 最初の右クリックでは上向きになるよう、初期値は下向きにします。
+	bool isHorizontalFacingUp_ = false;
+	// 右クリック中のMouse上下移動で加える、水平Mirrorの傾きです。
+	float horizontalTilt_ = 0.0f;
+	float horizontalTiltMouseSensitivity_ = 0.006f;
+	float maxHorizontalTilt_ = 0.85f;
+	// 右クリックを短く離した時だけ、上向き・下向きの切替として扱います。
+	float rightMouseHoldTime_ = 0.0f;
+	float rightMouseClickThreshold_ = 0.22f;
+	bool wasRightMouseHeld_ = false;
 	bool isCarried_ = false;
 };

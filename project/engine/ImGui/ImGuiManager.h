@@ -89,6 +89,9 @@ public:
 		const std::string& status,
 		LevelLoader::LevelData* levelData,
 		int& selectedObjectIndex);
+	// Stage1の環境光とキー・フィル・バックライトを、実行中に調整するUIです。
+	// 値が変更されたフレームだけtrueを返し、保存処理は呼び出し側へ任せます。
+	bool StageLightingWindow(LevelLoader::LightingData& lighting);
 	// 鏡の中心・大きさ・回転を編集するデバッグ用ウィンドウを表示します。
 	// 値が変更されたフレームだけ true を返します。
 	bool MirrorDebugWindow(

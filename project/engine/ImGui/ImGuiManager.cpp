@@ -205,7 +205,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 		ImGui::TextWrapped("Scene editing is locked. Switch to Edit View to select or transform objects.");
 		ImGui::End();
 	} else if (showModelWindow_ &&
-		currentSceneName != "GamePlay" &&
+		currentSceneName != "Debug" &&
 		currentSceneName != "Stage1" &&
 		currentSceneName != "Title") {
 		if (inspectorDockId_ != 0) {
@@ -431,16 +431,16 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 
 	if (IsGameViewActive()) {
 		RuntimeMonitorWindow(sceneName);
-	} else if (currentSceneName != "GamePlay" &&
+	} else if (currentSceneName != "Debug" &&
 		currentSceneName != "Title" &&
 		currentSceneName != "Stage1") {
 		if (ImGui::Begin("Model Shelf")) {
 			ImGui::TextUnformatted("Edit View Model Shelf");
 			ImGui::Separator();
 			ImGui::TextWrapped("This scene has not registered a resource shelf yet.");
-			if (SceneManager::GetInstance()->GetCurrentSceneName() != "GAMEPLAY") {
-				if (ImGui::Button("Go to GamePlay")) {
-					SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
+			if (SceneManager::GetInstance()->GetCurrentSceneName() != "DEBUG") {
+				if (ImGui::Button("Go to Debug")) {
+					SceneManager::GetInstance()->ChangeScene("DEBUG");
 				}
 			}
 			ImGui::SameLine();
@@ -2106,6 +2106,59 @@ LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 	(void)selectedObjectIndex;
 #endif
 	return result;
+}
+
+bool ImGuiManager::StageLightingWindow(LevelLoader::LightingData& lighting)
+{
+	bool isChanged = false;
+#ifdef USE_IMGUI
+	if (inspectorDockId_ != 0) {
+		ImGui::SetNextWindowDockID(inspectorDockId_, ImGuiCond_FirstUseEver);
+	}
+	if (!ImGui::Begin("Stage Lighting")) {
+		ImGui::End();
+		return false;
+	}
+
+	ImGui::TextUnformatted("Adjust the room brightness, then press Save Map in Stage Map Editor.");
+	ImGui::SeparatorText("Overall Light");
+	isChanged |= ImGui::ColorEdit3("Directional: color", &lighting.directionalColor.x);
+	isChanged |= ImGui::DragFloat3("Directional: direction", &lighting.directionalDirection.x, 0.01f);
+	isChanged |= ImGui::DragFloat("Directional: intensity", &lighting.directionalIntensity, 0.01f, 0.0f, 5.0f);
+	isChanged |= ImGui::ColorEdit3("Ambient: color", &lighting.ambientColor.x);
+	isChanged |= ImGui::DragFloat("Ambient: intensity", &lighting.ambientIntensity, 0.01f, 0.0f, 1.0f);
+	isChanged |= ImGui::ColorEdit3("Point: color", &lighting.pointColor.x);
+	isChanged |= ImGui::DragFloat3("Point: position", &lighting.pointPosition.x, 0.05f);
+	isChanged |= ImGui::DragFloat("Point: intensity", &lighting.pointIntensity, 0.01f, 0.0f, 10.0f);
+	isChanged |= ImGui::DragFloat("Point: radius", &lighting.pointRadius, 0.1f, 0.1f, 200.0f);
+	isChanged |= ImGui::DragFloat("Point: decay", &lighting.pointDecay, 0.01f, 0.01f, 5.0f);
+
+	ImGui::SeparatorText("Three-Point Lighting");
+	for (size_t index = 0; index < lighting.spotLights.size(); ++index) {
+		LevelLoader::SpotLightData& spotLight = lighting.spotLights[index];
+		ImGui::PushID(static_cast<int>(index));
+		if (ImGui::TreeNode(spotLight.name.c_str())) {
+			isChanged |= ImGui::ColorEdit3("Color", &spotLight.color.x);
+			isChanged |= ImGui::DragFloat3("Position", &spotLight.position.x, 0.05f);
+			isChanged |= ImGui::DragFloat3("Direction", &spotLight.direction.x, 0.01f);
+			isChanged |= ImGui::DragFloat("Intensity", &spotLight.intensity, 0.01f, 0.0f, 10.0f);
+			isChanged |= ImGui::DragFloat("Distance", &spotLight.distance, 0.1f, 0.1f, 200.0f);
+			isChanged |= ImGui::DragFloat("Decay", &spotLight.decay, 0.01f, 0.01f, 5.0f);
+			isChanged |= ImGui::DragFloat("Cos Angle", &spotLight.cosAngle, 0.01f, 0.0f, 0.99f);
+			isChanged |= ImGui::DragFloat("Cos Falloff Start", &spotLight.cosFalloffStart, 0.01f, 0.0f, 1.0f);
+			if (spotLight.cosFalloffStart < spotLight.cosAngle) {
+				// 円錐の中心側から減衰が始まるよう、開始値が外側の角度より小さくならないようにします。
+				spotLight.cosFalloffStart = spotLight.cosAngle;
+			}
+			ImGui::TreePop();
+		}
+		ImGui::PopID();
+	}
+	ImGui::End();
+#else
+	(void)lighting;
+#endif
+	return isChanged;
 }
 
 bool ImGuiManager::MirrorDebugWindow(

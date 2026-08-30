@@ -1,4 +1,4 @@
-#include "GamePlayScene.h"
+#include "DebugScene.h"
 #include "TextureManager.h"
 #include "ModelManager.h"
 #include "ParticleManager.h"
@@ -34,8 +34,8 @@
 using namespace MyMath;
 
 namespace {
-constexpr const char* kGamePlayLevelFileName = "scene";
-constexpr const char* kGamePlayLevelFilePath = "resources/levels/scene.json";
+constexpr const char* kDebugLevelFileName = "scene";
+constexpr const char* kDebugLevelFilePath = "resources/levels/scene.json";
 
 Vector3 TransformPoint(const Vector3& point, const Matrix4x4& matrix)
 {
@@ -155,7 +155,7 @@ bool NearlyEqual(const Transform& lhs, const Transform& rhs, float tolerance = 0
 
 }
 
-void GamePlayScene::Initialize()
+void DebugScene::Initialize()
 {
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
 	PostEffect::GetInstance()->SetGrayscale(false);
@@ -295,9 +295,9 @@ void GamePlayScene::Initialize()
 	walkObject_ = objWalk.get();
 	animationObjects.push_back(std::move(objWalk));
 
-	// GamePlayが最初から作成するモデルの直後へ、scene.jsonのモデルを追加します。
+	// Debugが最初から作成するモデルの直後へ、scene.jsonのモデルを追加します。
 	levelNormalObjectBaseCount_ = normalObjects.size();
-	levelHotReload_.SetFilePath(kGamePlayLevelFilePath);
+	levelHotReload_.SetFilePath(kDebugLevelFilePath);
 	ReloadLevelData();
 	levelHotReload_.Synchronize();
 	
@@ -382,10 +382,10 @@ void GamePlayScene::Initialize()
 
 }
 
-bool GamePlayScene::ReloadLevelData()
+bool DebugScene::ReloadLevelData()
 {
 	std::unique_ptr<LevelLoader::LevelData> levelData =
-		LevelLoader::Load(kGamePlayLevelFileName);
+		LevelLoader::Load(kDebugLevelFileName);
 	if (!levelData) {
 		levelReloadStatus_ = "Reload failed. Current scene was kept.";
 		return false;
@@ -448,7 +448,7 @@ bool GamePlayScene::ReloadLevelData()
 	return true;
 }
 
-void GamePlayScene::UpdateLevelHotReload()
+void DebugScene::UpdateLevelHotReload()
 {
 	if (levelHotReload_.ConsumeChange()) {
 		levelReloadStatus_ = "scene.json change detected. Reloading...";
@@ -456,7 +456,7 @@ void GamePlayScene::UpdateLevelHotReload()
 	}
 }
 
-void GamePlayScene::ScanResourceModels()
+void DebugScene::ScanResourceModels()
 {
 	SceneEditor::ShelfState state{};
 	state.entries = std::move(modelLibrary_);
@@ -475,7 +475,7 @@ void GamePlayScene::ScanResourceModels()
 		}
 	}
 }
-std::unique_ptr<Object3d> GamePlayScene::CreateObjectFromModel(const std::string& fileName, bool playAnimation)
+std::unique_ptr<Object3d> DebugScene::CreateObjectFromModel(const std::string& fileName, bool playAnimation)
 {
 	auto modelIt = std::find_if(modelLibrary_.begin(), modelLibrary_.end(), [&](const ResourceModelEntry& entry) {
 		return entry.fileName == fileName;
@@ -508,7 +508,7 @@ std::unique_ptr<Object3d> GamePlayScene::CreateObjectFromModel(const std::string
 	return object;
 }
 
-bool GamePlayScene::AddModelToScene(const std::string& fileName)
+bool DebugScene::AddModelToScene(const std::string& fileName)
 {
 	Camera* activeCamera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
 	Vector3 spawnPosition = { 0.0f, 0.0f, 4.0f };
@@ -519,7 +519,7 @@ bool GamePlayScene::AddModelToScene(const std::string& fileName)
 	return AddModelToScene(fileName, spawnPosition);
 }
 
-bool GamePlayScene::AddModelToScene(const std::string& fileName, const Vector3& spawnPosition)
+bool DebugScene::AddModelToScene(const std::string& fileName, const Vector3& spawnPosition)
 {
 	auto object = CreateObjectFromModel(fileName, true);
 	if (!object) {
@@ -542,14 +542,14 @@ bool GamePlayScene::AddModelToScene(const std::string& fileName, const Vector3& 
 	return true;
 }
 
-bool GamePlayScene::AddTextureToScene(const std::string& textureFilePath)
+bool DebugScene::AddTextureToScene(const std::string& textureFilePath)
 {
 	const float clientWidth = static_cast<float>(DirectXCommon::GetInstance()->GetClientWidth());
 	const float clientHeight = static_cast<float>(DirectXCommon::GetInstance()->GetClientHeight());
 	return AddTextureToScene(textureFilePath, { clientWidth * 0.5f, clientHeight * 0.5f });
 }
 
-bool GamePlayScene::AddTextureToScene(const std::string& textureFilePath, const Vector2& position)
+bool DebugScene::AddTextureToScene(const std::string& textureFilePath, const Vector2& position)
 {
 	if (textureFilePath.empty()) {
 		return false;
@@ -572,7 +572,7 @@ bool GamePlayScene::AddTextureToScene(const std::string& textureFilePath, const 
 	return true;
 }
 
-void GamePlayScene::ClearAddedSceneModels()
+void DebugScene::ClearAddedSceneModels()
 {
 	DirectXCommon::GetInstance()->WaitForGPU();
 	if (normalObjects.size() > baseNormalObjectCount_) {
@@ -589,17 +589,17 @@ void GamePlayScene::ClearAddedSceneModels()
 	ClearSceneSpriteSelection();
 }
 
-void GamePlayScene::RegisterEcsModel(Object3d* object, const std::string& sourceFile, bool isAnimated)
+void DebugScene::RegisterEcsModel(Object3d* object, const std::string& sourceFile, bool isAnimated)
 {
 	selectedEcsEntity_ = ecsWorld_.CreateModelEntity(object, sourceFile, isAnimated);
 }
 
-void GamePlayScene::RegisterEcsSprite(Sprite* sprite, const std::string& sourceFile)
+void DebugScene::RegisterEcsSprite(Sprite* sprite, const std::string& sourceFile)
 {
 	selectedEcsEntity_ = ecsWorld_.CreateSpriteEntity(sprite, sourceFile);
 }
 
-void GamePlayScene::UpdateEcsWorld()
+void DebugScene::UpdateEcsWorld()
 {
 	std::vector<Object3d*> currentObjects;
 	currentObjects.reserve(normalObjects.size() + animationObjects.size());
@@ -629,7 +629,7 @@ void GamePlayScene::UpdateEcsWorld()
 	}
 }
 
-Object3d* GamePlayScene::GetSelectedSceneObject()
+Object3d* DebugScene::GetSelectedSceneObject()
 {
 	if (!hasSelectedSceneObject_) {
 		return nullptr;
@@ -640,7 +640,7 @@ Object3d* GamePlayScene::GetSelectedSceneObject()
 	return selectedSceneObjectIndex_ < normalObjects.size() ? normalObjects[selectedSceneObjectIndex_].get() : nullptr;
 }
 
-const Object3d* GamePlayScene::GetSelectedSceneObject() const
+const Object3d* DebugScene::GetSelectedSceneObject() const
 {
 	if (!hasSelectedSceneObject_) {
 		return nullptr;
@@ -651,7 +651,7 @@ const Object3d* GamePlayScene::GetSelectedSceneObject() const
 	return selectedSceneObjectIndex_ < normalObjects.size() ? normalObjects[selectedSceneObjectIndex_].get() : nullptr;
 }
 
-void GamePlayScene::SelectSceneObject(bool animationObject, size_t index)
+void DebugScene::SelectSceneObject(bool animationObject, size_t index)
 {
 	if (animationObject) {
 		if (index >= animationObjects.size()) {
@@ -672,7 +672,7 @@ void GamePlayScene::SelectSceneObject(bool animationObject, size_t index)
 	ClearSceneSpriteSelection();
 }
 
-void GamePlayScene::ClearSceneObjectSelection()
+void DebugScene::ClearSceneObjectSelection()
 {
 	hasSelectedSceneObject_ = false;
 	selectedSceneObjectIsAnimation_ = false;
@@ -680,7 +680,7 @@ void GamePlayScene::ClearSceneObjectSelection()
 	inspectorAutoSelectModelFrames_ = 0;
 }
 
-Sprite* GamePlayScene::GetSelectedSceneSprite()
+Sprite* DebugScene::GetSelectedSceneSprite()
 {
 	if (!hasSelectedSceneSprite_ || selectedSceneSpriteIndex_ >= sprites.size()) {
 		return nullptr;
@@ -688,7 +688,7 @@ Sprite* GamePlayScene::GetSelectedSceneSprite()
 	return sprites[selectedSceneSpriteIndex_].get();
 }
 
-const Sprite* GamePlayScene::GetSelectedSceneSprite() const
+const Sprite* DebugScene::GetSelectedSceneSprite() const
 {
 	if (!hasSelectedSceneSprite_ || selectedSceneSpriteIndex_ >= sprites.size()) {
 		return nullptr;
@@ -696,7 +696,7 @@ const Sprite* GamePlayScene::GetSelectedSceneSprite() const
 	return sprites[selectedSceneSpriteIndex_].get();
 }
 
-void GamePlayScene::SelectSceneSprite(size_t index)
+void DebugScene::SelectSceneSprite(size_t index)
 {
 	if (index >= sprites.size()) {
 		ClearSceneSpriteSelection();
@@ -710,15 +710,16 @@ void GamePlayScene::SelectSceneSprite(size_t index)
 	ClearSceneObjectSelection();
 }
 
-void GamePlayScene::ClearSceneSpriteSelection()
+void DebugScene::ClearSceneSpriteSelection()
 {
 	hasSelectedSceneSprite_ = false;
 	selectedSceneSpriteIndex_ = 0;
 	inspectorAutoSelectSpriteFrames_ = 0;
 }
 
-bool GamePlayScene::TryGetGameViewWorldPosition(float screenX, float screenY, Vector3& outPosition) const
+bool DebugScene::TryGetGameViewWorldPosition(float screenX, float screenY, Vector3& outPosition) const
 {
+	// 画面上のMouse位置を、3D空間の「床へ置く座標」へ変換する関数です。
 	Camera* activeCamera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
 	if (!activeCamera) {
 		return false;
@@ -734,14 +735,17 @@ bool GamePlayScene::TryGetGameViewWorldPosition(float screenX, float screenY, Ve
 		return false;
 	}
 
+	// Game View内の割合へ変換します。左上が0、右下が1です。
 	const float normalizedX = (screenX - rectX) / rectWidth;
 	const float normalizedY = (screenY - rectY) / rectHeight;
 	if (normalizedX < 0.0f || normalizedX > 1.0f || normalizedY < 0.0f || normalizedY > 1.0f) {
 		return false;
 	}
 
+	// GPUが使うNDC座標へ変換します。X/Yは-1〜1、奥行きは0〜1です。
 	const float ndcX = normalizedX * 2.0f - 1.0f;
 	const float ndcY = 1.0f - normalizedY * 2.0f;
+	// ViewProjectionの逆行列を使うと、画面座標から3D空間の近点・遠点へ戻せます。
 	const Matrix4x4 inverseViewProjection = Inverse(activeCamera->GetViewProjectionMatrix());
 
 	Vector3 nearPoint{};
@@ -751,12 +755,14 @@ bool GamePlayScene::TryGetGameViewWorldPosition(float screenX, float screenY, Ve
 		return false;
 	}
 
+	// 近点から遠点へ伸ばす線が、Mouse位置を通る3DのRayです。
 	const Vector3 rayDirection{
 		farPoint.x - nearPoint.x,
 		farPoint.y - nearPoint.y,
 		farPoint.z - nearPoint.z
 	};
 
+	// RayとY=0の仮想床が交わる場所を、新しいモデルの配置位置にします。
 	constexpr float placementHeight = 0.0f;
 	if (std::abs(rayDirection.y) > 0.0001f) {
 		const float t = (placementHeight - nearPoint.y) / rayDirection.y;
@@ -770,6 +776,7 @@ bool GamePlayScene::TryGetGameViewWorldPosition(float screenX, float screenY, Ve
 		}
 	}
 
+	// Rayが床と平行な時は交点がないため、Camera前方6mを代替位置にします。
 	const float length = (std::max)(Length(rayDirection), 0.0001f);
 	outPosition = {
 		nearPoint.x + rayDirection.x / length * 6.0f,
@@ -779,8 +786,9 @@ bool GamePlayScene::TryGetGameViewWorldPosition(float screenX, float screenY, Ve
 	return true;
 }
 
-bool GamePlayScene::TryGetGameViewSpritePosition(float screenX, float screenY, Vector2& outPosition) const
+bool DebugScene::TryGetGameViewSpritePosition(float screenX, float screenY, Vector2& outPosition) const
 {
+	// Spriteは3Dではなく画面ピクセル座標で置くため、Game Viewの割合を画面サイズへ掛け直します。
 	float rectX = 0.0f;
 	float rectY = 0.0f;
 	float rectWidth = 0.0f;
@@ -804,7 +812,7 @@ bool GamePlayScene::TryGetGameViewSpritePosition(float screenX, float screenY, V
 	return true;
 }
 
-bool GamePlayScene::EnterModelPreview(const std::string& fileName)
+bool DebugScene::EnterModelPreview(const std::string& fileName)
 {
 	auto object = CreateObjectFromModel(fileName, true);
 	if (!object) {
@@ -817,6 +825,7 @@ bool GamePlayScene::EnterModelPreview(const std::string& fileName)
 		previewReturnCameraRotate_ = activeCamera->GetRotate();
 	}
 
+	// モデルごとの中心と半径を使い、原点に寄せてから見切れないCamera距離を決めます。
 	Vector3 previewCenter{};
 	float previewRadius = 1.0f;
 	auto modelIt = std::find_if(modelLibrary_.begin(), modelLibrary_.end(), [&](const ResourceModelEntry& entry) {
@@ -827,6 +836,7 @@ bool GamePlayScene::EnterModelPreview(const std::string& fileName)
 		previewRadius = (std::max)(modelIt->thumbnailRadius, 0.1f);
 	}
 
+	// モデル中心の逆方向へ動かすと、モデルの中心が座標(0,0,0)にそろいます。
 	object->SetTranslate({ -previewCenter.x, -previewCenter.y, -previewCenter.z });
 	object->SetScale({ 1.0f, 1.0f, 1.0f });
 	previewObject_ = std::move(object);
@@ -838,7 +848,7 @@ bool GamePlayScene::EnterModelPreview(const std::string& fileName)
 	return true;
 }
 
-bool GamePlayScene::EnterTexturePreview(const std::string& textureFilePath)
+bool DebugScene::EnterTexturePreview(const std::string& textureFilePath)
 {
 	if (textureFilePath.empty()) {
 		return false;
@@ -865,7 +875,7 @@ bool GamePlayScene::EnterTexturePreview(const std::string& textureFilePath)
 	return true;
 }
 
-void GamePlayScene::ExitModelPreview()
+void DebugScene::ExitModelPreview()
 {
 	if (!isModelPreviewMode_) {
 		return;
@@ -890,7 +900,7 @@ void GamePlayScene::ExitModelPreview()
 	previewCameraPitch_ = 0.0f;
 }
 
-void GamePlayScene::ResetTexturePreviewView()
+void DebugScene::ResetTexturePreviewView()
 {
 	if (!previewSprite_) {
 		return;
@@ -900,12 +910,13 @@ void GamePlayScene::ResetTexturePreviewView()
 	const Vector2 originalSize = previewSprite_->GetTextureSize();
 	const float maxWidth = (std::max)(160.0f, clientWidth * 0.72f);
 	const float maxHeight = (std::max)(120.0f, clientHeight * 0.72f);
+	// 横幅用・高さ用の小さい方の倍率を選ぶと、縦横比を保って両方の上限に収まります。
 	const float scale = (std::min)(maxWidth / (std::max)(originalSize.x, 1.0f), maxHeight / (std::max)(originalSize.y, 1.0f));
 	previewSprite_->SetSize({ originalSize.x * scale, originalSize.y * scale });
 	previewSprite_->SetPosition({ clientWidth * 0.5f, clientHeight * 0.5f });
 }
 
-void GamePlayScene::ResetModelPreviewCamera()
+void DebugScene::ResetModelPreviewCamera()
 {
 	if (!isModelPreviewMode_) {
 		return;
@@ -927,7 +938,7 @@ void GamePlayScene::ResetModelPreviewCamera()
 	}
 }
 
-void GamePlayScene::UpdateGameViewCameraControl()
+void DebugScene::UpdateGameViewCameraControl()
 {
 	Camera* activeCamera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
 	if (!activeCamera) {
@@ -1026,10 +1037,12 @@ void GamePlayScene::UpdateGameViewCameraControl()
 			previewCameraDistance_ = (std::max)(0.5f, previewCameraDistance_);
 		}
 
+		// 左DragはCameraの向きに対する右・上ベクトルへ分解し、斜めを向いても自然に平行移動します。
 		const float yawCos = std::cos(previewCameraYaw_);
 		const float yawSin = std::sin(previewCameraYaw_);
 		const float pitchCos = std::cos(previewCameraPitch_);
 		const float pitchSin = std::sin(previewCameraPitch_);
+		// yaw/pitchからCamera前方ベクトルを作り、注視点から距離分だけ後ろへCameraを置きます。
 		const Vector3 forward{
 			yawSin * pitchCos,
 			-pitchSin,
@@ -1064,7 +1077,7 @@ void GamePlayScene::UpdateGameViewCameraControl()
 	activeCamera->SetRotate(cameraRotate);
 }
 
-Vector3 GamePlayScene::GetParticleEffectPosition() const
+Vector3 DebugScene::GetParticleEffectPosition() const
 {
 	if (!objectAxis) {
 		return { 0.0f, 0.0f, 0.0f };
@@ -1076,7 +1089,7 @@ Vector3 GamePlayScene::GetParticleEffectPosition() const
 	return effectPosition;
 }
 
-void GamePlayScene::DrawParticleEffectImGui(bool embedded)
+void DebugScene::DrawParticleEffectImGui(bool embedded)
 {
 #ifdef USE_IMGUI
 	ParticleManager* particleManager = ParticleManager::GetInstance();
@@ -1154,14 +1167,14 @@ void GamePlayScene::DrawParticleEffectImGui(bool embedded)
 #endif
 }
 
-std::filesystem::path GamePlayScene::GetCaptureDirectory(const char* folderName) const
+std::filesystem::path DebugScene::GetCaptureDirectory(const char* folderName) const
 {
 	std::error_code errorCode;
 	const std::filesystem::path resourceDirectory = std::filesystem::absolute("resources", errorCode);
 	return (errorCode ? std::filesystem::path("resources") : resourceDirectory) / "Captures" / folderName;
 }
 
-bool GamePlayScene::CreateCaptureDirectories() const
+bool DebugScene::CreateCaptureDirectories() const
 {
 	std::error_code errorCode;
 	for (const char* folderName : { "Screenshots", "Videos", "Replays" }) {
@@ -1173,7 +1186,7 @@ bool GamePlayScene::CreateCaptureDirectories() const
 	return true;
 }
 
-std::string GamePlayScene::MakeTimestampString() const
+std::string DebugScene::MakeTimestampString() const
 {
 	const auto now = std::chrono::system_clock::now();
 	const std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
@@ -1187,9 +1200,10 @@ std::string GamePlayScene::MakeTimestampString() const
 	return stream.str();
 }
 
-bool GamePlayScene::CaptureGameViewPixels(std::vector<unsigned char>& pixels, int& width, int& height)
+bool DebugScene::CaptureGameViewPixels(std::vector<unsigned char>& pixels, int& width, int& height)
 {
 #ifdef USE_IMGUI
+	// ImGui表示用のGame View Textureから、RGBA画素をCPU側のvectorへコピーします。
 	return DirectXCommon::GetInstance()->CaptureGameTexturePixels(
 		pixels,
 		width,
@@ -1203,8 +1217,9 @@ bool GamePlayScene::CaptureGameViewPixels(std::vector<unsigned char>& pixels, in
 #endif
 }
 
-bool GamePlayScene::SavePixelsAsBmp(const std::filesystem::path& filePath, const std::vector<unsigned char>& pixels, int width, int height)
+bool DebugScene::SavePixelsAsBmp(const std::filesystem::path& filePath, const std::vector<unsigned char>& pixels, int width, int height)
 {
+	// BMPは先頭に二種類のHeaderを付けてから、RGBA32bitの画素をそのまま保存します。
 	if (pixels.empty() || width <= 0 || height <= 0) {
 		return false;
 	}
@@ -1224,6 +1239,7 @@ bool GamePlayScene::SavePixelsAsBmp(const std::filesystem::path& filePath, const
 	BITMAPINFOHEADER bitmapHeader{};
 	bitmapHeader.biSize = sizeof(BITMAPINFOHEADER);
 	bitmapHeader.biWidth = width;
+	// 高さを負にすると、先頭の画素を上端として扱うTop-Down BMPになります。
 	bitmapHeader.biHeight = -height;
 	bitmapHeader.biPlanes = 1;
 	bitmapHeader.biBitCount = 32;
@@ -1239,7 +1255,7 @@ bool GamePlayScene::SavePixelsAsBmp(const std::filesystem::path& filePath, const
 	return file.good();
 }
 
-bool GamePlayScene::BeginRecordingAvi(const std::filesystem::path& filePath, int width, int height, int frameRate)
+bool DebugScene::BeginRecordingAvi(const std::filesystem::path& filePath, int width, int height, int frameRate)
 {
 	if (width <= 0 || height <= 0 || frameRate <= 0) {
 		return false;
@@ -1299,7 +1315,7 @@ bool GamePlayScene::BeginRecordingAvi(const std::filesystem::path& filePath, int
 	return true;
 }
 
-bool GamePlayScene::AppendRecordingFrame(const std::vector<unsigned char>& pixels, int width, int height)
+bool DebugScene::AppendRecordingFrame(const std::vector<unsigned char>& pixels, int width, int height)
 {
 	if (!recordingAviStream_ ||
 		pixels.empty() ||
@@ -1308,6 +1324,7 @@ bool GamePlayScene::AppendRecordingFrame(const std::vector<unsigned char>& pixel
 		return false;
 	}
 
+	// RenderTextureは上から下、AVIは下から上の行順を期待するため、行を反転して渡します。
 	const size_t rowSize = static_cast<size_t>(width) * 4;
 	std::vector<unsigned char> bottomUpPixels(pixels.size());
 	for (int y = 0; y < height; ++y) {
@@ -1329,7 +1346,7 @@ bool GamePlayScene::AppendRecordingFrame(const std::vector<unsigned char>& pixel
 	return SUCCEEDED(result);
 }
 
-void GamePlayScene::EndRecordingAvi()
+void DebugScene::EndRecordingAvi()
 {
 	if (recordingAviStream_) {
 		AVIStreamRelease(static_cast<PAVISTREAM>(recordingAviStream_));
@@ -1344,7 +1361,7 @@ void GamePlayScene::EndRecordingAvi()
 	recordingVideoHeight_ = 0;
 }
 
-void GamePlayScene::DrawCaptureImGui()
+void DebugScene::DrawCaptureImGui()
 {
 #ifdef USE_IMGUI
 	const std::filesystem::path screenshotDirectory = GetCaptureDirectory("Screenshots");
@@ -1460,7 +1477,7 @@ void GamePlayScene::DrawCaptureImGui()
 #endif
 }
 
-void GamePlayScene::DrawTopToolsImGui()
+void DebugScene::DrawTopToolsImGui()
 {
 #ifdef USE_IMGUI
 	if (!ImGui::Begin("Top Tools")) {
@@ -1512,7 +1529,7 @@ void GamePlayScene::DrawTopToolsImGui()
 #endif
 }
 
-void GamePlayScene::UpdateRecordingCapture()
+void DebugScene::UpdateRecordingCapture()
 {
 	if (!isRecordingGameView_) {
 		return;
@@ -1543,7 +1560,7 @@ void GamePlayScene::UpdateRecordingCapture()
 	++recordingFrameIndex_;
 }
 
-void GamePlayScene::UpdateReplayCapture()
+void DebugScene::UpdateReplayCapture()
 {
 	if (!replayBufferEnabled_ || isRecordingGameView_) {
 		return;
@@ -1601,7 +1618,7 @@ void GamePlayScene::UpdateReplayCapture()
 	}
 }
 
-bool GamePlayScene::SaveReplayClip()
+bool DebugScene::SaveReplayClip()
 {
 	if (replayFrames_.empty() || isRecordingGameView_) {
 		return false;
@@ -1637,7 +1654,7 @@ bool GamePlayScene::SaveReplayClip()
 	return true;
 }
 
-void GamePlayScene::DrawInspectorImGui()
+void DebugScene::DrawInspectorImGui()
 {
 #ifdef USE_IMGUI
 	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
@@ -1681,7 +1698,7 @@ void GamePlayScene::DrawInspectorImGui()
 			ImGui::Separator();
 		}
 	};
-	options.drawExtraTabs = [this]() { DrawGamePlayInspectorTabs(); };
+	options.drawExtraTabs = [this]() { DrawDebugInspectorTabs(); };
 	SceneEditor::DrawInspector(options);
 	if (inspectorForceDockFrames_ > 0) {
 		--inspectorForceDockFrames_;
@@ -1695,7 +1712,7 @@ void GamePlayScene::DrawInspectorImGui()
 #endif
 }
 
-void GamePlayScene::DrawEditViewportImGui()
+void DebugScene::DrawEditViewportImGui()
 {
 #ifdef USE_IMGUI
 	if (!ImGuiManager::GetInstance()->IsEditViewActive() || isModelPreviewMode_) {
@@ -1741,7 +1758,7 @@ void GamePlayScene::DrawEditViewportImGui()
 #endif
 }
 
-void GamePlayScene::DrawSpriteEditViewportImGui()
+void DebugScene::DrawSpriteEditViewportImGui()
 {
 #ifdef USE_IMGUI
 	if (!ImGuiManager::GetInstance()->IsEditViewActive() || isModelPreviewMode_) {
@@ -1769,7 +1786,7 @@ void GamePlayScene::DrawSpriteEditViewportImGui()
 #endif
 }
 
-void GamePlayScene::DrawGamePlayInspectorTabs()
+void DebugScene::DrawDebugInspectorTabs()
 {
 #ifdef USE_IMGUI
 	if (ImGui::BeginTabItem("Particle")) {
@@ -1834,14 +1851,14 @@ void GamePlayScene::DrawGamePlayInspectorTabs()
 #endif
 }
 
-void GamePlayScene::DrawEcsInspectorImGui()
+void DebugScene::DrawEcsInspectorImGui()
 {
 #ifdef USE_IMGUI
 	if (!ImGui::BeginTabItem("ECS")) {
 		return;
 	}
 
-	ImGui::TextWrapped("Every GamePlay model and 2D texture is registered as an Entity.");
+	ImGui::TextWrapped("Every Debug model and 2D texture is registered as an Entity.");
 	ImGui::TextDisabled("Add a Box Collider to a 3D model when you need simple collision checks.");
 	ImGui::Separator();
 
@@ -1913,7 +1930,7 @@ void GamePlayScene::DrawEcsInspectorImGui()
 #endif
 }
 
-void GamePlayScene::DrawModelShelfImGui()
+void DebugScene::DrawModelShelfImGui()
 {
 #ifdef USE_IMGUI
 	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
@@ -1977,7 +1994,7 @@ void GamePlayScene::DrawModelShelfImGui()
 	lastModelShelfMessage_ = state.message;
 #endif
 }
-void GamePlayScene::HandleModelDropOnEditView()
+void DebugScene::HandleModelDropOnEditView()
 {
 #ifdef USE_IMGUI
 	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
@@ -2041,7 +2058,7 @@ void GamePlayScene::HandleModelDropOnEditView()
 #endif
 }
 
-void GamePlayScene::HandleGameViewSpriteSelection()
+void DebugScene::HandleGameViewSpriteSelection()
 {
 #ifdef USE_IMGUI
 	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
@@ -2094,7 +2111,7 @@ void GamePlayScene::HandleGameViewSpriteSelection()
 #endif
 }
 
-void GamePlayScene::HandleGameViewObjectSelection()
+void DebugScene::HandleGameViewObjectSelection()
 {
 #ifdef USE_IMGUI
 	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
@@ -2204,7 +2221,7 @@ void GamePlayScene::HandleGameViewObjectSelection()
 #endif
 }
 
-void GamePlayScene::DrawEditViewModelToolsOverlay()
+void DebugScene::DrawEditViewModelToolsOverlay()
 {
 #ifdef USE_IMGUI
 	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
@@ -2261,8 +2278,9 @@ void GamePlayScene::DrawEditViewModelToolsOverlay()
 #endif
 }
 
-bool GamePlayScene::IsMouseOverSelectedObjectGizmo(float mouseScreenX, float mouseScreenY) const
+bool DebugScene::IsMouseOverSelectedObjectGizmo(float mouseScreenX, float mouseScreenY) const
 {
+	// 3Dの軸を画面へ投影し、Mouseと線分との距離で「軸をつかんだか」を判定します。
 #ifdef USE_IMGUI
 	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
 		return false;
@@ -2308,6 +2326,7 @@ bool GamePlayScene::IsMouseOverSelectedObjectGizmo(float mouseScreenX, float mou
 	const float axisLength = (std::max)({ size.x, size.y, size.z, 1.0f }) * 0.85f;
 	const Matrix4x4& viewProjectionMatrix = activeCamera->GetViewProjectionMatrix();
 	const auto projectPoint = [&](const Vector3& world, ImVec2& out) {
+		// ワールド座標をNDCへ変換してから、ImGuiのGame View座標へ変換します。
 		Vector3 ndc{};
 		if (!TransformCoord(world, viewProjectionMatrix, ndc)) {
 			return false;
@@ -2348,7 +2367,7 @@ bool GamePlayScene::IsMouseOverSelectedObjectGizmo(float mouseScreenX, float mou
 #endif
 }
 
-bool GamePlayScene::IsMouseOverSelectedSpriteGizmo(float mouseScreenX, float mouseScreenY) const
+bool DebugScene::IsMouseOverSelectedSpriteGizmo(float mouseScreenX, float mouseScreenY) const
 {
 #ifdef USE_IMGUI
 	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
@@ -2391,8 +2410,9 @@ bool GamePlayScene::IsMouseOverSelectedSpriteGizmo(float mouseScreenX, float mou
 #endif
 }
 
-void GamePlayScene::DrawSelectedSpriteGizmo()
+void DebugScene::DrawSelectedSpriteGizmo()
 {
+	// Spriteは画面ピクセル座標なので、Game Viewの表示倍率を戻してDrag量を計算します。
 #ifdef USE_IMGUI
 	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
 		return;
@@ -2460,6 +2480,7 @@ void GamePlayScene::DrawSelectedSpriteGizmo()
 	}
 	if (isDraggingSpriteGizmo_ && activeSpriteGizmoAxis_ != GizmoAxis::None) {
 		const ImVec2 mouseDelta = ImGui::GetIO().MouseDelta;
+		// Game Viewが縮小表示されていても、実際のSprite座標と同じ移動量へ直します。
 		const float spriteDeltaX = mouseDelta.x * (clientWidth / rectWidth);
 		const float spriteDeltaY = mouseDelta.y * (clientHeight / rectHeight);
 		if (activeSpriteGizmoAxis_ == GizmoAxis::X) {
@@ -2500,8 +2521,9 @@ void GamePlayScene::DrawSelectedSpriteGizmo()
 #endif
 }
 
-void GamePlayScene::DrawSelectedObjectGizmo()
+void DebugScene::DrawSelectedObjectGizmo()
 {
+	// 3Dモデル用のXYZ軸を画面に描き、Dragした分だけ選択したワールド軸へ移動します。
 #ifdef USE_IMGUI
 	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
 		return;
@@ -2580,6 +2602,7 @@ void GamePlayScene::DrawSelectedObjectGizmo()
 	Vector3 hoveredWorldDirection{};
 	float bestAxisDistance = hitRadius;
 	const auto normalizedScreenDirection = [&](const ImVec2& end) {
+		// 画面上の軸を長さ1にそろえると、Mouse移動を軸方向へ投影できます。
 		const ImVec2 direction(end.x - centerScreen.x, end.y - centerScreen.y);
 		const float length = std::sqrt(direction.x * direction.x + direction.y * direction.y);
 		if (length <= 0.0001f) {
@@ -2623,6 +2646,7 @@ void GamePlayScene::DrawSelectedObjectGizmo()
 	if (isDraggingGizmo_ && activeGizmoAxis_ != GizmoAxis::None) {
 		const ImVec2 mouseDelta = ImGui::GetIO().MouseDelta;
 		const float moveScale = (std::max)(axisLength, 1.0f) * 0.006f;
+		// 内積でMouse移動のうち「選択した画面上の軸方向」の量だけを取り出します。
 		const float projectedDrag =
 			mouseDelta.x * activeGizmoScreenDirectionX_ +
 			mouseDelta.y * activeGizmoScreenDirectionY_;
@@ -2670,8 +2694,9 @@ void GamePlayScene::DrawSelectedObjectGizmo()
 #endif
 }
 
-bool GamePlayScene::BuildWorldAabb(const Object3d& object, MyMath::AABB& outAabb) const
+bool DebugScene::BuildWorldAabb(const Object3d& object, MyMath::AABB& outAabb) const
 {
+	// 全頂点をTransform後のワールド座標へ変換し、最小・最大値からAABBを作ります。
 	Model* model = object.GetModel();
 	if (!model || model->GetModelData().vertices.empty()) {
 		return false;
@@ -2692,6 +2717,7 @@ bool GamePlayScene::BuildWorldAabb(const Object3d& object, MyMath::AABB& outAabb
 	};
 
 	for (const Model::VertexData& vertex : model->GetModelData().vertices) {
+		// 回転も含んだworldMatrixを使うため、ローカルAABBのままより正しい範囲になります。
 		const Vector3 localPosition{ vertex.position.x, vertex.position.y, vertex.position.z };
 		const Vector3 worldPosition = TransformPoint(localPosition, worldMatrix);
 		minPoint.x = (std::min)(minPoint.x, worldPosition.x);
@@ -2707,8 +2733,9 @@ bool GamePlayScene::BuildWorldAabb(const Object3d& object, MyMath::AABB& outAabb
 	return true;
 }
 
-void GamePlayScene::DrawCollisionDebugOverlay()
+void DebugScene::DrawCollisionDebugOverlay()
 {
+	// AABB同士の重なりを調べ、青は通常・赤は重なっているColliderとして線で表示します。
 #ifdef USE_IMGUI
 	if (!showCollisionDebug_) {
 		return;
@@ -2776,6 +2803,7 @@ void GamePlayScene::DrawCollisionDebugOverlay()
 	drawList->PushClipRect(imageMin, imageMax, true);
 
 	const auto projectToGameView = [&](const Vector3& position, ImVec2& screenPosition) {
+		// 同次座標のwで割る透視除算を行い、3D座標をGame Viewの2D座標へ変換します。
 		const float x = position.x * viewProjectionMatrix.m[0][0] + position.y * viewProjectionMatrix.m[1][0] + position.z * viewProjectionMatrix.m[2][0] + viewProjectionMatrix.m[3][0];
 		const float y = position.x * viewProjectionMatrix.m[0][1] + position.y * viewProjectionMatrix.m[1][1] + position.z * viewProjectionMatrix.m[2][1] + viewProjectionMatrix.m[3][1];
 		const float w = position.x * viewProjectionMatrix.m[0][3] + position.y * viewProjectionMatrix.m[1][3] + position.z * viewProjectionMatrix.m[2][3] + viewProjectionMatrix.m[3][3];
@@ -2824,7 +2852,7 @@ void GamePlayScene::DrawCollisionDebugOverlay()
 #endif
 }
 
-void GamePlayScene::InitializeTimePlaybackSmokeFromEnvironment()
+void DebugScene::InitializeTimePlaybackSmokeFromEnvironment()
 {
 	if (GetEnvironmentString("CG2_TIME_PLAYBACK_SMOKE") != "1") {
 		return;
@@ -2844,7 +2872,7 @@ void GamePlayScene::InitializeTimePlaybackSmokeFromEnvironment()
 		std::filesystem::path("logs") / ("time_playback_smoke_" + MakeTimestampString() + ".log");
 
 	if (uiSmokeEnabled_) {
-		FinishTimePlaybackSmoke(false, "CG2_GAMEPLAY_UI_SMOKE cannot run at the same time.");
+		FinishTimePlaybackSmoke(false, "CG2_DEBUG_UI_SMOKE cannot run at the same time.");
 		return;
 	}
 	if (!objectPlane || !objectAxis || !objectAxis->IsAnimating()) {
@@ -2961,7 +2989,7 @@ void GamePlayScene::InitializeTimePlaybackSmokeFromEnvironment()
 	}
 }
 
-void GamePlayScene::UpdateTimePlaybackSmoke()
+void DebugScene::UpdateTimePlaybackSmoke()
 {
 	if (!timePlaybackSmokeEnabled_ || timePlaybackSmokeFinished_) {
 		return;
@@ -3262,7 +3290,7 @@ void GamePlayScene::UpdateTimePlaybackSmoke()
 	}
 }
 
-void GamePlayScene::FinishTimePlaybackSmoke(bool success, const std::string& message)
+void DebugScene::FinishTimePlaybackSmoke(bool success, const std::string& message)
 {
 	if (timePlaybackSmokeFinished_) {
 		return;
@@ -3276,9 +3304,9 @@ void GamePlayScene::FinishTimePlaybackSmoke(bool success, const std::string& mes
 	PostQuitMessage(success ? 0 : 1);
 }
 
-void GamePlayScene::InitializeUiSmokeFromEnvironment()
+void DebugScene::InitializeUiSmokeFromEnvironment()
 {
-	if (GetEnvironmentString("CG2_GAMEPLAY_UI_SMOKE").empty()) {
+	if (GetEnvironmentString("CG2_DEBUG_UI_SMOKE").empty()) {
 		return;
 	}
 
@@ -3294,7 +3322,7 @@ void GamePlayScene::InitializeUiSmokeFromEnvironment()
 	uiSmokeLogPath_ = std::filesystem::path("logs") / ("gameplay_ui_smoke_" + MakeTimestampString() + ".log");
 }
 
-void GamePlayScene::UpdateUiSmoke()
+void DebugScene::UpdateUiSmoke()
 {
 	if (!uiSmokeEnabled_ || uiSmokeFinished_) {
 		return;
@@ -3432,7 +3460,7 @@ void GamePlayScene::UpdateUiSmoke()
 	}
 }
 
-void GamePlayScene::UpdateUiSmokeAfterDraw()
+void DebugScene::UpdateUiSmokeAfterDraw()
 {
 	if (!uiSmokeEnabled_ || uiSmokeFinished_ || !uiSmokePendingCapture_) {
 		return;
@@ -3486,7 +3514,7 @@ void GamePlayScene::UpdateUiSmokeAfterDraw()
 		" video=" + videoPath.string());
 }
 
-void GamePlayScene::FinishUiSmoke(bool success, const std::string& message)
+void DebugScene::FinishUiSmoke(bool success, const std::string& message)
 {
 	if (uiSmokeFinished_) {
 		return;
@@ -3500,8 +3528,9 @@ void GamePlayScene::FinishUiSmoke(bool success, const std::string& message)
 	PostQuitMessage(success ? 0 : 1);
 }
 
-void GamePlayScene::UpdateParticleEffectEmission()
+void DebugScene::UpdateParticleEffectEmission()
 {
+	// Inspectorで値が変わった時だけCylinderを作り直し、毎フレーム全消去しないようにします。
 	ParticleManager* particleManager = ParticleManager::GetInstance();
 	const Vector3 effectPosition = GetParticleEffectPosition();
 	if (cylinderEffect_.enabled != lastCylinderEffectEnabled_ || (cylinderEffect_.enabled && refreshCylinderEffect_)) {
@@ -3520,6 +3549,7 @@ void GamePlayScene::UpdateParticleEffectEmission()
 		refreshCylinderEffect_ = false;
 	}
 
+	// Hitなどは0.12秒ごとに発生させ、1フレームに大量発生しないようにします。
 	particleEffectEmitTimer_ += DirectXCommon::GetInstance()->GetDeltaTime();
 	if (particleEffectEmitTimer_ < 0.12f) {
 		return;
@@ -3546,8 +3576,9 @@ void GamePlayScene::UpdateParticleEffectEmission()
 	}
 }
 
-void GamePlayScene::Update()
+void DebugScene::Update()
 {
+	// DebugSceneの一フレームは、読込→入力→Camera→モデル→UI→Particleの順です。
 	// Blenderからscene.jsonが保存された時だけ、配置済みモデルを再読込します。
 	UpdateLevelHotReload();
 	UpdateGameViewCameraControl();
@@ -3607,6 +3638,7 @@ void GamePlayScene::Update()
 			moveDirection = Normalize(moveDirection);
 			walkObject_->GetTransform().translate.x += moveDirection.x * 2.0f * DirectXCommon::GetInstance()->GetDeltaTime();
 			walkObject_->GetTransform().translate.z += moveDirection.z * 2.0f * DirectXCommon::GetInstance()->GetDeltaTime();
+			// 移動ベクトルからY回転を作り、モデル正面を歩行方向へ合わせます。
 			walkObject_->GetTransform().rotate.y = std::atan2(moveDirection.x, moveDirection.z);
 			walkObject_->SetAnimationPlaying(true);
 		} else {
@@ -3653,6 +3685,7 @@ void GamePlayScene::Update()
 	const bool hasRightFoot = walkObject_ && walkObject_->GetJointWorldMatrix("mixamorig:RightFoot", rightFootWorldMatrix);
 	if (Length(moveDirection) > 0.0f && (hasLeftFoot || hasRightFoot))
 	{
+		// 足ボーンのWorld行列の移動成分を取り出し、足元Particleの発生位置へ使います。
 		GPUParticle::GetInstance()->SetEmitterTranslate(0, { leftFootWorldMatrix.m[3][0], leftFootWorldMatrix.m[3][1], leftFootWorldMatrix.m[3][2] });
 		GPUParticle::GetInstance()->SetEmitterEnabled(0, hasLeftFoot);
 		GPUParticle::GetInstance()->SetEmitterTranslate(1, { rightFootWorldMatrix.m[3][0], rightFootWorldMatrix.m[3][1], rightFootWorldMatrix.m[3][2] });
@@ -3686,7 +3719,7 @@ void GamePlayScene::Update()
 
 	//ゲームの処理
 
-	ImGuiManager::GetInstance()->Begin("GamePlay");
+	ImGuiManager::GetInstance()->Begin("Debug");
 	// プレビューはEdit View専用とし、Game Viewへ戻った時は通常のシーン表示へ復帰する。
 	if (ImGuiManager::GetInstance()->IsGameViewActive() && isModelPreviewMode_) {
 		ExitModelPreview();
@@ -3772,8 +3805,9 @@ void GamePlayScene::Update()
 	UpdateTimePlaybackSmoke();
 }
 
-void GamePlayScene::Draw()
+void DebugScene::Draw()
 {
+	// 描画順は3D背景→Particle→Sprite→PostEffect→ImGuiです。
 
 	//描画前処理
 	DirectXCommon::GetInstance()->PreDraw();
@@ -3825,6 +3859,7 @@ void GamePlayScene::Draw()
 	// SceneはRenderTextureへ描画済みなので、ImGuiの直前にSwapChainへ切り替える
 	}
 	if (PostEffect::GetInstance()->IsEnabled()) {
+		// PostEffect有効時は、SceneのRenderTextureを加工してから画面へ出します。
 		if (PostEffect::GetInstance()->IsGaussianFilter()) {
 			DirectXCommon::GetInstance()->PreDrawForGaussianHorizontalTexture();
 			PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), true);
@@ -3855,7 +3890,7 @@ void GamePlayScene::Draw()
 
 }
 
-void GamePlayScene::Finalize()
+void DebugScene::Finalize()
 {
 	//GPUの完了を待機
 	DirectXCommon::GetInstance()->WaitForGPU();

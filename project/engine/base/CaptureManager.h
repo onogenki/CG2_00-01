@@ -231,7 +231,7 @@ private:
 	bool performanceBaselineEnabled_ = false;
 	bool smokeFinished_ = false;
 	int smokeFrame_ = 0;
-	int smokeGamePlayFrame_ = 0;
+	int smokeDebugFrame_ = 0;
 	int smokeCaptureAttempts_ = 0;
 	int smokeVisibleCaptures_ = 0;
 	int smokeSavedPhotos_ = 0;

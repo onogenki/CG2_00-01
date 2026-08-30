@@ -11,7 +11,7 @@
 class Camera;
 
 // ImGui上でリソース棚とシーン内オブジェクトの編集UIを構築する。
-// 実データの追加・削除はコールバックでGamePlaySceneへ委譲する。
+// 実データの追加・削除はコールバックでDebugSceneへ委譲する。
 class SceneEditor
 {
 public:
