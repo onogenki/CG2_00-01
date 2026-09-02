@@ -79,6 +79,16 @@ ipch/
 # TFS 2012 Local Workspace
 $tf/
 
+# assimpの配布ライブラリは、Debug/Releaseの除外ルールから外して共有する。
+!project/externals/assimp/lib/
+!project/externals/assimp/lib/Debug/
+!project/externals/assimp/lib/Debug/**
+!project/externals/assimp/lib/Release/
+!project/externals/assimp/lib/Release/**
+
+# OBJモデルは、配置場所を問わず共有する。
+!*.obj
+
 # Guidance Automation Toolkit
 *.gpState
 
