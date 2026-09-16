@@ -3,7 +3,6 @@
 #include "CameraManager.h"
 #include "DirectXCommon.h"
 #include "LevelLoader.h"
-#include "Laser.h"
 #include "Object3d.h"
 #include "ParticleEmitter.h"
 #include "SrvManager.h"
@@ -23,6 +22,7 @@
 class Sprite;
 struct Transform;
 class Mirror;
+struct LaserSegment;
 
 // シーン映像をゲームとして操作するか、編集画面として操作するかを表します。
 enum class SceneViewMode
@@ -81,7 +81,6 @@ public:
 		const std::function<void(bool animationObject, size_t index)>& onObjectRemoved = {});
 	void CameraWindow(CameraManager* cameraManager, bool embedded = false);
 	std::string ParticleWindow(Transform& emitterTransform, bool embedded = false);
-	void PostEffectWindow();
 	// レベルファイルの再読込と、マップ内オブジェクトの編集UIを表示します。
 	LevelEditorResult LevelHotReloadWindow(
 		bool& autoReload,
@@ -172,7 +171,6 @@ private:
 	bool showModelWindow_ = true;
 	bool showParticleWindow_ = true;
 	bool showCameraWindow_ = true;
-	bool showPostEffectWindow_ = true;
 	bool showDemoWindow_ = false;
 	bool showSkeletonDebugDraw_ = false;
 	bool resetDockLayout_ = false;

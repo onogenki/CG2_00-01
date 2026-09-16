@@ -1,23 +1,21 @@
 #pragma once
-#include "DirectXCommon.h"
-#include "Object3dCommon.h"
-#include "SpriteCommon.h"
-#include "CameraManager.h"
-#include "Camera.h"
 #include "Object3d.h"
-#include "Sprite.h"
-#include "ParticleEmitter.h"
-#include "Audio.h"
 #include "BaseScene.h"
-#include "SceneEditor.h"
-#include "SkyBox.h"
+#include "TitleEditor.h"
 #include <memory>
 #include <string>
 #include <vector>
 
+class SkyBox;
+class Sprite;
+
 class TitleScene : public BaseScene
 {
 public:
+	// 前方宣言した所有型を安全に扱うため、実装はTitleScene.cppに置きます。
+	TitleScene();
+	// unique_ptrが前方宣言したTitle用型を安全に解放できるよう、実装はTitleScene.cppに置きます。
+	~TitleScene() override;
 	// Title画面へ入った一度だけ、Camera・モデル・UI用データを作成します。
 	void Initialize() override;
 	// Title画面を抜ける時に、TitleSceneが所有するデータを解放します。
@@ -31,24 +29,33 @@ public:
 	bool IsFinished() const { return isFinished_; }
 
 private:
-	// ---------- Edit View・モデル棚 ----------
+	// ---------- 初期化の補助関数 ----------
 
-	// resources内のモデルとTextureを調べ、Title用のモデル棚へ登録します。
-	void ScanResourceShelf();
-	// Titleのモデル一覧をImGuiに表示します。
-	void DrawTitleModelShelfImGui();
-	// 選択中モデル・SpriteのTransformを編集するImGuiを表示します。
-	void DrawTitleInspectorImGui();
-	// モデル棚からEdit Viewへ落としたモデルをTitleへ追加します。
-	void HandleTitleShelfDropOnEditView();
-	// 3Dモデルを置くTitle用のEdit Viewを描画します。
-	void DrawTitleEditViewport();
-	// 2D Spriteを置くTitle用のEdit Viewを描画します。
-	void DrawTitleSpriteEditViewport();
+	// DirectX・Camera・Object3dを、TitleSceneが使える初期状態へそろえます。
+	void InitializeRenderSystems();
+	// JSONを使わないTitle画面用の標準照明を設定します。
+	void InitializeDefaultLighting();
+	// 背景の平面モデルと初期Spriteを作成します。
+	bool InitializeTitleObjects();
+	// SkyBoxとTitle開始時の音声を準備します。
+	void InitializeSkyBoxAndAudio();
+	// Camera・Light・3Dモデル・Sprite・SkyBoxを、このフレームの状態へ更新します。
+	void UpdateSceneContent();
+	// Title専用の編集UIを更新します。
+	void UpdateEditorUi(bool isGameViewActive);
+	// TitleからDebugまたはStage1へ移る入力を確認します。
+	void UpdateSceneTransition(bool isGameViewActive);
+
+	// ---------- Title固有の生成ルール ----------
+
 	// 指定した3DモデルをTitleの通常モデル一覧へ追加します。
 	bool AddModelToTitle(const std::string& fileName);
 	// 指定したTextureをTitleのSprite一覧へ追加します。
 	bool AddTextureToTitle(const std::string& textureFilePath);
+	// Edit Viewから追加したTitleモデル・Spriteだけを削除します。
+	void ClearAddedTitleObjects();
+	// TitleEditorへ渡す、TitleScene所有データと追加・削除操作の窓口を作ります。
+	TitleEditor::Context MakeTitleEditorContext();
 
 	// ---------- 空・3Dモデル・Sprite ----------
 
@@ -56,13 +63,13 @@ private:
 	std::unique_ptr<SkyBox> skyBox_;
 
 	// アニメーションを使わないTitle用の3Dモデルです。
-	std::vector<std::unique_ptr<Object3d>> normalObjects;
+	std::vector<std::unique_ptr<Object3d>> normalObjects_;
 	// アニメーション再生を行うTitle用の3Dモデルです。
 	std::vector<std::unique_ptr<Object3d>> animationObjects_;
 	// Title上へ追加した2D画像です。
 	std::vector<std::unique_ptr<Sprite>> addedSprites_;
-	// モデル棚に表示するresources内のファイル一覧です。
-	SceneEditor::ShelfState shelfState_;
+	// TitleのModel Shelf・Inspector・Edit Viewを担当するUI部品です。
+	TitleEditor titleEditor_{};
 
 	// ---------- Title全体のライト ----------
 
@@ -73,35 +80,15 @@ private:
 	// 円すい状の範囲だけを照らす光です。
 	Object3d::SpotLight spotLight_{};
 
-	// ---------- Edit Viewの選択状態 ----------
+	// ---------- Edit Viewの削除境界 ----------
 
 	// Initialize時からあるモデル数です。追加分だけを消す境界に使います。
 	size_t baseNormalObjectCount_ = 0;
+	// Initialize時からあるAnimationモデル数です。追加分だけを消す境界に使います。
+	size_t baseAnimationObjectCount_ = 0;
 	//最初からタイトルに置くスプライトの数です。追加したスプライトだけを削除できるようにします。
 	size_t baseSpriteCount_ = 0;
-	// Inspectorで選択しているSpriteの番号です。
-	size_t selectedTitleSpriteIndex_ = 0;
-	// trueならselectedTitleSpriteIndex_のSpriteを編集します。
-	bool hasSelectedTitleSprite_ = false;
-	// モデル追加直後にInspectorへ選択状態を渡すための残りフレーム数です。
-	int inspectorAutoSelectSpriteFrames_ = 0;
-	// 3Dモデルを編集するViewの、Cameraや選択状態です。
-	SceneEditor::ViewportState viewportEditorState_{};
-	// Spriteを編集するViewの、選択状態です。
-	SceneEditor::SpriteViewportState spriteViewportEditorState_{};
-	// trueならselectedTitleObjectIndex_の3Dモデルを編集します。
-	bool hasSelectedTitleObject_ = false;
-	// 選択中3Dモデルがアニメーション用一覧にあるかを表します。
-	bool selectedTitleObjectIsAnimation_ = false;
-	// Inspectorで選択している3Dモデルの番号です。
-	size_t selectedTitleObjectIndex_ = 0;
-	// モデル追加直後にInspectorへ選択状態を渡すための残りフレーム数です。
-	int inspectorAutoSelectModelFrames_ = 0;
-
 	// ---------- Titleの進行状態 ----------
-
-	// タイトル上で動かす代表モデルへの非所有ポインタです。
-	Object3d* obj = nullptr;
 	// trueになると、SceneManagerがTitleSceneを終了できます。
 	bool isFinished_ = false;
 };

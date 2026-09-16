@@ -4,12 +4,52 @@
 
 namespace MyMath {
 
+	Vector2 AddVector2(const Vector2& left, const Vector2& right) {
+		return { left.x + right.x, left.y + right.y };
+	}
+
+	Vector2 SubtractVector2(const Vector2& left, const Vector2& right) {
+		return { left.x - right.x, left.y - right.y };
+	}
+
+	Vector3 Add(const Vector3& left, const Vector3& right) {
+		return { left.x + right.x, left.y + right.y, left.z + right.z };
+	}
+
+	Vector3 Subtract(const Vector3& left, const Vector3& right) {
+		return { left.x - right.x, left.y - right.y, left.z - right.z };
+	}
+
+	Vector4 AddVector4(const Vector4& left, const Vector4& right) {
+		return { left.x + right.x, left.y + right.y, left.z + right.z, left.w + right.w };
+	}
+
+	Vector4 SubtractVector4(const Vector4& left, const Vector4& right) {
+		return { left.x - right.x, left.y - right.y, left.z - right.z, left.w - right.w };
+	}
+
+	Vector2 MultiplyVector2(float scalar, const Vector2& v) {
+		return { scalar * v.x, scalar * v.y };
+	}
+
 	Vector3 Multiply(float scalar, const Vector3& v) {
 		return { scalar * v.x, scalar * v.y, scalar * v.z };
 	}
 
+	Vector4 MultiplyVector4(float scalar, const Vector4& v) {
+		return { scalar * v.x, scalar * v.y, scalar * v.z, scalar * v.w };
+	}
+
+	float DotVector2(const Vector2& v1, const Vector2& v2) {
+		return v1.x * v2.x + v1.y * v2.y;
+	}
+
 	float Dot(const Vector3& v1, const Vector3& v2) {
 		return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+	}
+
+	float DotVector4(const Vector4& v1, const Vector4& v2) {
+		return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w;
 	}
 
 	Vector3 Cross(const Vector3& v1, const Vector3& v2) {
@@ -20,16 +60,80 @@ namespace MyMath {
 		};
 	}
 
+	float LengthVector2(const Vector2& v) {
+		return std::sqrt(DotVector2(v, v));
+	}
+
 	float Length(const Vector3& v) {
 		return std::sqrt(Dot(v, v));
 	}
 
+	float LengthVector4(const Vector4& v) {
+		return std::sqrt(DotVector4(v, v));
+	}
+
+	Vector2 NormalizeVector2(const Vector2& v) {
+		const float length = LengthVector2(v);
+		return std::isfinite(length) && length > 0.000001f
+			? MultiplyVector2(1.0f / length, v)
+			: Vector2{};
+	}
+
 	Vector3 Normalize(const Vector3& v) {
-		float len = Length(v);
-		if (std::isfinite(len) && len > 0.000001f) {
-			return Multiply(1.0f / len, v);
-		}
-		return { 0, 0, 0 };
+		const float length = Length(v);
+		return std::isfinite(length) && length > 0.000001f
+			? Multiply(1.0f / length, v)
+			: Vector3{};
+	}
+
+	Vector4 NormalizeVector4(const Vector4& v) {
+		const float length = LengthVector4(v);
+		return std::isfinite(length) && length > 0.000001f
+			? MultiplyVector4(1.0f / length, v)
+			: Vector4{};
+	}
+
+	Vector2 LerpVector2(const Vector2& v1, const Vector2& v2, float t) {
+		return AddVector2(v1, MultiplyVector2(t, SubtractVector2(v2, v1)));
+	}
+
+	Vector3 Lerp(const Vector3& v1, const Vector3& v2, float t) {
+		return Add(v1, Multiply(t, Subtract(v2, v1)));
+	}
+
+	Vector4 LerpVector4(const Vector4& v1, const Vector4& v2, float t) {
+		return AddVector4(v1, MultiplyVector4(t, SubtractVector4(v2, v1)));
+	}
+
+	// 浮動小数点の丸め誤差を考慮して、二つの値が十分近いかを調べます。
+	bool IsNearlyEqual(float lhs, float rhs, float tolerance) {
+		return std::abs(lhs - rhs) <= tolerance;
+	}
+
+	bool IsNearlyEqualVector2(const Vector2& lhs, const Vector2& rhs, float tolerance) {
+		return IsNearlyEqual(lhs.x, rhs.x, tolerance) &&
+			IsNearlyEqual(lhs.y, rhs.y, tolerance);
+	}
+
+	// X・Y・Zの全成分が十分近い時だけ、二つのVector3を同じと扱います。
+	bool IsNearlyEqual(const Vector3& lhs, const Vector3& rhs, float tolerance) {
+		return IsNearlyEqual(lhs.x, rhs.x, tolerance) &&
+			IsNearlyEqual(lhs.y, rhs.y, tolerance) &&
+			IsNearlyEqual(lhs.z, rhs.z, tolerance);
+	}
+
+	bool IsNearlyEqualVector4(const Vector4& lhs, const Vector4& rhs, float tolerance) {
+		return IsNearlyEqual(lhs.x, rhs.x, tolerance) &&
+			IsNearlyEqual(lhs.y, rhs.y, tolerance) &&
+			IsNearlyEqual(lhs.z, rhs.z, tolerance) &&
+			IsNearlyEqual(lhs.w, rhs.w, tolerance);
+	}
+
+	// 拡大率・回転・位置の全成分が十分近い時だけ、二つのTransformを同じと扱います。
+	bool IsNearlyEqual(const Transform& lhs, const Transform& rhs, float tolerance) {
+		return IsNearlyEqual(lhs.scale, rhs.scale, tolerance) &&
+			IsNearlyEqual(lhs.rotate, rhs.rotate, tolerance) &&
+			IsNearlyEqual(lhs.translate, rhs.translate, tolerance);
 	}
 
 	Matrix4x4 MakeIdentity4x4() {
@@ -142,17 +246,55 @@ namespace MyMath {
 		return Multiply(scaleMatrix, Multiply(rotateMatrix, translateMatrix));
 	}
 
-	Vector3 Lerp(const Vector3& v1, const Vector3& v2, float t)
-	{
+	Quaternion MultiplyQuaternion(const Quaternion& left, const Quaternion& right) {
 		return {
-		v1.x + (v2.x - v1.x) * t,
-		v1.y + (v2.y - v1.y) * t,
-		v1.z + (v2.z - v1.z) * t
+			left.w * right.x + left.x * right.w + left.y * right.z - left.z * right.y,
+			left.w * right.y - left.x * right.z + left.y * right.w + left.z * right.x,
+			left.w * right.z + left.x * right.y - left.y * right.x + left.z * right.w,
+			left.w * right.w - left.x * right.x - left.y * right.y - left.z * right.z,
+		};
+	}
+
+	float DotQuaternion(const Quaternion& left, const Quaternion& right) {
+		return left.x * right.x + left.y * right.y + left.z * right.z + left.w * right.w;
+	}
+
+	Quaternion NormalizeQuaternion(const Quaternion& quaternion) {
+		const float length = std::sqrt(DotQuaternion(quaternion, quaternion));
+		if (!std::isfinite(length) || length <= 0.000001f) {
+			return {};
+		}
+		return {
+			quaternion.x / length,
+			quaternion.y / length,
+			quaternion.z / length,
+			quaternion.w / length,
+		};
+	}
+
+	Quaternion ConjugateQuaternion(const Quaternion& quaternion) {
+		return { -quaternion.x, -quaternion.y, -quaternion.z, quaternion.w };
+	}
+
+	Quaternion LerpQuaternion(const Quaternion& q0, const Quaternion& q1, float t) {
+		return NormalizeQuaternion({
+			q0.x + (q1.x - q0.x) * t,
+			q0.y + (q1.y - q0.y) * t,
+			q0.z + (q1.z - q0.z) * t,
+			q0.w + (q1.w - q0.w) * t,
+		});
+	}
+
+	Transform LerpTransform(const Transform& from, const Transform& to, float t) {
+		return {
+			Lerp(from.scale, to.scale, t),
+			Lerp(from.rotate, to.rotate, t),
+			Lerp(from.translate, to.translate, t),
 		};
 	}
 
 	Quaternion Slerp(const Quaternion& q0, const Quaternion& q1, float t) {
-		float dot = q0.x * q1.x + q0.y * q1.y + q0.z * q1.z + q0.w * q1.w;
+		float dot = DotQuaternion(q0, q1);
 		Quaternion q1_ = q1;
 
 		// 内積が負の場合は、逆回転を防ぐために反転
@@ -163,15 +305,7 @@ namespace MyMath {
 
 		// 内積が1に近い（角度がほぼ0）場合はゼロ除算を防ぐため線形補間
 		if (dot >= 1.0f - 0.0005f) {
-			Quaternion result = {
-				q0.x * (1.0f - t) + q1_.x * t,
-				q0.y * (1.0f - t) + q1_.y * t,
-				q0.z * (1.0f - t) + q1_.z * t,
-				q0.w * (1.0f - t) + q1_.w * t
-			};
-			// 正規化
-			float norm = std::sqrt(result.x * result.x + result.y * result.y + result.z * result.z + result.w * result.w);
-			return { result.x / norm, result.y / norm, result.z / norm, result.w / norm };
+			return LerpQuaternion(q0, q1_, t);
 		}
 
 		float theta_0 = std::acos(dot);

@@ -1,5 +1,6 @@
 #include "Collision.h"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -7,16 +8,6 @@ using namespace MyMath;
 
 namespace
 {
-	Vector3 Add(const Vector3& left, const Vector3& right)
-	{
-		return { left.x + right.x, left.y + right.y, left.z + right.z };
-	}
-
-	Vector3 Subtract(const Vector3& left, const Vector3& right)
-	{
-		return { left.x - right.x, left.y - right.y, left.z - right.z };
-	}
-
 	float Clamp(float value, float minimum, float maximum)
 	{
 		if (value < minimum) {
@@ -163,6 +154,74 @@ Collision::CollisionInfo Collision::SphereOBB(const Sphere& sphere, const OBB& o
 	const float sign = localPosition[nearestAxisIndex] >= 0.0f ? 1.0f : -1.0f;
 	result.normal = Multiply(sign, obb.orientations[nearestAxisIndex]);
 	result.penetrationDepth = sphere.radius + nearestFaceDistance;
+	return result;
+}
+
+// 二つの球の中心距離と半径の合計を比べ、重なりと押し戻し量を返します。
+Collision::CollisionInfo Collision::SphereSphere(const Sphere& first, const Sphere& second)
+{
+	const Vector3 centerDifference = Subtract(first.center, second.center);
+	const float distance = Length(centerDifference);
+	const float combinedRadius = first.radius + second.radius;
+	if (distance > combinedRadius + 0.001f) {
+		return {};
+	}
+
+	CollisionInfo result{};
+	result.isCollision = true;
+	if (distance > 0.0001f) {
+		result.normal = Multiply(1.0f / distance, centerDifference);
+		result.penetrationDepth = (std::max)(0.0f, combinedRadius - distance);
+		return result;
+	}
+
+	// 完全に同じ位置へ出現した場合も、安定して片方を押し出せる既定方向を返します。
+	result.normal = { 1.0f, 0.0f, 0.0f };
+	result.penetrationDepth = (std::max)(combinedRadius, 0.0f);
+	return result;
+}
+
+// 球を複数の床・壁・置物から順番に押し戻し、移動物共通の衝突解決を行います。
+Collision::SphereObbResolution Collision::ResolveSphereObbs(
+	const Sphere& sphere,
+	Vector3& position,
+	Vector3& velocity,
+	const std::vector<OBB>& solidObbs,
+	int solveCount,
+	float groundNormalThreshold)
+{
+	SphereObbResolution result{};
+	Sphere movingSphere = sphere;
+	const int clampedSolveCount = (std::max)(solveCount, 1);
+
+	// 斜めの箱や複数の箱に接した時も、前の押し戻し結果を次の判定へ反映します。
+	for (int solveIndex = 0; solveIndex < clampedSolveCount; ++solveIndex) {
+		for (const OBB& solidObb : solidObbs) {
+			movingSphere.center = position;
+			const CollisionInfo collision = SphereOBB(movingSphere, solidObb);
+			if (!collision.isCollision) {
+				continue;
+			}
+
+			result.isCollision = true;
+			position.x += collision.normal.x * collision.penetrationDepth;
+			position.y += collision.normal.y * collision.penetrationDepth;
+			position.z += collision.normal.z * collision.penetrationDepth;
+			movingSphere.center = position;
+
+			if (collision.normal.y > groundNormalThreshold) {
+				result.isGrounded = true;
+			}
+
+			// 面へ向かう速度だけを消し、着地後に落下し続けないようにします。
+			const float velocityTowardSurface = Dot(velocity, collision.normal);
+			if (velocityTowardSurface < 0.0f) {
+				velocity.x -= collision.normal.x * velocityTowardSurface;
+				velocity.y -= collision.normal.y * velocityTowardSurface;
+				velocity.z -= collision.normal.z * velocityTowardSurface;
+			}
+		}
+	}
 	return result;
 }
 

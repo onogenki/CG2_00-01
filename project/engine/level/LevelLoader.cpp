@@ -9,6 +9,15 @@
 
 namespace
 {
+	// JSONの再帰変換はLevelLoader.cppだけで使い、LevelLoader.hへJSON型を公開しません。
+	LevelLoader::ObjectData LoadObject(
+		const nlohmann::json& object,
+		bool usesEngineCoordinates = false);
+	void LoadObjects(
+		const nlohmann::json& objects,
+		std::vector<LevelLoader::ObjectData>& objectList,
+		bool usesEngineCoordinates = false);
+
 	nlohmann::json SaveVector3(const Vector3& value)
 	{
 		return nlohmann::json::array({ value.x, value.y, value.z });
@@ -323,9 +332,12 @@ bool LevelLoader::Save(const std::string& fileName, const LevelData& levelData)
 	return !error;
 }
 
-LevelLoader::ObjectData LevelLoader::LoadObject(const nlohmann::json& object, bool usesEngineCoordinates)
+namespace
 {
-	ObjectData objectData{};
+	// JSONをObjectDataへ変換する詳細処理は、この実装ファイル内だけに閉じます。
+	LevelLoader::ObjectData LoadObject(const nlohmann::json& object, bool usesEngineCoordinates)
+{
+	LevelLoader::ObjectData objectData{};
 	objectData.type = object.at("type").get<std::string>();
 
 	if (object.contains("name"))
@@ -472,13 +484,14 @@ LevelLoader::ObjectData LevelLoader::LoadObject(const nlohmann::json& object, bo
 }
 
 //再帰処理
-void LevelLoader::LoadObjects(
+void LoadObjects(
 	const nlohmann::json& objects,
-	std::vector<ObjectData>& objectList,
+	std::vector<LevelLoader::ObjectData>& objectList,
 	bool usesEngineCoordinates)
 {
 	for (const nlohmann::json& object : objects)
 	{
 		objectList.push_back(LoadObject(object, usesEngineCoordinates));
 	}
+}
 }
