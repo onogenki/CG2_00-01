@@ -1,53 +1,55 @@
 #include "TitleScene.h"
+#include "Audio.h"
+#include "Camera.h"
+#include "CameraManager.h"
+#include "DirectXCommon.h"
+#include "Object3dCommon.h"
+#include "Sprite.h"
+#include "SpriteCommon.h"
+#include "SceneRenderPipeline.h"
+#include "SkyBox.h"
 #include "TextureManager.h"
-#include "ModelManager.h"
-#include "ParticleManager.h"
+#include "Object3dFactory.h"
+#include "Object3dRenderContext.h"
 #include "PostEffect.h"
 #include "ImGuiManager.h"
 #include "Input.h"
-#include"SceneManager.h"
+#include "SceneManager.h"
 #include <dinput.h>
 #include <algorithm>
 #include <cstddef>
 #include <cmath>
 using namespace MyMath;
 
-void TitleScene::ScanResourceShelf()
-{
-	// SceneEditorへ任せることで、TitleとDebugで同じresources一覧を使えます。
-	SceneEditor::ScanResourceShelf(shelfState_);
-}
+// TitleSceneが所有する前方宣言型を、完全な型を読み込んだ場所で生成します。
+TitleScene::TitleScene() = default;
 
+// TitleSceneが所有する前方宣言型を、完全な型を読み込んだ場所で解放します。
+TitleScene::~TitleScene() = default;
+
+// Shelfから選ばれたモデルを作り、通常モデルまたはAnimationモデルの一覧へ追加します。
 bool TitleScene::AddModelToTitle(const std::string& fileName)
 {
-	if (!ModelManager::GetInstance()->LoadModel(fileName)) {
+	auto object = Object3dFactory::Create(object3dCommon, fileName, true);
+	if (!object) {
 		return false;
 	}
-	auto object = std::make_unique<Object3d>();
-	object->Initialize(object3dCommon);
-	object->SetModel(fileName);
-	object->InitializeAnimation();
-	object->SetCamera(cameraManager ? cameraManager->GetActiveCamera() : nullptr);
-	object->SetDirectionalLight(directionalLight_);
-	object->SetPointLight(pointLight_);
-	object->SetSpotLight(spotLight_);
+	// Camera・LightはUpdateのObject3dRenderContextが全モデルへ一括設定します。
+	// 生成時はTitle固有の位置・Animationだけを決めます。
 	// 追加順にX方向へずらし、同じ場所にモデルが重なって見えない状態を防ぎます。
-	const float offset = static_cast<float>(normalObjects.size() + animationObjects_.size()) * 1.4f;
+	const float offset = static_cast<float>(normalObjects_.size() + animationObjects_.size()) * 1.4f;
 	object->SetTranslate({ -2.0f + offset, 0.0f, 6.0f });
 	object->SetScale({ 1.0f, 1.0f, 1.0f });
 	if (object->IsSkeletal()) {
-		const Model::Animation animation = Model::LoadAnimationFile("./resources", fileName);
-		if (animation.duration > 0.0f) {
-			object->PlayAnimation(animation);
-			object->SetIsLoop(true);
-		}
+		Object3dFactory::LoadAndPlayAnimation(*object, fileName);
 		animationObjects_.push_back(std::move(object));
 	} else {
-		normalObjects.push_back(std::move(object));
+		normalObjects_.push_back(std::move(object));
 	}
 	return true;
 }
 
+// Shelfから選ばれたTextureをSpriteにし、Title画面のグリッド位置へ追加します。
 bool TitleScene::AddTextureToTitle(const std::string& textureFilePath)
 {
 	auto sprite = std::make_unique<Sprite>();
@@ -67,202 +69,81 @@ bool TitleScene::AddTextureToTitle(const std::string& textureFilePath)
 	const float y = 160.0f + static_cast<float>(addedSpriteIndex / 4) * 160.0f;
 	sprite->SetPosition({ x, y });
 	addedSprites_.push_back(std::move(sprite));
-	selectedTitleSpriteIndex_ = addedSprites_.size() - 1;
-	hasSelectedTitleSprite_ = true;
-	inspectorAutoSelectSpriteFrames_ = 2;
 	return true;
 }
 
-void TitleScene::DrawTitleModelShelfImGui()
+// Model Shelfから追加した要素だけを消し、Title開始時の背景モデル・Spriteは残します。
+void TitleScene::ClearAddedTitleObjects()
 {
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
+	if (normalObjects_.size() > baseNormalObjectCount_) {
+		normalObjects_.resize(baseNormalObjectCount_);
 	}
-	SceneEditor::ShelfCallbacks callbacks{};
-	callbacks.sceneLabel = "Title";
-	callbacks.addedModelCount =
-		(normalObjects.size() > baseNormalObjectCount_ ? normalObjects.size() - baseNormalObjectCount_ : 0) +
-		animationObjects_.size();
-	callbacks.addedTextureCount = addedSprites_.size() - baseSpriteCount_;
-	callbacks.addModel = [this](const std::string& fileName) { return AddModelToTitle(fileName); };
-	callbacks.addTexture = [this](const std::string& textureFilePath) { return AddTextureToTitle(textureFilePath); };
-	callbacks.clearAdded = [this]() {
-		if (normalObjects.size() > baseNormalObjectCount_) {
-			normalObjects.resize(baseNormalObjectCount_);
-			obj = normalObjects.empty() ? nullptr : normalObjects.front().get();
-		}
-		animationObjects_.clear();
-		//最初からあるタイトル用スプライトは残し、後から追加したものだけを消す
+	if (animationObjects_.size() > baseAnimationObjectCount_) {
+		animationObjects_.resize(baseAnimationObjectCount_);
+	}
+	if (addedSprites_.size() > baseSpriteCount_) {
 		addedSprites_.resize(baseSpriteCount_);
-		selectedTitleSpriteIndex_ = 0;
-		hasSelectedTitleSprite_ = false;
-		inspectorAutoSelectSpriteFrames_ = 0;
-	};
-	SceneEditor::DrawModelShelf(shelfState_, callbacks);
-}
-
-void TitleScene::DrawTitleInspectorImGui()
-{
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
-	// 追加直後の数フレームだけInspectorへ選択番号を渡し、自動で対象タブを開きます。
-	const int forcedSpriteIndex = hasSelectedTitleSprite_ &&
-		inspectorAutoSelectSpriteFrames_ > 0 &&
-		selectedTitleSpriteIndex_ < addedSprites_.size()
-		? static_cast<int>(selectedTitleSpriteIndex_)
-		: -1;
-	if (inspectorAutoSelectSpriteFrames_ > 0) {
-		--inspectorAutoSelectSpriteFrames_;
-	}
-	SceneEditor::InspectorOptions options{};
-	options.description = "Adjust TitleScene models and 2D textures added from Model Shelf.";
-	options.sprites = &addedSprites_;
-	options.normalObjects = &normalObjects;
-	options.animationObjects = &animationObjects_;
-	options.directionalLight = &directionalLight_;
-	options.pointLight = &pointLight_;
-	options.spotLight = &spotLight_;
-	options.addedSpriteCount = addedSprites_.size() - baseSpriteCount_;
-	options.protectedSpriteCount = baseSpriteCount_;
-	options.protectedNormalObjectCount = baseNormalObjectCount_;
-	options.forcedSpriteIndex = forcedSpriteIndex;
-	options.forcedNormalIndex =
-		hasSelectedTitleObject_ && !selectedTitleObjectIsAnimation_ && inspectorAutoSelectModelFrames_ > 0
-		? static_cast<int>(selectedTitleObjectIndex_)
-		: -1;
-	options.forcedAnimationIndex =
-		hasSelectedTitleObject_ && selectedTitleObjectIsAnimation_ && inspectorAutoSelectModelFrames_ > 0
-		? static_cast<int>(selectedTitleObjectIndex_)
-		: -1;
-	options.selectSpriteTab = forcedSpriteIndex >= 0;
-	options.selectModelTab = options.forcedNormalIndex >= 0 || options.forcedAnimationIndex >= 0;
-	options.removeSprite = [this](size_t index) {
-		if (index >= addedSprites_.size()) {
-			return;
-		}
-		DirectXCommon::GetInstance()->WaitForGPU();
-		addedSprites_.erase(addedSprites_.begin() + static_cast<std::ptrdiff_t>(index));
-		selectedTitleSpriteIndex_ = addedSprites_.empty() ? 0 : (std::min)(index, addedSprites_.size() - 1);
-		hasSelectedTitleSprite_ = !addedSprites_.empty();
-		inspectorAutoSelectSpriteFrames_ = addedSprites_.empty() ? 0 : 2;
-	};
-	SceneEditor::DrawInspector(options);
-	if (inspectorAutoSelectModelFrames_ > 0) {
-		--inspectorAutoSelectModelFrames_;
 	}
 }
 
-void TitleScene::DrawTitleEditViewport()
+// TitleEditorへ、TitleSceneが所有する一覧とTitle固有の生成・削除ルールを渡します。
+TitleEditor::Context TitleScene::MakeTitleEditorContext()
 {
-#ifdef USE_IMGUI
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
-	SceneEditor::ViewportOptions options{};
-	options.camera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
-	for (size_t index = 0; index < normalObjects.size(); ++index) {
-		Object3d* object = normalObjects[index].get();
-		const std::string name = object && !object->GetModelName().empty()
-			? object->GetModelName()
-			: "Title Model";
-		options.objects.push_back({ name + " [" + std::to_string(index) + "]", object });
-	}
-	// Viewportは通常モデルとAnimationモデルを一つの一覧で扱うため、境界番号を保存します。
-	const size_t animationOffset = options.objects.size();
-	for (size_t index = 0; index < animationObjects_.size(); ++index) {
-		Object3d* object = animationObjects_[index].get();
-		const std::string name = object && !object->GetModelName().empty()
-			? object->GetModelName()
-			: "Title Animation";
-		options.objects.push_back({ name + " [Animation " + std::to_string(index) + "]", object });
-	}
-
-	if (hasSelectedTitleObject_) {
-		viewportEditorState_.selectedIndex = selectedTitleObjectIsAnimation_
-			? static_cast<int>(animationOffset + selectedTitleObjectIndex_)
-			: static_cast<int>(selectedTitleObjectIndex_);
-	} else {
-		viewportEditorState_.selectedIndex = -1;
-	}
-	options.onSelectionChanged = [this, animationOffset](int index) {
-		if (index < 0) {
-			hasSelectedTitleObject_ = false;
-			return;
-		}
-		hasSelectedTitleObject_ = true;
-		hasSelectedTitleSprite_ = false;
-		// 境界より前は通常モデル、後ろはAnimationモデルとして元の配列番号へ戻します。
-		selectedTitleObjectIsAnimation_ = static_cast<size_t>(index) >= animationOffset;
-		selectedTitleObjectIndex_ = selectedTitleObjectIsAnimation_
-			? static_cast<size_t>(index) - animationOffset
-			: static_cast<size_t>(index);
-		inspectorAutoSelectModelFrames_ = 2;
+	TitleEditor::Context context{};
+	context.camera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
+	context.normalObjects = &normalObjects_;
+	context.animationObjects = &animationObjects_;
+	context.sprites = &addedSprites_;
+	context.directionalLight = &directionalLight_;
+	context.pointLight = &pointLight_;
+	context.spotLight = &spotLight_;
+	context.baseNormalObjectCount = baseNormalObjectCount_;
+	context.baseAnimationObjectCount = baseAnimationObjectCount_;
+	context.baseSpriteCount = baseSpriteCount_;
+	context.addModel = [this](const std::string& fileName)
+	{
+		return AddModelToTitle(fileName);
 	};
-	SceneEditor::DrawViewportEditor(viewportEditorState_, options);
-#endif
-}
-
-void TitleScene::DrawTitleSpriteEditViewport()
-{
-#ifdef USE_IMGUI
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
-	SceneEditor::SpriteViewportOptions options{};
-	for (size_t index = 0; index < addedSprites_.size(); ++index) {
-		options.sprites.push_back({
-			"Title Sprite [" + std::to_string(index) + "]",
-			addedSprites_[index].get(),
-		});
-	}
-	spriteViewportEditorState_.selectedIndex =
-		hasSelectedTitleSprite_ && selectedTitleSpriteIndex_ < addedSprites_.size()
-		? static_cast<int>(selectedTitleSpriteIndex_)
-		: -1;
-	options.onSelectionChanged = [this](int index) {
-		if (index < 0) {
-			hasSelectedTitleSprite_ = false;
-			return;
-		}
-		hasSelectedTitleSprite_ = true;
-		selectedTitleSpriteIndex_ = static_cast<size_t>(index);
-		hasSelectedTitleObject_ = false;
-		inspectorAutoSelectSpriteFrames_ = 2;
-		inspectorAutoSelectModelFrames_ = 0;
+	context.addTexture = [this](const std::string& textureFilePath)
+	{
+		return AddTextureToTitle(textureFilePath);
 	};
-	SceneEditor::DrawSpriteViewportEditor(spriteViewportEditorState_, options);
-#endif
-}
-
-void TitleScene::HandleTitleShelfDropOnEditView()
-{
-	SceneEditor::ShelfCallbacks callbacks{};
-	callbacks.sceneLabel = "Title";
-	callbacks.addModel = [this](const std::string& fileName) { return AddModelToTitle(fileName); };
-	callbacks.addTexture = [this](const std::string& textureFilePath) { return AddTextureToTitle(textureFilePath); };
-	SceneEditor::HandleShelfDropOnEditView(shelfState_, callbacks);
+	context.clearAdded = [this]()
+	{
+		ClearAddedTitleObjects();
+	};
+	return context;
 }
 
 void TitleScene::Initialize()
 {
-	// Title専用のCameraManagerを作り、ほかのSceneのCamera状態を持ち込まないようにします。
+	InitializeRenderSystems();
+	InitializeDefaultLighting();
+	if (!InitializeTitleObjects()) {
+		return;
+	}
+	InitializeSkyBoxAndAudio();
+	titleEditor_.ScanResourceShelf();
+	isFinished_ = false;
+}
+
+// DirectX・Camera・Object3d共通設定を、TitleScene用に初期化します。
+void TitleScene::InitializeRenderSystems()
+{
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
 	PostEffect::GetInstance()->SetGrayscale(false);
 	PostEffect::GetInstance()->SetSepia(false);
 
-	cameraManager = std::make_unique<CameraManager>();
-	mainCamera = std::make_unique<Camera>();
-
-	mainCamera->SetRotate({ 0.0f,0.0f,0.0f });
-	mainCamera->SetTranslate({ 0.0f,0.0f,-10.0f });
-	cameraManager->AddCamera("MainCamera", mainCamera.get());
-	cameraManager->SetActiveCamera("MainCamera");
-
+	// Title専用のCameraManagerを作り、ほかのSceneのCamera状態を持ち込まないようにします。
+	InitializeMainCamera({ 0.0f, 0.0f, -10.0f });
 	object3dCommon = Object3dCommon::GetInstance();
 	object3dCommon->Initialize(dxCommon);
 	object3dCommon->SetDefaultCamera(cameraManager->GetActiveCamera());
+}
 
+// Title画面の背景モデルを照らす三種類のLightを、初期値へ設定します。
+void TitleScene::InitializeDefaultLighting()
+{
 	directionalLight_.direction = { 1.0f, -1.0f, 1.0f };
 	directionalLight_.intensity = 0.0f;
 	directionalLight_.color = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -282,19 +163,21 @@ void TitleScene::Initialize()
 	spotLight_.decay = 2.0f;
 	spotLight_.cosAngle = std::cos(0.45f);
 	spotLight_.cosFalloffStart = 1.0f;
+}
 
-	ModelManager::GetInstance()->LoadModel("plane.obj");
-	auto terrain = std::make_unique<Object3d>();
-
-	terrain->Initialize(object3dCommon);
-	terrain->SetModel("plane.obj");
-	terrain->SetDirectionalLight(directionalLight_);
-	terrain->SetPointLight(pointLight_);
-	terrain->SetSpotLight(spotLight_);
+// Titleの初期3DモデルとSpriteを作り、Edit Viewで保護する件数を記録します。
+bool TitleScene::InitializeTitleObjects()
+{
+	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+	auto terrain = Object3dFactory::Create(object3dCommon, "plane.obj");
+	if (!terrain) {
+		return false;
+	}
+	// Camera・LightはUpdateのObject3dRenderContextが通常モデル一覧へ一括設定します。
 	terrain->GetTransform().translate = { 1.0f, -2.0f, 10.0f };
-	obj = terrain.get();
-	normalObjects.push_back(std::move(terrain));
-	baseNormalObjectCount_ = normalObjects.size();
+	normalObjects_.push_back(std::move(terrain));
+	baseNormalObjectCount_ = normalObjects_.size();
+	baseAnimationObjectCount_ = animationObjects_.size();
 
 	spriteCommon = SpriteCommon::GetInstance();
 	spriteCommon->Initialize(dxCommon);
@@ -307,167 +190,121 @@ void TitleScene::Initialize()
 	titleSprite->SetPosition({ 0.0f, 0.0f });
 	addedSprites_.push_back(std::move(titleSprite));
 	baseSpriteCount_ = addedSprites_.size();
-	selectedTitleSpriteIndex_ = 0;
-	hasSelectedTitleSprite_ = true;
+	titleEditor_.SelectSprite(0);
+	return true;
+}
 
-	// skyBoxの背景
+// SkyBoxとTitle開始時の音声を、TitleSceneが表示される一度だけ準備します。
+void TitleScene::InitializeSkyBoxAndAudio()
+{
+	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+	// SkyBoxの背景Textureです。
 	TextureManager::GetInstance()->LoadTexture("Resources/qwantani_moonrise_puresky_1k.dds");
-
-	//Skybox
 	skyBox_ = std::make_unique<SkyBox>();
 	skyBox_->Initialize(dxCommon, cameraManager->GetActiveCamera());
-	// 添付されていたDDSテクスチャのパスを指定する
 	skyBox_->SetTexture("Resources/qwantani_moonrise_puresky_1k.dds");
 
-	//音声読み込み
 	Audio::GetInstance()->LoadFile("Resources/Alarm01.wav");
-	//音声再生
 	Audio::GetInstance()->PlayWave("Resources/Alarm01.wav");
-
-	ScanResourceShelf();
-	isFinished_ = false;
 }
 
 void TitleScene::Update()
 {
-	//カメラの更新
+	// Game Viewが操作対象かどうかと入力機器は、このフレームで一度だけ取得します。
+	const bool isGameViewActive = ImGuiManager::GetInstance()->IsGameViewActive();
+	UpdateSceneContent();
+	UpdateEditorUi(isGameViewActive);
+	UpdateSceneTransition(isGameViewActive);
+}
+
+void TitleScene::UpdateSceneContent()
+{
+	// Cameraの更新は、モデルがCameraを参照する前に完了させます。
 	cameraManager->Update();
 
-	// すべてのTitleモデルへ、同じCameraと3種類のLightを渡してから行列を更新します。
-	for (auto& object3d : normalObjects) {
-		object3d->SetCamera(cameraManager->GetActiveCamera());
-		// 方向が0だとLight計算ができないため、安全な下向きへ戻します。
-		float length = Length(directionalLight_.direction);
-		if (length > 0.0f) {
-			directionalLight_.direction = Normalize(directionalLight_.direction);
-		} else {
-			directionalLight_.direction = { 0.0f, -1.0f, 0.0f };
-		}
-		object3d->SetDirectionalLight(directionalLight_);
-		object3d->SetPointLight(pointLight_);
-		object3d->SetSpotLight(spotLight_);
-		object3d->Update();
-	}
-	for (auto& object3d : animationObjects_) {
-		object3d->SetCamera(cameraManager->GetActiveCamera());
-		object3d->SetDirectionalLight(directionalLight_);
-		object3d->SetPointLight(pointLight_);
-		object3d->SetSpotLight(spotLight_);
-		object3d->Update();
-	}
-
-	// CameraのView行列とProjection行列を掛けると、3D座標を画面へ映す行列になります。
-	Matrix4x4 viewMatrix = cameraManager->GetActiveCamera()->GetViewMatrix();
-	Matrix4x4 projectionMatrix = cameraManager->GetActiveCamera()->GetProjectionMatrix();
-	Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
+	// 方向が0でもLight計算が壊れないよう、共通の安全な単位方向へそろえます。
+	Object3dRenderContext::NormalizeDirectionalLight(directionalLight_);
+	// Titleが所有するCamera・Lightをまとめ、全モデルへ同じ描画準備を行います。
+	Object3dRenderContext renderContext(
+		cameraManager->GetActiveCamera(),
+		directionalLight_,
+		pointLight_,
+		spotLight_);
+	renderContext.UpdateObjects(normalObjects_);
+	renderContext.UpdateObjects(animationObjects_);
 
 	for (auto& sprite : addedSprites_) {
 		sprite->Update();
 	}
 	skyBox_->Update();
+}
 
+
+void TitleScene::UpdateEditorUi(bool isGameViewActive)
+{
+	// Titleの編集UIは、3DモデルとSpriteを更新した後の状態を表示します。
 	ImGuiManager::GetInstance()->Begin("Title");
-	DrawTitleModelShelfImGui();
-	DrawTitleInspectorImGui();
-	HandleTitleShelfDropOnEditView();
-	DrawTitleEditViewport();
-	DrawTitleSpriteEditViewport();
-	if (ImGuiManager::GetInstance()->IsGameViewActive()) {
+	titleEditor_.Draw(MakeTitleEditorContext());
+	if (isGameViewActive) {
 		SceneEditor::UpdateViewportCamera(cameraManager ? cameraManager->GetActiveCamera() : nullptr);
 	}
 	ImGuiManager::GetInstance()->End();
+}
 
-	//sapceキーが押されていたら
-	if (ImGuiManager::GetInstance()->IsGameViewActive() &&
-		(Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->IsPadButtonPressed(0, 1)))
+
+void TitleScene::UpdateSceneTransition(bool isGameViewActive)
+{
+	// Game Viewが操作対象でない時は、Editor操作をScene切替入力として扱いません。
+	if (!isGameViewActive) {
+		return;
+	}
+
+	Input* input = Input::GetInstance();
+	// SpaceまたはPadの1ボタンで、Debug Sceneを開きます。
+	if (input->TriggerKey(DIK_SPACE) || input->IsPadButtonPressed(0, 1))
 	{
-		//シーン切り替え
 		SceneManager::GetInstance()->ChangeScene("DEBUG");
 	}
 
-	//ステージシーンへ
-	if (ImGuiManager::GetInstance()->IsGameViewActive() &&
-		(Input::GetInstance()->TriggerKey(DIK_RETURN) || Input::GetInstance()->IsPadButtonPressed(0, 3)))
+	// EnterまたはPadの3ボタンで、本編のStage1を開きます。
+	if (input->TriggerKey(DIK_RETURN) || input->IsPadButtonPressed(0, 3))
 	{
 		SceneManager::GetInstance()->ChangeScene("STAGE1");
 	}
-
 }
 
 void TitleScene::Draw()
 {
-	//描画前処理
-	DirectXCommon::GetInstance()->PreDraw();
-	SrvManager::GetInstance()->PreDraw();
+	// 共通PipelineがRenderTextureへの描画開始を行い、Titleは描画対象だけを並べます。
+	SceneRenderPipeline::Begin(DirectXCommon::GetInstance());
 
-	object3dCommon->SetCommonDrawSetting();
-	for (const auto& object : normalObjects) {
-		if (object) {
-			object->Draw();
-		}
-	}
-	for (const auto& object : animationObjects_) {
-		if (object) {
-			object->Draw();
-		}
-	}
+	SceneRenderPipeline::DrawObjects(object3dCommon, normalObjects_);
+	SceneRenderPipeline::DrawObjects(object3dCommon, animationObjects_);
 	//skyBox描画
 	if (skyBox_) {
 		skyBox_->Draw();
 	}
 
-	spriteCommon->SetCommonDrawSetting();
-	for (const auto& sprite : addedSprites_) {
-		sprite->Draw();
-	}
+	SceneRenderPipeline::DrawSprites(spriteCommon, addedSprites_);
 
-	// SceneはRenderTextureへ描画済みなので、ImGuiの直前にSwapChainへ切り替える
-	if (PostEffect::GetInstance()->IsEnabled()) {
-		if (PostEffect::GetInstance()->IsGaussianFilter()) {
-			DirectXCommon::GetInstance()->PreDrawForGaussianHorizontalTexture();
-			PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), true);
-			DirectXCommon::GetInstance()->PreDrawForGaussianVerticalTexture();
-			PostEffect::GetInstance()->DrawGaussianVertical(DirectXCommon::GetInstance()->GetGaussianBlurTextureSrvIndex());
-		} else if (PostEffect::GetInstance()->IsDepthBasedOutline()) {
-			PostEffect::GetInstance()->SetProjectionInverse(Inverse(cameraManager->GetActiveCamera()->GetProjectionMatrix()));
-			DirectXCommon::GetInstance()->PreDrawForDepthBasedOutlineTexture();
-			PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), true);
-		} else {
-			DirectXCommon::GetInstance()->PreDrawForPostEffectTexture();
-			PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), true);
-		}
-	}
-	DirectXCommon::GetInstance()->PreDrawForSwapChain(PostEffect::GetInstance()->IsEnabled());
-#ifndef USE_IMGUI
-	// RenderTextureのSceneを全画面三角形でSwapChainへコピーする
-	if (PostEffect::GetInstance()->IsEnabled()) {
-		PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetPostEffectTextureSrvIndex(), false);
-	} else {
-		PostEffect::GetInstance()->Draw(DirectXCommon::GetInstance()->GetRenderTextureSrvIndex(), false);
-	}
-#endif
-	ImGuiManager::GetInstance()->Draw(DirectXCommon::GetInstance());
-
-	DirectXCommon::GetInstance()->PostDraw();
-	
+	// PostEffect・SwapChain・ImGui・Presentは、全Scene共通のPipelineへ任せます。
+	SceneRenderPipeline::End(
+		DirectXCommon::GetInstance(),
+		cameraManager ? cameraManager->GetActiveCamera() : nullptr);
 }
 
 void TitleScene::Finalize()
 {
 	//GPUの完了待ち
 	DirectXCommon::GetInstance()->WaitForGPU();
-	obj = nullptr;
 	addedSprites_.clear();
 	skyBox_.reset();
-	normalObjects.clear();
+	normalObjects_.clear();
 	animationObjects_.clear();
-	shelfState_.entries.clear();
-	shelfState_.selectedEntry.clear();
-	shelfState_.message.clear();
+	titleEditor_.Finalize();
 	baseNormalObjectCount_ = 0;
+	baseAnimationObjectCount_ = 0;
 	baseSpriteCount_ = 0;
-	selectedTitleSpriteIndex_ = 0;
-	inspectorAutoSelectSpriteFrames_ = 0;
 	mainCamera.reset();
 	cameraManager.reset();
 	isFinished_ = false;

@@ -1,14 +1,10 @@
 #include "SceneEditor.h"
-#include "DirectXCommon.h"
 #include "ImGuiManager.h"
+#include "SceneEditorShelfMessages.h"
+#include "SceneEditorViewportMath.h"
 #include "TextureManager.h"
-#include <assimp/Importer.hpp>
-#include <assimp/postprocess.h>
-#include <assimp/scene.h>
 #include <algorithm>
-#include <cctype>
 #include <cmath>
-#include <filesystem>
 #include <limits>
 #include <numbers>
 #include <unordered_map>
@@ -23,6 +19,72 @@ namespace {
 		Vector3 minimum{};
 		Vector3 maximum{};
 	};
+
+	// Model Shelfに表示するモデル・Texture種別ごとの件数です。
+	struct ShelfStatistics
+	{
+		size_t loadableModelCount = 0;
+		size_t animationModelCount = 0;
+		size_t textureCount = 0;
+		size_t unsupportedModelCount = 0;
+	};
+
+	// 一覧を一度だけ走査し、Shelf上部へ表示する件数を集計します。
+	ShelfStatistics CalculateShelfStatistics(const std::vector<SceneEditor::ShelfEntry>& entries)
+	{
+		ShelfStatistics statistics{};
+		for (const SceneEditor::ShelfEntry& entry : entries) {
+			if (entry.isTexture) {
+				++statistics.textureCount;
+			} else if (!entry.canLoad) {
+				++statistics.unsupportedModelCount;
+			} else {
+				++statistics.loadableModelCount;
+				if (entry.hasAnimation) {
+					++statistics.animationModelCount;
+				}
+			}
+		}
+		return statistics;
+	}
+
+	// ShelfStateが保持する選択名から、実際の表示項目を返します。
+	const SceneEditor::ShelfEntry* FindSelectedShelfEntry(const SceneEditor::ShelfState& state)
+	{
+		const auto selectedIt = std::find_if(
+			state.entries.begin(),
+			state.entries.end(),
+			[&state](const SceneEditor::ShelfEntry& entry)
+			{
+				return entry.fileName == state.selectedEntry;
+			});
+		return selectedIt != state.entries.end() ? &(*selectedIt) : nullptr;
+	}
+
+	// モデルまたはTextureをSceneへ追加・Previewできる状態かを返します。
+	bool IsShelfEntryLoadable(const SceneEditor::ShelfEntry* entry)
+	{
+		return entry != nullptr && (entry->canLoad || entry->isTexture);
+	}
+
+	// 削除済みObjectを選択したままにならないよう、Viewportの選択状態を安全に戻します。
+	void ResetInvalidViewportSelection(
+		SceneEditor::ViewportState& state,
+		const std::vector<SceneEditor::ViewportObject>& objects)
+	{
+		if (state.selectedIndex == -1) {
+			return;
+		}
+		if (state.selectedIndex >= 0 &&
+			state.selectedIndex < static_cast<int>(objects.size()) &&
+			objects[state.selectedIndex].object) {
+			return;
+		}
+
+		state.selectedIndex = -1;
+		state.isDragging = false;
+		state.activeAxis = -1;
+	}
 
 	Vector3 TransformEditorPoint(const Vector3& point, const Matrix4x4& matrix)
 	{
@@ -52,18 +114,73 @@ namespace {
 		return std::isfinite(screen.x) && std::isfinite(screen.y);
 	}
 
-	float EditorDistanceToSegment(const ImVec2& point, const ImVec2& start, const ImVec2& end)
+	// Edit View左上のTransform切替とCamera編集を表示し、操作中ならtrueを返します。
+	bool DrawViewportToolbar(
+		SceneEditor::ViewportState& state,
+		const SceneEditor::ViewportOptions& options,
+		float rectX,
+		float rectY)
 	{
-		const ImVec2 segment(end.x - start.x, end.y - start.y);
-		const ImVec2 fromStart(point.x - start.x, point.y - start.y);
-		const float lengthSquared = segment.x * segment.x + segment.y * segment.y;
-		const float amount = lengthSquared > 0.0001f
-			? std::clamp((fromStart.x * segment.x + fromStart.y * segment.y) / lengthSquared, 0.0f, 1.0f)
-			: 0.0f;
-		const float dx = point.x - (start.x + segment.x * amount);
-		const float dy = point.y - (start.y + segment.y * amount);
-		return std::sqrt(dx * dx + dy * dy);
+		ImGui::SetNextWindowPos(ImVec2(rectX + 10.0f, rectY + 10.0f), ImGuiCond_Always);
+		ImGui::SetNextWindowBgAlpha(0.88f);
+		const ImGuiWindowFlags toolbarFlags =
+			ImGuiWindowFlags_NoDecoration |
+			ImGuiWindowFlags_AlwaysAutoResize |
+			ImGuiWindowFlags_NoSavedSettings |
+			ImGuiWindowFlags_NoDocking;
+		ImGui::Begin("Edit View Tools", nullptr, toolbarFlags);
+		const auto drawToolButton = [&state](const char* label, SceneEditor::TransformTool tool) {
+			const bool isActive = state.tool == tool;
+			if (isActive) {
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.48f, 0.82f, 1.0f));
+			}
+			if (ImGui::Button(label)) {
+				state.tool = tool;
+				state.isDragging = false;
+				state.activeAxis = -1;
+			}
+			if (isActive) {
+				ImGui::PopStyleColor();
+			}
+		};
+		drawToolButton("Move", SceneEditor::TransformTool::Move);
+		ImGui::SameLine();
+		drawToolButton("Rotate", SceneEditor::TransformTool::Rotate);
+		ImGui::SameLine();
+		drawToolButton("Scale", SceneEditor::TransformTool::Scale);
+		if (state.selectedIndex >= 0) {
+			ImGui::Text("Selected: %s", options.objects[state.selectedIndex].label.c_str());
+		} else {
+			ImGui::TextDisabled("Left click an object to select it.");
+		}
+		ImGui::TextDisabled("RMB: rotate camera | MMB: pan | Wheel: zoom");
+		if (ImGui::TreeNode("Camera Transform")) {
+			Vector3 cameraPosition = options.camera->GetTranslate();
+			if (ImGui::DragFloat3("Camera Position", &cameraPosition.x, 0.05f)) {
+				options.camera->SetTranslate(cameraPosition);
+			}
+			constexpr float kRadianToDegree = 180.0f / std::numbers::pi_v<float>;
+			constexpr float kDegreeToRadian = std::numbers::pi_v<float> / 180.0f;
+			const Vector3 cameraRotation = options.camera->GetRotate();
+			float cameraRotationDegrees[3]{
+				cameraRotation.x * kRadianToDegree,
+				cameraRotation.y * kRadianToDegree,
+				cameraRotation.z * kRadianToDegree,
+			};
+			if (ImGui::DragFloat3("Camera Rotation (deg)", cameraRotationDegrees, 1.0f)) {
+				options.camera->SetRotate({
+					cameraRotationDegrees[0] * kDegreeToRadian,
+					cameraRotationDegrees[1] * kDegreeToRadian,
+					cameraRotationDegrees[2] * kDegreeToRadian,
+				});
+			}
+			ImGui::TreePop();
+		}
+		const bool toolbarHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
+		ImGui::End();
+		return toolbarHovered;
 	}
+
 #endif
 
 	bool BuildEditorWorldBounds(const Object3d& object, Vector3& minimum, Vector3& maximum)
@@ -138,203 +255,6 @@ namespace {
 		return true;
 	}
 
-bool IsShelfModelFile(const std::filesystem::path& path)
-{
-	std::string extension = path.extension().string();
-	std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) {
-		return static_cast<char>(std::tolower(c));
-	});
-	return extension == ".obj" || extension == ".gltf" || extension == ".glb" || extension == ".fbx";
-}
-
-bool IsShelfTextureFile(const std::filesystem::path& path)
-{
-	std::string extension = path.extension().string();
-	std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) {
-		return static_cast<char>(std::tolower(c));
-	});
-	return extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".bmp";
-}
-
-Vector3 ToShelfVector3(const aiVector3D& value)
-{
-	return { value.x, value.y, value.z };
-}
-
-std::string MakeAddMessage(const std::string& sceneLabel, const char* kind, const std::string& fileName, bool success)
-{
-	return std::string(success ? "Added " : "Could not add ") + sceneLabel + " " + kind + ": " + fileName;
-}
-
-std::string MakePreviewMessage(const char* kind, const std::string& fileName, bool success)
-{
-	return std::string(success ? "Previewing " : "Could not preview ") + kind + ": " + fileName;
-}
-}
-
-void SceneEditor::ScanResourceShelf(ShelfState& state)
-{
-	state.entries.clear();
-
-	const std::filesystem::path resourceDirectory = "resources";
-	std::error_code errorCode;
-	if (!std::filesystem::exists(resourceDirectory, errorCode)) {
-		state.selectedEntry.clear();
-		return;
-	}
-
-	for (std::filesystem::recursive_directory_iterator it(resourceDirectory, std::filesystem::directory_options::skip_permission_denied, errorCode), end;
-		it != end;
-		it.increment(errorCode)) {
-		if (errorCode) {
-			errorCode.clear();
-			continue;
-		}
-		if (!it->is_regular_file(errorCode) || errorCode) {
-			errorCode.clear();
-			continue;
-		}
-
-		const bool isModelFile = IsShelfModelFile(it->path());
-		const bool isTextureFile = IsShelfTextureFile(it->path());
-		if (!isModelFile && !isTextureFile) {
-			continue;
-		}
-
-		std::filesystem::path relativePath = std::filesystem::relative(it->path(), resourceDirectory, errorCode);
-		if (errorCode) {
-			relativePath = it->path().filename();
-			errorCode.clear();
-		}
-		std::filesystem::path displayPath = relativePath;
-		displayPath.replace_extension();
-
-		ShelfEntry shelfEntry{};
-		shelfEntry.fileName = relativePath.generic_string();
-		shelfEntry.displayName = displayPath.generic_string();
-
-		if (isTextureFile) {
-			shelfEntry.isTexture = true;
-			shelfEntry.textureFilePath = (std::filesystem::path("Resources") / relativePath).generic_string();
-			TextureManager* textureManager = TextureManager::GetInstance();
-			if (!textureManager->Contains(shelfEntry.textureFilePath)) {
-				textureManager->LoadTexture(shelfEntry.textureFilePath);
-			}
-			shelfEntry.textureSrvIndex = textureManager->GetSrvIndex(shelfEntry.textureFilePath);
-			const DirectX::TexMetadata& metadata = textureManager->GetMetaData(shelfEntry.textureFilePath);
-			shelfEntry.textureSize = {
-				static_cast<float>(metadata.width),
-				static_cast<float>(metadata.height)
-			};
-			state.entries.push_back(std::move(shelfEntry));
-			continue;
-		}
-
-		Assimp::Importer importer;
-		const aiScene* scene = importer.ReadFile(it->path().string(), aiProcess_Triangulate | aiProcess_GenNormals);
-		if (scene) {
-			shelfEntry.hasMesh = scene->HasMeshes();
-			shelfEntry.hasAnimation = scene->mNumAnimations > 0;
-
-			Vector3 minPoint{
-				(std::numeric_limits<float>::max)(),
-				(std::numeric_limits<float>::max)(),
-				(std::numeric_limits<float>::max)()
-			};
-			Vector3 maxPoint{
-				std::numeric_limits<float>::lowest(),
-				std::numeric_limits<float>::lowest(),
-				std::numeric_limits<float>::lowest()
-			};
-			bool hasVertex = false;
-			bool hasDrawableFace = false;
-			for (uint32_t meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex) {
-				const aiMesh* mesh = scene->mMeshes[meshIndex];
-				if (!mesh || !mesh->HasPositions()) {
-					continue;
-				}
-				hasDrawableFace = hasDrawableFace || mesh->HasFaces();
-				for (uint32_t vertexIndex = 0; vertexIndex < mesh->mNumVertices; ++vertexIndex) {
-					const Vector3 position = ToShelfVector3(mesh->mVertices[vertexIndex]);
-					minPoint.x = (std::min)(minPoint.x, position.x);
-					minPoint.y = (std::min)(minPoint.y, position.y);
-					minPoint.z = (std::min)(minPoint.z, position.z);
-					maxPoint.x = (std::max)(maxPoint.x, position.x);
-					maxPoint.y = (std::max)(maxPoint.y, position.y);
-					maxPoint.z = (std::max)(maxPoint.z, position.z);
-					hasVertex = true;
-				}
-			}
-
-			if (hasVertex) {
-				shelfEntry.thumbnailCenter = {
-					(minPoint.x + maxPoint.x) * 0.5f,
-					(minPoint.y + maxPoint.y) * 0.5f,
-					(minPoint.z + maxPoint.z) * 0.5f
-				};
-				const Vector3 size{
-					maxPoint.x - minPoint.x,
-					maxPoint.y - minPoint.y,
-					maxPoint.z - minPoint.z
-				};
-				shelfEntry.thumbnailRadius = (std::max)({ size.x, size.y, size.z, 0.001f }) * 0.5f;
-			}
-			shelfEntry.canLoad = shelfEntry.hasMesh && hasVertex && hasDrawableFace;
-
-			constexpr size_t maxThumbnailLines = 96;
-			constexpr size_t maxThumbnailTriangles = 72;
-			for (uint32_t meshIndex = 0; meshIndex < scene->mNumMeshes && shelfEntry.thumbnailLines.size() < maxThumbnailLines; ++meshIndex) {
-				const aiMesh* mesh = scene->mMeshes[meshIndex];
-				if (!mesh || !mesh->HasPositions() || !mesh->HasFaces()) {
-					continue;
-				}
-				for (uint32_t faceIndex = 0; faceIndex < mesh->mNumFaces; ++faceIndex) {
-					const aiFace& face = mesh->mFaces[faceIndex];
-					if (face.mNumIndices < 2) {
-						continue;
-					}
-					if (face.mNumIndices >= 3 && shelfEntry.thumbnailTriangles.size() < maxThumbnailTriangles) {
-						for (uint32_t index = 1; index + 1 < face.mNumIndices && shelfEntry.thumbnailTriangles.size() < maxThumbnailTriangles; ++index) {
-							const uint32_t index0 = face.mIndices[0];
-							const uint32_t index1 = face.mIndices[index];
-							const uint32_t index2 = face.mIndices[index + 1];
-							if (index0 < mesh->mNumVertices && index1 < mesh->mNumVertices && index2 < mesh->mNumVertices) {
-								shelfEntry.thumbnailTriangles.push_back({
-									ToShelfVector3(mesh->mVertices[index0]),
-									ToShelfVector3(mesh->mVertices[index1]),
-									ToShelfVector3(mesh->mVertices[index2])
-								});
-							}
-						}
-					}
-					for (uint32_t index = 0; index < face.mNumIndices && shelfEntry.thumbnailLines.size() < maxThumbnailLines; ++index) {
-						const uint32_t startIndex = face.mIndices[index];
-						const uint32_t endIndex = face.mIndices[(index + 1) % face.mNumIndices];
-						if (startIndex >= mesh->mNumVertices || endIndex >= mesh->mNumVertices) {
-							continue;
-						}
-						shelfEntry.thumbnailLines.emplace_back(
-							ToShelfVector3(mesh->mVertices[startIndex]),
-							ToShelfVector3(mesh->mVertices[endIndex]));
-					}
-				}
-			}
-		}
-
-		state.entries.push_back(std::move(shelfEntry));
-	}
-
-	std::sort(state.entries.begin(), state.entries.end(), [](const ShelfEntry& lhs, const ShelfEntry& rhs) {
-		return lhs.fileName < rhs.fileName;
-	});
-	if (!state.selectedEntry.empty()) {
-		const bool selectionStillExists = std::any_of(state.entries.begin(), state.entries.end(), [&](const ShelfEntry& entry) {
-			return entry.fileName == state.selectedEntry;
-		});
-		if (!selectionStillExists) {
-			state.selectedEntry.clear();
-		}
-	}
 }
 
 void SceneEditor::DrawModelShelf(ShelfState& state, const ShelfCallbacks& callbacks)
@@ -350,33 +270,17 @@ void SceneEditor::DrawModelShelf(ShelfState& state, const ShelfCallbacks& callba
 		return;
 	}
 
-	const size_t loadableModelCount = static_cast<size_t>(std::count_if(state.entries.begin(), state.entries.end(), [](const ShelfEntry& entry) {
-		return !entry.isTexture && entry.canLoad;
-	}));
-	const size_t animationModelCount = static_cast<size_t>(std::count_if(state.entries.begin(), state.entries.end(), [](const ShelfEntry& entry) {
-		return entry.canLoad && entry.hasAnimation;
-	}));
-	const size_t textureCount = static_cast<size_t>(std::count_if(state.entries.begin(), state.entries.end(), [](const ShelfEntry& entry) {
-		return entry.isTexture;
-	}));
-	const size_t unsupportedModelCount = static_cast<size_t>(std::count_if(state.entries.begin(), state.entries.end(), [](const ShelfEntry& entry) {
-		return !entry.isTexture && !entry.canLoad;
-	}));
-	auto findSelectedEntry = [&state]() -> const ShelfEntry* {
-		const auto selectedIt = std::find_if(state.entries.begin(), state.entries.end(), [&](const ShelfEntry& entry) {
-			return entry.fileName == state.selectedEntry;
-		});
-		return selectedIt != state.entries.end() ? &(*selectedIt) : nullptr;
-	};
-	const ShelfEntry* selectedEntry = findSelectedEntry();
-	bool hasLoadableSelection = selectedEntry != nullptr && (selectedEntry->canLoad || selectedEntry->isTexture);
+	ShelfStatistics statistics = CalculateShelfStatistics(state.entries);
+	const ShelfEntry* selectedEntry = FindSelectedShelfEntry(state);
+	bool hasLoadableSelection = IsShelfEntryLoadable(selectedEntry);
 
 	ImGui::Text("%s Resources (%zu)", callbacks.sceneLabel.c_str(), state.entries.size());
 	ImGui::SameLine();
 	if (ImGui::SmallButton("Refresh")) {
 		ScanResourceShelf(state);
-		selectedEntry = findSelectedEntry();
-		hasLoadableSelection = selectedEntry != nullptr && (selectedEntry->canLoad || selectedEntry->isTexture);
+		statistics = CalculateShelfStatistics(state.entries);
+		selectedEntry = FindSelectedShelfEntry(state);
+		hasLoadableSelection = IsShelfEntryLoadable(selectedEntry);
 		state.message = "Refreshed " + callbacks.sceneLabel + " resources: " + std::to_string(state.entries.size()) + " shelf item(s) found.";
 	}
 	if (callbacks.drawExtraToolbar) {
@@ -393,10 +297,10 @@ void SceneEditor::DrawModelShelf(ShelfState& state, const ShelfCallbacks& callba
 	ImGui::TextDisabled("Added: %zu (Textures: %zu)", callbacks.addedModelCount + callbacks.addedTextureCount, callbacks.addedTextureCount);
 	ImGui::TextDisabled(
 		"Models: %zu | Animation: %zu | 2D Textures: %zu | Unsupported: %zu",
-		loadableModelCount,
-		animationModelCount,
-		textureCount,
-		unsupportedModelCount);
+		statistics.loadableModelCount,
+		statistics.animationModelCount,
+		statistics.textureCount,
+		statistics.unsupportedModelCount);
 	if (!state.message.empty()) {
 		ImGui::TextWrapped("%s", state.message.c_str());
 	}
@@ -408,7 +312,7 @@ void SceneEditor::DrawModelShelf(ShelfState& state, const ShelfCallbacks& callba
 		ImGui::BeginDisabled(!hasLoadableSelection);
 		if (ImGui::SmallButton("Preview Selected")) {
 			const bool success = callbacks.previewEntry(*selectedEntry);
-			state.message = MakePreviewMessage(selectedEntry->isTexture ? "2D Texture" : "model", selectedEntry->isTexture ? selectedEntry->textureFilePath : selectedEntry->fileName, success);
+			state.message = SceneEditorShelfMessages::MakePreviewMessage(selectedEntry->isTexture ? "2D Texture" : "model", selectedEntry->isTexture ? selectedEntry->textureFilePath : selectedEntry->fileName, success);
 		}
 		ImGui::EndDisabled();
 		ImGui::SameLine();
@@ -417,10 +321,10 @@ void SceneEditor::DrawModelShelf(ShelfState& state, const ShelfCallbacks& callba
 	if (ImGui::SmallButton(("Add Selected to " + callbacks.sceneLabel).c_str())) {
 		if (selectedEntry->isTexture) {
 			const bool success = callbacks.addTexture && callbacks.addTexture(selectedEntry->textureFilePath);
-			state.message = MakeAddMessage(callbacks.sceneLabel, "2D Texture", selectedEntry->textureFilePath, success);
+			state.message = SceneEditorShelfMessages::MakeAddMessage(callbacks.sceneLabel, "2D Texture", selectedEntry->textureFilePath, success);
 		} else {
 			const bool success = callbacks.addModel && callbacks.addModel(selectedEntry->fileName);
-			state.message = MakeAddMessage(callbacks.sceneLabel, "model", selectedEntry->fileName, success);
+			state.message = SceneEditorShelfMessages::MakeAddMessage(callbacks.sceneLabel, "model", selectedEntry->fileName, success);
 		}
 		if (callbacks.afterAdd) {
 			callbacks.afterAdd();
@@ -463,10 +367,10 @@ void SceneEditor::DrawModelShelf(ShelfState& state, const ShelfCallbacks& callba
 			state.selectedEntry = entry.fileName;
 			if (callbacks.previewOnDoubleClick && callbacks.previewEntry) {
 				const bool success = callbacks.previewEntry(entry);
-				state.message = MakePreviewMessage("2D Texture", entry.textureFilePath, success);
+				state.message = SceneEditorShelfMessages::MakePreviewMessage("2D Texture", entry.textureFilePath, success);
 			} else {
 				const bool success = callbacks.addTexture && callbacks.addTexture(entry.textureFilePath);
-				state.message = MakeAddMessage(callbacks.sceneLabel, "2D Texture", entry.textureFilePath, success);
+				state.message = SceneEditorShelfMessages::MakeAddMessage(callbacks.sceneLabel, "2D Texture", entry.textureFilePath, success);
 				if (callbacks.afterAdd) {
 					callbacks.afterAdd();
 				}
@@ -475,10 +379,10 @@ void SceneEditor::DrawModelShelf(ShelfState& state, const ShelfCallbacks& callba
 			state.selectedEntry = entry.fileName;
 			if (callbacks.previewOnDoubleClick && callbacks.previewEntry) {
 				const bool success = callbacks.previewEntry(entry);
-				state.message = MakePreviewMessage("model", entry.fileName, success);
+				state.message = SceneEditorShelfMessages::MakePreviewMessage("model", entry.fileName, success);
 			} else {
 				const bool success = callbacks.addModel && callbacks.addModel(entry.fileName);
-				state.message = MakeAddMessage(callbacks.sceneLabel, "model", entry.fileName, success);
+				state.message = SceneEditorShelfMessages::MakeAddMessage(callbacks.sceneLabel, "model", entry.fileName, success);
 				if (callbacks.afterAdd) {
 					callbacks.afterAdd();
 				}
@@ -625,62 +529,6 @@ void SceneEditor::DrawModelShelf(ShelfState& state, const ShelfCallbacks& callba
 #endif
 }
 
-void SceneEditor::HandleShelfDropOnEditView(ShelfState& state, const ShelfCallbacks& callbacks)
-{
-#ifdef USE_IMGUI
-	// Game Viewへの誤配置を防ぎ、Edit Viewだけをドロップ先として扱う。
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
-
-	float x = 0.0f;
-	float y = 0.0f;
-	float width = 0.0f;
-	float height = 0.0f;
-	if (!ImGuiManager::GetInstance()->GetGameViewRect(x, y, width, height)) {
-		return;
-	}
-
-	const ImRect gameViewRect(ImVec2(x, y), ImVec2(x + width, y + height));
-	const std::string dropTargetId = callbacks.sceneLabel + "EditViewShelfDropTarget";
-	if (ImGui::BeginDragDropTargetCustom(gameViewRect, ImGui::GetID(dropTargetId.c_str()))) {
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("MODEL_FILE")) {
-			std::string fileName(static_cast<const char*>(payload->Data), payload->DataSize);
-			if (!fileName.empty() && fileName.back() == '\0') {
-				fileName.pop_back();
-			}
-			const bool success = callbacks.addModel && callbacks.addModel(fileName);
-			state.message = MakeAddMessage(callbacks.sceneLabel, "model", fileName, success);
-			if (callbacks.afterAdd) {
-				callbacks.afterAdd();
-			}
-		}
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("TEXTURE_FILE")) {
-			std::string textureFilePath(static_cast<const char*>(payload->Data), payload->DataSize);
-			if (!textureFilePath.empty() && textureFilePath.back() == '\0') {
-				textureFilePath.pop_back();
-			}
-			const bool success = callbacks.addTexture && callbacks.addTexture(textureFilePath);
-			state.message = MakeAddMessage(callbacks.sceneLabel, "2D Texture", textureFilePath, success);
-			if (callbacks.afterAdd) {
-				callbacks.afterAdd();
-			}
-		}
-		ImGui::EndDragDropTarget();
-	}
-
-	if (ImGui::IsDragDropActive() && gameViewRect.Contains(ImGui::GetMousePos())) {
-		ImDrawList* drawList = ImGui::GetForegroundDrawList();
-		drawList->AddRect(gameViewRect.Min, gameViewRect.Max, IM_COL32(80, 180, 255, 255), 0.0f, 0, 4.0f);
-		const std::string dropLabel = "Drop into " + callbacks.sceneLabel;
-		drawList->AddText(ImVec2(gameViewRect.Min.x + 16.0f, gameViewRect.Min.y + 16.0f), IM_COL32(180, 230, 255, 255), dropLabel.c_str());
-	}
-#else
-	(void)state;
-	(void)callbacks;
-#endif
-}
-
 void SceneEditor::DrawViewportEditor(ViewportState& state, const ViewportOptions& options)
 {
 #ifdef USE_IMGUI
@@ -705,71 +553,10 @@ void SceneEditor::DrawViewportEditor(ViewportState& state, const ViewportOptions
 	const ImRect imageRect(imageMin, ImVec2(rectX + rectWidth, rectY + rectHeight));
 	const Matrix4x4& viewProjection = options.camera->GetViewProjectionMatrix();
 
-	if (state.selectedIndex >= static_cast<int>(options.objects.size()) ||
-		(state.selectedIndex >= 0 && !options.objects[state.selectedIndex].object)) {
-		state.selectedIndex = -1;
-		state.isDragging = false;
-		state.activeAxis = -1;
-	}
+	ResetInvalidViewportSelection(state, options.objects);
 
-	// Edit View左上へ、Blenderのツール切替に相当する小さな操作パネルを重ねる。
-	ImGui::SetNextWindowPos(ImVec2(rectX + 10.0f, rectY + 10.0f), ImGuiCond_Always);
-	ImGui::SetNextWindowBgAlpha(0.88f);
-	const ImGuiWindowFlags toolbarFlags =
-		ImGuiWindowFlags_NoDecoration |
-		ImGuiWindowFlags_AlwaysAutoResize |
-		ImGuiWindowFlags_NoSavedSettings |
-		ImGuiWindowFlags_NoDocking;
-	ImGui::Begin("Edit View Tools", nullptr, toolbarFlags);
-	const auto drawToolButton = [&](const char* label, TransformTool tool) {
-		const bool isActive = state.tool == tool;
-		if (isActive) {
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.48f, 0.82f, 1.0f));
-		}
-		if (ImGui::Button(label)) {
-			state.tool = tool;
-			state.isDragging = false;
-			state.activeAxis = -1;
-		}
-		if (isActive) {
-			ImGui::PopStyleColor();
-		}
-	};
-	drawToolButton("Move", TransformTool::Move);
-	ImGui::SameLine();
-	drawToolButton("Rotate", TransformTool::Rotate);
-	ImGui::SameLine();
-	drawToolButton("Scale", TransformTool::Scale);
-	if (state.selectedIndex >= 0) {
-		ImGui::Text("Selected: %s", options.objects[state.selectedIndex].label.c_str());
-	} else {
-		ImGui::TextDisabled("Left click an object to select it.");
-	}
-	ImGui::TextDisabled("RMB: rotate camera | MMB: pan | Wheel: zoom");
-	if (ImGui::TreeNode("Camera Transform")) {
-		Vector3 cameraPosition = options.camera->GetTranslate();
-		if (ImGui::DragFloat3("Camera Position", &cameraPosition.x, 0.05f)) {
-			options.camera->SetTranslate(cameraPosition);
-		}
-		constexpr float kRadianToDegree = 180.0f / std::numbers::pi_v<float>;
-		constexpr float kDegreeToRadian = std::numbers::pi_v<float> / 180.0f;
-		const Vector3 cameraRotation = options.camera->GetRotate();
-		float cameraRotationDegrees[3]{
-			cameraRotation.x * kRadianToDegree,
-			cameraRotation.y * kRadianToDegree,
-			cameraRotation.z * kRadianToDegree,
-		};
-		if (ImGui::DragFloat3("Camera Rotation (deg)", cameraRotationDegrees, 1.0f)) {
-			options.camera->SetRotate({
-				cameraRotationDegrees[0] * kDegreeToRadian,
-				cameraRotationDegrees[1] * kDegreeToRadian,
-				cameraRotationDegrees[2] * kDegreeToRadian,
-			});
-		}
-		ImGui::TreePop();
-	}
-	const bool toolbarHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
-	ImGui::End();
+	// Transform切替とCamera編集は、Viewport本体とは別の小さな操作パネルへ任せます。
+	const bool toolbarHovered = DrawViewportToolbar(state, options, rectX, rectY);
 
 	Object3d* selectedObject = state.selectedIndex >= 0
 		? options.objects[state.selectedIndex].object
@@ -823,7 +610,7 @@ void SceneEditor::DrawViewportEditor(ViewportState& state, const ViewportOptions
 					if (!isAxisEndVisible[axisEndIndex]) {
 						continue;
 					}
-					const float distance = EditorDistanceToSegment(mouse, centerScreen, endScreens[axisEndIndex]);
+					const float distance = SceneEditorViewportMath::DistanceToSegment(mouse, centerScreen, endScreens[axisEndIndex]);
 					if (distance <= bestDistance) {
 						bestDistance = distance;
 						hoveredAxisEnd = axisEndIndex;
@@ -985,436 +772,3 @@ void SceneEditor::DrawViewportEditor(ViewportState& state, const ViewportOptions
 #endif
 }
 
-void SceneEditor::DrawSpriteViewportEditor(SpriteViewportState& state, const SpriteViewportOptions& options)
-{
-#ifdef USE_IMGUI
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
-
-	float rectX = 0.0f;
-	float rectY = 0.0f;
-	float rectWidth = 0.0f;
-	float rectHeight = 0.0f;
-	if (!ImGuiManager::GetInstance()->GetGameViewRect(rectX, rectY, rectWidth, rectHeight)) {
-		return;
-	}
-	const float clientWidth = static_cast<float>(DirectXCommon::GetInstance()->GetClientWidth());
-	const float clientHeight = static_cast<float>(DirectXCommon::GetInstance()->GetClientHeight());
-	if (clientWidth <= 0.0f || clientHeight <= 0.0f) {
-		return;
-	}
-
-	if (state.selectedIndex >= static_cast<int>(options.sprites.size()) ||
-		(state.selectedIndex >= 0 && !options.sprites[state.selectedIndex].sprite)) {
-		state.selectedIndex = -1;
-		state.isDragging = false;
-		state.activeAxis = -1;
-	}
-
-	const ImRect imageRect(
-		ImVec2(rectX, rectY),
-		ImVec2(rectX + rectWidth, rectY + rectHeight));
-	const float screenScaleX = rectWidth / clientWidth;
-	const float screenScaleY = rectHeight / clientHeight;
-	const auto toScreen = [&](const Vector2& point) {
-		return ImVec2(
-			rectX + point.x * screenScaleX,
-			rectY + point.y * screenScaleY);
-	};
-
-	// 3Dツールと重ならない位置に、2D専用の小さな操作パネルを表示します。
-	ImGui::SetNextWindowPos(ImVec2(rectX + 10.0f, rectY + 135.0f), ImGuiCond_Always);
-	ImGui::SetNextWindowBgAlpha(0.88f);
-	const ImGuiWindowFlags toolbarFlags =
-		ImGuiWindowFlags_NoDecoration |
-		ImGuiWindowFlags_AlwaysAutoResize |
-		ImGuiWindowFlags_NoSavedSettings |
-		ImGuiWindowFlags_NoDocking;
-	ImGui::Begin("2D Edit Tools", nullptr, toolbarFlags);
-	const auto drawToolButton = [&](const char* label, TransformTool tool) {
-		const bool isActive = state.tool == tool;
-		if (isActive) {
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.48f, 0.82f, 1.0f));
-		}
-		if (ImGui::Button(label)) {
-			state.tool = tool;
-			state.isDragging = false;
-			state.activeAxis = -1;
-		}
-		if (isActive) {
-			ImGui::PopStyleColor();
-		}
-	};
-	ImGui::TextUnformatted("2D Sprite");
-	drawToolButton("Move##Sprite", TransformTool::Move);
-	ImGui::SameLine();
-	drawToolButton("Rotate##Sprite", TransformTool::Rotate);
-	ImGui::SameLine();
-	drawToolButton("Size##Sprite", TransformTool::Scale);
-	if (state.selectedIndex >= 0) {
-		ImGui::Text("Selected: %s", options.sprites[state.selectedIndex].label.c_str());
-	} else {
-		ImGui::TextDisabled("Left click a 2D texture to select it.");
-	}
-	const bool toolbarHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
-	ImGui::End();
-
-	Sprite* selectedSprite = state.selectedIndex >= 0
-		? options.sprites[state.selectedIndex].sprite
-		: nullptr;
-	bool gizmoHovered = false;
-	if (selectedSprite) {
-		const Vector2 position = selectedSprite->GetPosition();
-		const Vector2 size = selectedSprite->GetSize();
-		const Vector2 anchor = selectedSprite->GetAnchorPoint();
-		const float rotation = selectedSprite->GetRotation();
-		const float cosine = std::cos(rotation);
-		const float sine = std::sin(rotation);
-		const auto rotatePoint = [&](const Vector2& local) {
-			return Vector2{
-				position.x + local.x * cosine - local.y * sine,
-				position.y + local.x * sine + local.y * cosine,
-			};
-		};
-		const std::array<Vector2, 4> localCorners{ {
-			{ -size.x * anchor.x, -size.y * anchor.y },
-			{ size.x * (1.0f - anchor.x), -size.y * anchor.y },
-			{ size.x * (1.0f - anchor.x), size.y * (1.0f - anchor.y) },
-			{ -size.x * anchor.x, size.y * (1.0f - anchor.y) },
-		} };
-		std::array<ImVec2, 4> corners{};
-		for (size_t index = 0; index < corners.size(); ++index) {
-			corners[index] = toScreen(rotatePoint(localCorners[index]));
-		}
-
-		const Vector2 worldCenter = rotatePoint({
-			size.x * (0.5f - anchor.x),
-			size.y * (0.5f - anchor.y),
-		});
-		const ImVec2 center = toScreen(worldCenter);
-		const ImVec2 mouse = ImGui::GetMousePos();
-		constexpr float axisLength = 58.0f;
-		const ImVec2 xHandle(center.x + axisLength, center.y);
-		const ImVec2 yHandle(center.x, center.y - axisLength);
-		const float halfScreenWidth = std::abs(size.x * screenScaleX) * 0.5f;
-		const float halfScreenHeight = std::abs(size.y * screenScaleY) * 0.5f;
-		const float rotationRadius = (std::max)({ halfScreenWidth, halfScreenHeight, 34.0f }) + 18.0f;
-		const float centerDistance = std::sqrt(
-			(mouse.x - center.x) * (mouse.x - center.x) +
-			(mouse.y - center.y) * (mouse.y - center.y));
-
-		int hoveredAxis = -1;
-		if (state.tool == TransformTool::Rotate) {
-			if (std::abs(centerDistance - rotationRadius) <= 10.0f) {
-				hoveredAxis = 2;
-			}
-		} else {
-			float bestDistance = 11.0f;
-			const float xDistance = EditorDistanceToSegment(mouse, center, xHandle);
-			if (xDistance <= bestDistance) {
-				bestDistance = xDistance;
-				hoveredAxis = 0;
-			}
-			const float yDistance = EditorDistanceToSegment(mouse, center, yHandle);
-			if (yDistance <= bestDistance) {
-				hoveredAxis = 1;
-			}
-		}
-		gizmoHovered = hoveredAxis >= 0;
-
-		if (gizmoHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-			state.activeAxis = hoveredAxis;
-			state.isDragging = true;
-			state.previousMouseAngle = std::atan2(mouse.y - center.y, mouse.x - center.x);
-		}
-		if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-			state.activeAxis = -1;
-			state.isDragging = false;
-		}
-
-		if (state.isDragging && state.activeAxis >= 0) {
-			const ImVec2 mouseDelta = ImGui::GetIO().MouseDelta;
-			Vector2 editedPosition = selectedSprite->GetPosition();
-			Vector2 editedSize = selectedSprite->GetSize();
-			float editedRotation = selectedSprite->GetRotation();
-			if (state.tool == TransformTool::Move) {
-				if (state.activeAxis == 0) {
-					editedPosition.x += mouseDelta.x / screenScaleX;
-				}
-				if (state.activeAxis == 1) {
-					editedPosition.y += mouseDelta.y / screenScaleY;
-				}
-				selectedSprite->SetPosition(editedPosition);
-			} else if (state.tool == TransformTool::Rotate) {
-				const float mouseAngle = std::atan2(mouse.y - center.y, mouse.x - center.x);
-				float angleDelta = mouseAngle - state.previousMouseAngle;
-				if (angleDelta > std::numbers::pi_v<float>) angleDelta -= std::numbers::pi_v<float> * 2.0f;
-				if (angleDelta < -std::numbers::pi_v<float>) angleDelta += std::numbers::pi_v<float> * 2.0f;
-				editedRotation += angleDelta;
-				state.previousMouseAngle = mouseAngle;
-				selectedSprite->SetRotation(editedRotation);
-			} else {
-				if (state.activeAxis == 0) {
-					editedSize.x = (std::max)(1.0f, editedSize.x + mouseDelta.x / screenScaleX);
-				}
-				if (state.activeAxis == 1) {
-					editedSize.y = (std::max)(1.0f, editedSize.y - mouseDelta.y / screenScaleY);
-				}
-				selectedSprite->SetSize(editedSize);
-			}
-			if (options.onTransformChanged) {
-				options.onTransformChanged(
-					state.selectedIndex,
-					selectedSprite->GetPosition(),
-					selectedSprite->GetRotation(),
-					selectedSprite->GetSize());
-			}
-		}
-
-		ImDrawList* drawList = ImGui::GetForegroundDrawList();
-		drawList->PushClipRect(imageRect.Min, imageRect.Max, true);
-		for (size_t index = 0; index < corners.size(); ++index) {
-			drawList->AddLine(
-				corners[index],
-				corners[(index + 1) % corners.size()],
-				IM_COL32(255, 225, 95, 255),
-				2.0f);
-		}
-		if (state.tool == TransformTool::Rotate) {
-			drawList->AddCircle(
-				center,
-				rotationRadius,
-				gizmoHovered ? IM_COL32(255, 255, 255, 255) : IM_COL32(255, 190, 70, 255),
-				48,
-				3.0f);
-			drawList->AddText(
-				ImVec2(center.x + rotationRadius + 8.0f, center.y - 8.0f),
-				IM_COL32(255, 220, 120, 255),
-				"Rotate");
-		} else {
-			const ImU32 xColor = state.activeAxis == 0
-				? IM_COL32(255, 255, 255, 255)
-				: IM_COL32(255, 75, 75, 255);
-			const ImU32 yColor = state.activeAxis == 1
-				? IM_COL32(255, 255, 255, 255)
-				: IM_COL32(70, 235, 110, 255);
-			drawList->AddLine(center, xHandle, xColor, 4.0f);
-			drawList->AddLine(center, yHandle, yColor, 4.0f);
-			if (state.tool == TransformTool::Scale) {
-				drawList->AddRectFilled(
-					ImVec2(xHandle.x - 6.0f, xHandle.y - 6.0f),
-					ImVec2(xHandle.x + 6.0f, xHandle.y + 6.0f),
-					xColor);
-				drawList->AddRectFilled(
-					ImVec2(yHandle.x - 6.0f, yHandle.y - 6.0f),
-					ImVec2(yHandle.x + 6.0f, yHandle.y + 6.0f),
-					yColor);
-			} else {
-				drawList->AddCircleFilled(xHandle, 7.0f, xColor);
-				drawList->AddCircleFilled(yHandle, 7.0f, yColor);
-			}
-			drawList->AddText(ImVec2(xHandle.x + 8.0f, xHandle.y - 8.0f), xColor, "X");
-			drawList->AddText(ImVec2(yHandle.x + 8.0f, yHandle.y - 8.0f), yColor, "Y");
-		}
-		drawList->PopClipRect();
-	}
-
-	// ギズモ以外を左クリックした時だけ、手前に描かれたスプライトから順に選択します。
-	if (!state.isDragging &&
-		!gizmoHovered &&
-		!toolbarHovered &&
-		imageRect.Contains(ImGui::GetMousePos()) &&
-		ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-		const ImVec2 mouse = ImGui::GetMousePos();
-		const Vector2 mouseInClient{
-			(mouse.x - rectX) / screenScaleX,
-			(mouse.y - rectY) / screenScaleY,
-		};
-		int selectedIndex = -1;
-		for (int index = static_cast<int>(options.sprites.size()) - 1; index >= 0; --index) {
-			Sprite* sprite = options.sprites[index].sprite;
-			if (!sprite) {
-				continue;
-			}
-			const Vector2 position = sprite->GetPosition();
-			const Vector2 size = sprite->GetSize();
-			const Vector2 anchor = sprite->GetAnchorPoint();
-			const float rotation = sprite->GetRotation();
-			const float cosine = std::cos(-rotation);
-			const float sine = std::sin(-rotation);
-			const Vector2 delta{
-				mouseInClient.x - position.x,
-				mouseInClient.y - position.y,
-			};
-			const Vector2 local{
-				delta.x * cosine - delta.y * sine,
-				delta.x * sine + delta.y * cosine,
-			};
-			const float minimumX = -size.x * anchor.x;
-			const float minimumY = -size.y * anchor.y;
-			if (local.x >= minimumX &&
-				local.x <= minimumX + size.x &&
-				local.y >= minimumY &&
-				local.y <= minimumY + size.y) {
-				selectedIndex = index;
-				break;
-			}
-		}
-		if (state.selectedIndex != selectedIndex) {
-			state.selectedIndex = selectedIndex;
-			if (options.onSelectionChanged) {
-				options.onSelectionChanged(selectedIndex);
-			}
-		}
-	}
-#else
-	(void)state;
-	(void)options;
-#endif
-}
-
-void SceneEditor::UpdateViewportCamera(Camera* camera, bool inputBlocked)
-{
-#ifdef USE_IMGUI
-	if (!camera || inputBlocked) {
-		return;
-	}
-	float rectX = 0.0f;
-	float rectY = 0.0f;
-	float rectWidth = 0.0f;
-	float rectHeight = 0.0f;
-	if (!ImGuiManager::GetInstance()->GetGameViewRect(rectX, rectY, rectWidth, rectHeight)) {
-		return;
-	}
-	const ImRect imageRect(
-		ImVec2(rectX, rectY),
-		ImVec2(rectX + rectWidth, rectY + rectHeight));
-	if (!imageRect.Contains(ImGui::GetMousePos()) || ImGui::IsAnyItemActive()) {
-		return;
-	}
-
-	Vector3 cameraPosition = camera->GetTranslate();
-	Vector3 cameraRotation = camera->GetRotate();
-	const ImVec2 mouseDelta = ImGui::GetIO().MouseDelta;
-	bool cameraChanged = false;
-	if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-		cameraRotation.y += mouseDelta.x * 0.005f;
-		cameraRotation.x = std::clamp(cameraRotation.x + mouseDelta.y * 0.005f, -1.45f, 1.45f);
-		cameraChanged = true;
-	}
-	if (ImGui::IsMouseDown(ImGuiMouseButton_Middle)) {
-		const Vector3 right{ std::cos(cameraRotation.y), 0.0f, -std::sin(cameraRotation.y) };
-		cameraPosition.x -= right.x * mouseDelta.x * 0.01f;
-		cameraPosition.z -= right.z * mouseDelta.x * 0.01f;
-		cameraPosition.y += mouseDelta.y * 0.01f;
-		cameraChanged = true;
-	}
-	if (std::abs(ImGui::GetIO().MouseWheel) > 0.0001f) {
-		const float cosinePitch = std::cos(cameraRotation.x);
-		const Vector3 forward{
-			std::sin(cameraRotation.y) * cosinePitch,
-			-std::sin(cameraRotation.x),
-			std::cos(cameraRotation.y) * cosinePitch,
-		};
-		const float zoomAmount = ImGui::GetIO().MouseWheel * 0.6f;
-		cameraPosition.x += forward.x * zoomAmount;
-		cameraPosition.y += forward.y * zoomAmount;
-		cameraPosition.z += forward.z * zoomAmount;
-		cameraChanged = true;
-	}
-	if (cameraChanged) {
-		camera->SetTranslate(cameraPosition);
-		camera->SetRotate(cameraRotation);
-	}
-#else
-	(void)camera;
-	(void)inputBlocked;
-#endif
-}
-
-void SceneEditor::DrawInspector(const InspectorOptions& options)
-{
-#ifdef USE_IMGUI
-	// Transformを変更できるInspectorはEdit Viewだけで表示する。
-	if (!ImGuiManager::GetInstance()->IsEditViewActive()) {
-		return;
-	}
-
-	if (!options.normalObjects || !options.animationObjects || !options.directionalLight || !options.pointLight || !options.spotLight) {
-		return;
-	}
-
-	const unsigned int inspectorDockId = ImGuiManager::GetInstance()->GetInspectorDockId();
-	if (inspectorDockId != 0) {
-		ImGui::SetNextWindowDockID(inspectorDockId, options.forceDock ? ImGuiCond_Always : ImGuiCond_FirstUseEver);
-	}
-
-	ImGui::Begin("Inspector");
-	if (options.description && options.description[0] != '\0') {
-		ImGui::TextWrapped("%s", options.description);
-		ImGui::Separator();
-	}
-	if (options.drawHeader) {
-		options.drawHeader();
-	}
-
-	const size_t addedNormalCount = options.normalObjects->size() > options.protectedNormalObjectCount
-		? options.normalObjects->size() - options.protectedNormalObjectCount
-		: 0;
-	const size_t addedAnimationCount = options.animationObjects->size() > options.protectedAnimationObjectCount
-		? options.animationObjects->size() - options.protectedAnimationObjectCount
-		: 0;
-	if (addedNormalCount > 0 || addedAnimationCount > 0 || options.addedSpriteCount > 0) {
-		ImGui::TextDisabled("Added Models: %zu | 2D Textures: %zu", addedNormalCount + addedAnimationCount, options.addedSpriteCount);
-	}
-
-	if (ImGui::BeginTabBar("SceneEditorInspectorTabs")) {
-		const ImGuiTabItemFlags spriteTabFlags = options.selectSpriteTab ? ImGuiTabItemFlags_SetSelected : 0;
-		if (options.sprites && ImGui::BeginTabItem("Sprite", nullptr, spriteTabFlags)) {
-			const int selectedSpriteIndex = ImGuiManager::GetInstance()->SpriteWindow(*options.sprites, true, options.forcedSpriteIndex);
-			const bool canRemoveSprite = options.removeSprite && selectedSpriteIndex >= 0 &&
-				static_cast<size_t>(selectedSpriteIndex) >= options.protectedSpriteCount;
-			ImGui::Separator();
-			ImGui::BeginDisabled(!canRemoveSprite);
-			const bool removeSprite = ImGui::Button("Remove Added 2D Texture") ||
-				(canRemoveSprite && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
-					!ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Delete, false));
-			ImGui::EndDisabled();
-			if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-				ImGui::SetTooltip(canRemoveSprite
-					? "Remove this 2D Texture. Delete key also works while Inspector is focused."
-					: "Initial scene sprites are protected. Only textures added from Model Shelf can be removed here.");
-			}
-			if (removeSprite && canRemoveSprite) {
-				options.removeSprite(static_cast<size_t>(selectedSpriteIndex));
-			}
-			ImGui::EndTabItem();
-		}
-		const ImGuiTabItemFlags modelTabFlags = options.selectModelTab ? ImGuiTabItemFlags_SetSelected : 0;
-		if (ImGui::BeginTabItem("Model", nullptr, modelTabFlags)) {
-			ImGuiManager::GetInstance()->ModelWindow(
-				*options.normalObjects,
-				*options.animationObjects,
-				*options.directionalLight,
-				*options.pointLight,
-				*options.spotLight,
-				true,
-				options.protectedNormalObjectCount,
-				options.protectedAnimationObjectCount,
-				options.forcedNormalIndex,
-				options.forcedAnimationIndex,
-				options.onModelRemoved);
-			ImGui::EndTabItem();
-		}
-		if (options.drawExtraTabs) {
-			options.drawExtraTabs();
-		}
-		ImGui::EndTabBar();
-	}
-
-	ImGui::End();
-#else
-	(void)options;
-#endif
-}

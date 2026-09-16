@@ -94,6 +94,9 @@ public:
 		size_t addedTextureCount = 0;
 		std::function<bool(const std::string&)> addModel;
 		std::function<bool(const std::string&)> addTexture;
+		// Drop位置に置く必要があるSceneだけが設定する、画面座標付きの追加処理です。
+		std::function<bool(const std::string&, float, float)> addModelAtDropPosition;
+		std::function<bool(const std::string&, float, float)> addTextureAtDropPosition;
 		std::function<void()> clearAdded;
 		std::function<bool(const ShelfEntry&)> previewEntry;
 		std::function<void()> afterAdd;
