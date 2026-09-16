@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BaseScene.h"
+#include "BgmPlayer.h"
 #include "FileHotReload.h"
 #include "LevelLoader.h"
 #include "Laser.h"
@@ -92,6 +93,8 @@ private:
 	void UpdateMainCamera();
 	// 開始演出・通常追従・Event Cameraの優先順位で、Stage1のCameraを更新します。
 	void UpdateStageCamera(float deltaTime, bool isStageStartPlaying);
+	// Stage1の最初の描画後に、BGMの読込・開始・フェード更新を行います。
+	void UpdateStageBgm(float deltaTime);
 	// カメラが現在見ている正面方向を取得します。
 	Vector3 GetCameraForward(const Camera& camera) const;
 	// ---------- ImGuiの確認・編集UI ----------
@@ -192,6 +195,11 @@ private:
 	std::unique_ptr<StageStart> stageStart_;
 	// stage1.jsonのstage_startから読み込む、開始演出の調整値です。
 	StageStart::Settings stageStartSettings_{};
+	// Loading完了後のStage1画面が出てから再生する、Stage1用のループBGMです。
+	BgmPlayer stageBgm_{};
+	// Stage1の最初の描画完了を確認してからBGMを読み込むためのフラグです。
+	bool hasStageFrameBeenDrawn_ = false;
+	bool hasStageBgmStarted_ = false;
 	// Player用とLaser遮蔽用のOBB一覧を、Stageの現在状態からまとめて作る部品です。
 	StageCollisionWorld collisionWorld_{};
 	// ---------- stage1.jsonの実行中データ ----------

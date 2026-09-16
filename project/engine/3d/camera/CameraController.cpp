@@ -176,8 +176,22 @@ void CameraController::UpdateCameraTransform(
 	// Camera の理想位置は Focus 基準で決めるため、Player が向くだけでは移動しない
 	const Vector3 targetCameraPosition =
 		CalculateCollisionSafeCameraPosition(cameraCollisionObbs);
-	const float cameraT = 1.0f - std::exp(-cameraFollowSpeed_ * deltaTime);
+	const Vector3 idealCameraPosition = CalculateTargetCameraPosition();
+	const Vector3 avoidanceOffset{
+		idealCameraPosition.x - targetCameraPosition.x,
+		idealCameraPosition.y - targetCameraPosition.y,
+		idealCameraPosition.z - targetCameraPosition.z,
+	};
+	const bool isAvoidingOuterWall = Length(avoidanceOffset) > 0.0001f;
+	const float followSpeed = isAvoidingOuterWall
+		? wallAvoidanceFollowSpeed_
+		: cameraFollowSpeed_;
+	const float cameraT = 1.0f - std::exp(-followSpeed * deltaTime);
 	cameraPosition_ = Lerp(cameraPosition_, targetCameraPosition, cameraT);
+	// 補間中に外壁を通り抜けるFrameを作らず、建物の外を映さないようにします。
+	cameraPosition_ = ClampCameraPositionToCollisionBoundaries(
+		cameraPosition_,
+		cameraCollisionObbs);
 
 	// 走っている間だけ少し広く映し、止まると通常の視野角へ戻す
 	const float baseFovY = hasAreaSettings_ ? areaBaseFovY_ : baseFovY_;
@@ -456,6 +470,48 @@ Vector3 CameraController::CalculateCollisionSafeCameraPosition(
 		orbitPitch_,
 		distance_,
 		cameraCollisionObbs);
+	return {
+		focus_.x + cameraPath.x * safeT,
+		focus_.y + cameraPath.y * safeT,
+		focus_.z + cameraPath.z * safeT,
+	};
+}
+
+// 現在位置が外壁の外側へ補間されそうな時だけ、最初の外壁の手前へ即座に収めます。
+Vector3 CameraController::ClampCameraPositionToCollisionBoundaries(
+	const Vector3& cameraPosition,
+	const std::vector<MyMath::OBB>& cameraCollisionObbs) const
+{
+	if (!isWallAvoidanceEnabled_ || cameraCollisionObbs.empty()) {
+		return cameraPosition;
+	}
+
+	const Vector3 cameraPath{
+		cameraPosition.x - focus_.x,
+		cameraPosition.y - focus_.y,
+		cameraPosition.z - focus_.z,
+	};
+	const float pathLength = Length(cameraPath);
+	if (pathLength <= 0.0001f) {
+		return cameraPosition;
+	}
+
+	float nearestHitT = 1.0f;
+	for (const MyMath::OBB& cameraCollisionObb : cameraCollisionObbs) {
+		const Collision::SegmentHit hit = Collision::SegmentOBB(
+			focus_,
+			cameraPosition,
+			cameraCollisionObb,
+			cameraCollisionRadius_);
+		if (hit.isHit) {
+			nearestHitT = (std::min)(nearestHitT, hit.t);
+		}
+	}
+
+	const float safeT = std::clamp(
+		nearestHitT - cameraCollisionMargin_ / pathLength,
+		0.0f,
+		1.0f);
 	return {
 		focus_.x + cameraPath.x * safeT,
 		focus_.y + cameraPath.y * safeT,

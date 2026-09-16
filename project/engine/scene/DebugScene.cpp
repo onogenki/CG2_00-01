@@ -110,10 +110,7 @@ void DebugScene::InitializeSceneResources()
 	// 添付されているDDSテクスチャのパスを指定する
 	skyBox_->SetTexture("Resources/qwantani_moon_noon_puresky_1k.dds");
 
-	//音声読み込み
-	Audio::GetInstance()->LoadFile("Resources/Alarm01.wav");
-	//音声再生
-	Audio::GetInstance()->PlayWave("Resources/Alarm01.wav");
+	// Debug Sceneは音を即時再生せず、Game View表示後にStage1がBGMを開始します。
 }
 
 

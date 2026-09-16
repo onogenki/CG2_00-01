@@ -37,6 +37,6 @@ public:
 	static void DrawSprites(
 		SpriteCommon* spriteCommon,
 		const std::vector<std::unique_ptr<Sprite>>& sprites);
-	// Sceneのモデル描画後に、PostEffect・SwapChain・ImGui・Presentまでを順番に実行します。
-	static void End(DirectXCommon* directXCommon, const Camera* activeCamera);
+	// Sceneのモデル描画後に、PostEffect・SwapChain・必要ならImGui・Presentまでを順番に実行します。
+	static void End(DirectXCommon* directXCommon, const Camera* activeCamera, bool drawImGui = true);
 };

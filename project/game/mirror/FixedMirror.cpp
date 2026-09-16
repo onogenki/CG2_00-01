@@ -37,6 +37,8 @@ bool FixedMirror::Initialize(
 	if (!Object3dFactory::InitializeObject(object_, object3dCommon, modelName)) {
 		return false;
 	}
+	// 反射Textureがまだ一枚も作られていない時や裏面を見た時にも、UVチェッカーを表示しません。
+	object_.SetTextureOverride("resources/white.png");
 	// plane.objの板に厚みを持たせ、Playerが鏡をすり抜けないようにします。
 	collider_.SetLocalShape({}, { 1.0f, 1.0f, 0.05f });
 	SyncVisualAndCollider();

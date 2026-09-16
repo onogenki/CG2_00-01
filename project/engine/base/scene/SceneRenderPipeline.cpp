@@ -65,7 +65,10 @@ void SceneRenderPipeline::DrawSprites(
 }
 
 // Scene描画後のPostEffect・SwapChain・ImGui・Presentを共通の順番で実行します。
-void SceneRenderPipeline::End(DirectXCommon* directXCommon, const Camera* activeCamera)
+void SceneRenderPipeline::End(
+	DirectXCommon* directXCommon,
+	const Camera* activeCamera,
+	bool drawImGui)
 {
 	if (!directXCommon) {
 		return;
@@ -100,6 +103,8 @@ void SceneRenderPipeline::End(DirectXCommon* directXCommon, const Camera* active
 			: directXCommon->GetRenderTextureSrvIndex(),
 		false);
 #endif
-	ImGuiManager::GetInstance()->Draw(directXCommon);
+	if (drawImGui) {
+		ImGuiManager::GetInstance()->Draw(directXCommon);
+	}
 	directXCommon->PostDraw();
 }

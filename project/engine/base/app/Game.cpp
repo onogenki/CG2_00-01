@@ -43,9 +43,9 @@ void Game::Initialize()
 	sceneFactory_ = std::move(gameSceneFactory);
 	SceneManager::GetInstance()->SetSceneFactory(sceneFactory_.get());
 
-	// 環境変数を指定すると、通常のタイトル画面を経由せず対象シーンを起動できる。
+	// 環境変数を指定すると、通常のLoading画面を経由せず対象Sceneを起動できます。
 	const std::string startSceneName = GetEnvironmentString("CG2_START_SCENE");
-	SceneManager::GetInstance()->ChangeScene(startSceneName.empty() ? "TITLE" : startSceneName);
+	SceneManager::GetInstance()->ChangeScene(startSceneName.empty() ? "LOADING" : startSceneName);
 	InitializeSceneStressFromEnvironment();
 }
 

@@ -2,6 +2,7 @@
 
 #include "Camera.h"
 #include "CameraController.h"
+#include "Audio.h"
 #include "CarryableMirror.h"
 #include "DirectXCommon.h"
 #include "Collision.h"
@@ -51,7 +52,11 @@ Stage1::~Stage1() = default;
 
 void Stage1::Initialize()
 {
+	hasStageFrameBeenDrawn_ = false;
+	hasStageBgmStarted_ = false;
 	InitializeRenderSystems();
+	// BGMの再生役だけを準備し、音声ファイルの読込はStage1画面の表示後まで遅らせます。
+	stageBgm_.Initialize(Audio::GetInstance());
 	InitializeDefaultLighting();
 	InitializeSharedModels();
 	if (!InitializeStageGimmicks()) {
@@ -100,11 +105,6 @@ void Stage1::InitializeSharedModels()
 {
 	// モデル自体の読込はPlayer・Mirrorを含め、すべてObject3dFactoryが担当します。
 	ModelManager::GetInstance()->LoadModel("sphere.obj");
-	if (Model* sphereModel = ModelManager::GetInstance()->FindModel("sphere.obj")) {
-		sphereModel->SetTexture("Resources/monsterBall.png");
-		// 青い室内Lightの反射で水色に見えないよう、球はTextureの赤・白を優先します。
-		sphereModel->SetSpecularIntensity(0.15f);
-	}
 }
 
 // JSONの内容に関係なく必要な床・鏡・Laser・Switch・Doorを作成します。
@@ -237,13 +237,15 @@ bool Stage1::InitializePlayerAndCamera()
 		player_.reset();
 		return false;
 	}
+	// sphere.obj本来のUVチェッカーを使わず、Playerだけへモンスターボール画像を明示します。
+	player_->GetObject().SetTextureOverride("resources/monsterBall.png");
 
 	// Camera本体とは別のControllerに、Playerを追従する規則を任せます。
 	cameraController_ = std::make_unique<CameraController>();
 	cameraController_->Initialize(mainCamera.get(), player_->GetPosition());
 	cameraController_->SetAutoRecenterEnabled(false);
-	// Stage1は壁に隠れたPlayerをシルエットで見せるため、壁際でもCameraを近付けません。
-	cameraController_->SetWallAvoidanceEnabled(false);
+	// 建物の外壁だけは越えないようにし、室内壁の向こうはシルエット表示を優先します。
+	cameraController_->SetWallAvoidanceEnabled(true);
 
 	// 通常Cameraの完成位置を保存してから、開始演出用の前上方Cameraへ切り替えます。
 	stageStart_ = std::make_unique<StageStart>();
@@ -302,6 +304,7 @@ void Stage1::Finalize()
 	carryableMirror_.reset();
 	lightPuzzle_.Finalize();
 	stageStart_.reset();
+	stageBgm_.Stop();
 	cameraController_.reset();
 	player_.reset();
 }
@@ -317,6 +320,7 @@ void Stage1::Update()
 	// ---------- プレイヤーの移動と重力 ----------
 	const float deltaTime = DirectXCommon::GetInstance()->GetDeltaTime();
 	const bool isStageStartPlaying = UpdateStagePlayer(deltaTime);
+	UpdateStageBgm(deltaTime);
 	// 本編のDoor・危険Lightの結果だけを、自動確認部品へ渡します。
 	gameplaySmoke_.Update(
 		{ &hazardLights_, lightPuzzle_.IsDoorSwitchReceivingLight(), lightPuzzle_.GetDoorOpenAmount() },
@@ -416,6 +420,8 @@ void Stage1::Draw()
 	SceneRenderPipeline::End(
 		DirectXCommon::GetInstance(),
 		cameraManager ? cameraManager->GetActiveCamera() : nullptr);
+	// 次のUpdateからBGMを読み込めるよう、最初の本編画面が出たことを記録します。
+	hasStageFrameBeenDrawn_ = true;
 }
 
 std::unique_ptr<Object3d> Stage1::CreateRuntimeObject(const std::string& modelName)
@@ -540,7 +546,7 @@ void Stage1::UpdateStageCamera(float deltaTime, bool isStageStartPlaying)
 			stageCameraEvents_.UpdateEventCamera(
 				*player_,
 				*cameraManager,
-				collisionWorld_.GetSolidObbs(),
+				collisionWorld_.GetCameraBoundaryObbs(),
 				deltaTime);
 			if (const std::string status = stageCameraEvents_.ConsumeStatus(); !status.empty()) {
 				stageMapReloadStatus_ = status;
@@ -551,6 +557,20 @@ void Stage1::UpdateStageCamera(float deltaTime, bool isStageStartPlaying)
 		stageCameraEvents_.RestoreMainCamera(*cameraManager);
 	}
 	cameraManager->Update();
+}
+
+// 最初のStage1描画を待ってからBGMを読み込むため、音が白いLoading画面より先に流れません。
+void Stage1::UpdateStageBgm(float deltaTime)
+{
+	if (!hasStageFrameBeenDrawn_) {
+		return;
+	}
+
+	if (!hasStageBgmStarted_) {
+		// 現在ある短い音源を動作確認用にループします。曲を追加したらこのパスだけ差し替えます。
+		hasStageBgmStarted_ = stageBgm_.Play("resources/Alarm01.wav", 0.20f, 0.80f);
+	}
+	stageBgm_.Update(deltaTime);
 }
 
 // Player位置・向き・壁回避の結果から、通常追従Cameraを更新します。
@@ -571,14 +591,14 @@ void Stage1::UpdateMainCamera()
 	Input* input = Input::GetInstance();
 	bool isCameraStepInput = false;
 	if (input->TriggerKey(DIK_LEFT)) {
-		isCameraStepInput |= cameraController_->TryStepOrbit(1, collisionWorld_.GetSolidObbs());
+		isCameraStepInput |= cameraController_->TryStepOrbit(1, collisionWorld_.GetCameraBoundaryObbs());
 	} else if (input->TriggerKey(DIK_RIGHT)) {
-		isCameraStepInput |= cameraController_->TryStepOrbit(-1, collisionWorld_.GetSolidObbs());
+		isCameraStepInput |= cameraController_->TryStepOrbit(-1, collisionWorld_.GetCameraBoundaryObbs());
 	}
 	if (input->TriggerKey(DIK_UP)) {
-		isCameraStepInput |= cameraController_->TryStepDistance(1, collisionWorld_.GetSolidObbs());
+		isCameraStepInput |= cameraController_->TryStepDistance(1, collisionWorld_.GetCameraBoundaryObbs());
 	} else if (input->TriggerKey(DIK_DOWN)) {
-		isCameraStepInput |= cameraController_->TryStepDistance(-1, collisionWorld_.GetSolidObbs());
+		isCameraStepInput |= cameraController_->TryStepDistance(-1, collisionWorld_.GetCameraBoundaryObbs());
 	}
 
 	// Rを押すと、Playerが最後に向いた方向の後ろへCameraをゆっくり戻す
@@ -592,7 +612,7 @@ void Stage1::UpdateMainCamera()
 		player_->GetPosition(),
 		player_->GetMoveDirection(),
 		isCameraStepInput,
-		collisionWorld_.GetSolidObbs());
+		collisionWorld_.GetCameraBoundaryObbs());
 }
 
 // Cameraのワールド行列から、Player移動に使う正面方向を返します。

@@ -21,6 +21,8 @@ public:
 	{
 		// JSONまたはCSV上のnameです。Editorで対象を見分けるために使います。
 		std::string sourceName;
+		// JSON上のtagです。SceneがCameraBoundaryなどの役割で振り分けるために使います。
+		std::string tag;
 		// 画面に描画する3Dモデルです。
 		std::unique_ptr<Object3d> visual;
 		// モデルのTransformを反映して、実際に衝突判定へ使うOBB Colliderです。

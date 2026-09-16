@@ -3,6 +3,7 @@
 #include <mfidl.h>
 #include <mfreadwrite.h>
 #include <wrl.h>
+#include <algorithm>
 #include <cassert>
 
 #pragma comment(lib, "xaudio2.lib")
@@ -163,12 +164,16 @@ void Audio::Update()
 //音声データ解放
 void Audio::Unload()
 {
-	std::vector<std::shared_ptr<SourceVoiceCallback>> callbacks;
+	std::vector<ActiveVoice> activeVoices;
 	{
 		std::scoped_lock lock(sourceVoiceMutex_);
-		callbacks.swap(sourceVoiceCallbacks_);
+		activeVoices.swap(sourceVoiceCallbacks_);
 	}
-	for (const auto& callback : callbacks) {
+	for (const ActiveVoice& activeVoice : activeVoices) {
+		const std::shared_ptr<SourceVoiceCallback>& callback = activeVoice.callback;
+		if (!callback || !callback->GetVoice()) {
+			continue;
+		}
 		IXAudio2SourceVoice* voice = callback->GetVoice();
 		voice->Stop();
 		voice->DestroyVoice();
@@ -177,15 +182,30 @@ void Audio::Unload()
 	soundDatas_.clear();
 }
 
-//音声再生
-bool Audio::PlayWave(const std::string& filename)
+// 単発の効果音は、従来どおり再生終了後に自動で破棄します。
+bool Audio::PlayWave(const std::string& filename, float volume)
+{
+	return PlayWaveInternal(filename, false, volume) != kInvalidVoiceId;
+}
+
+// BGM用に、停止されるまで同じ音を繰り返すVoiceを作成します。
+Audio::VoiceId Audio::PlayWaveLoop(const std::string& filename, float volume)
+{
+	return PlayWaveInternal(filename, true, volume);
+}
+
+// 単発音とループ音のどちらにも共通する、XAudio2 Voice生成処理です。
+Audio::VoiceId Audio::PlayWaveInternal(
+	const std::string& filename,
+	bool isLooping,
+	float volume)
 {
 	HRESULT result;
 
 	// 本棚から音声データを探し出す
 	auto soundIt = soundDatas_.find(filename);
 	if (!xAudio2_ || soundIt == soundDatas_.end()) {
-		return false;
+		return kInvalidVoiceId;
 	}
 	SoundData& soundData = soundIt->second;
 
@@ -194,7 +214,7 @@ bool Audio::PlayWave(const std::string& filename)
 	IXAudio2SourceVoice* pSourceVoice = nullptr;
 	result = xAudio2_->CreateSourceVoice(&pSourceVoice, &soundData.wfex, 0, XAUDIO2_DEFAULT_FREQ_RATIO, callback.get());
 	if (FAILED(result)) {
-		return false;
+		return kInvalidVoiceId;
 	}
 	callback->SetVoice(pSourceVoice);
 
@@ -202,25 +222,121 @@ bool Audio::PlayWave(const std::string& filename)
 	XAUDIO2_BUFFER buf{};
 	buf.pAudioData = soundData.buffer.data();
 	buf.AudioBytes = static_cast<UINT32>(soundData.buffer.size());
-	buf.Flags = XAUDIO2_END_OF_STREAM;
+	buf.Flags = isLooping ? 0 : XAUDIO2_END_OF_STREAM;
+	buf.LoopCount = isLooping ? XAUDIO2_LOOP_INFINITE : 0;
 
 	//波形データの再生
 	result = pSourceVoice->SubmitSourceBuffer(&buf);
 	if (FAILED(result)) {
 		pSourceVoice->DestroyVoice();
-		return false;
+		return kInvalidVoiceId;
 	}
+	pSourceVoice->SetVolume(std::clamp(volume, 0.0f, 1.0f));
+	VoiceId voiceId = kInvalidVoiceId;
 	{
 		std::scoped_lock lock(sourceVoiceMutex_);
-		sourceVoiceCallbacks_.push_back(callback);
+		voiceId = nextVoiceId_++;
+		sourceVoiceCallbacks_.push_back({ voiceId, callback });
 	}
 	result = pSourceVoice->Start();
 	if (FAILED(result)) {
 		callback->MarkFinished();
 		ReleaseFinishedVoices();
+		return kInvalidVoiceId;
+	}
+	return voiceId;
+}
+
+// 指定番号のVoiceだけを止め、ほかの効果音やBGMは残します。
+bool Audio::StopWave(VoiceId voiceId)
+{
+	std::shared_ptr<SourceVoiceCallback> callback;
+	{
+		std::scoped_lock lock(sourceVoiceMutex_);
+		const auto found = std::find_if(
+			sourceVoiceCallbacks_.begin(),
+			sourceVoiceCallbacks_.end(),
+			[voiceId](const ActiveVoice& activeVoice) { return activeVoice.id == voiceId; });
+		if (found == sourceVoiceCallbacks_.end()) {
+			return false;
+		}
+		callback = found->callback;
+		sourceVoiceCallbacks_.erase(found);
+	}
+	if (!callback || !callback->GetVoice()) {
 		return false;
 	}
+	callback->GetVoice()->Stop();
+	callback->GetVoice()->FlushSourceBuffers();
+	callback->GetVoice()->DestroyVoice();
 	return true;
+}
+
+// Voice番号を使って、再生途中でも音量を変更します。
+bool Audio::SetVoiceVolume(VoiceId voiceId, float volume)
+{
+	std::shared_ptr<SourceVoiceCallback> callback;
+	{
+		std::scoped_lock lock(sourceVoiceMutex_);
+		const auto found = std::find_if(
+			sourceVoiceCallbacks_.begin(),
+			sourceVoiceCallbacks_.end(),
+			[voiceId](const ActiveVoice& activeVoice) { return activeVoice.id == voiceId; });
+		if (found == sourceVoiceCallbacks_.end()) {
+			return false;
+		}
+		callback = found->callback;
+	}
+	return callback && callback->GetVoice() &&
+		SUCCEEDED(callback->GetVoice()->SetVolume(std::clamp(volume, 0.0f, 1.0f)));
+}
+
+// 一時停止はVoiceを破棄せず、ResumeWaveで同じ位置から再開します。
+bool Audio::PauseWave(VoiceId voiceId)
+{
+	std::shared_ptr<SourceVoiceCallback> callback;
+	{
+		std::scoped_lock lock(sourceVoiceMutex_);
+		const auto found = std::find_if(
+			sourceVoiceCallbacks_.begin(),
+			sourceVoiceCallbacks_.end(),
+			[voiceId](const ActiveVoice& activeVoice) { return activeVoice.id == voiceId; });
+		if (found == sourceVoiceCallbacks_.end()) {
+			return false;
+		}
+		callback = found->callback;
+	}
+	return callback && callback->GetVoice() && SUCCEEDED(callback->GetVoice()->Stop());
+}
+
+// PauseWaveで止めたVoiceを、先頭からではなく停止位置から再開します。
+bool Audio::ResumeWave(VoiceId voiceId)
+{
+	std::shared_ptr<SourceVoiceCallback> callback;
+	{
+		std::scoped_lock lock(sourceVoiceMutex_);
+		const auto found = std::find_if(
+			sourceVoiceCallbacks_.begin(),
+			sourceVoiceCallbacks_.end(),
+			[voiceId](const ActiveVoice& activeVoice) { return activeVoice.id == voiceId; });
+		if (found == sourceVoiceCallbacks_.end()) {
+			return false;
+		}
+		callback = found->callback;
+	}
+	return callback && callback->GetVoice() && SUCCEEDED(callback->GetVoice()->Start());
+}
+
+// 効果音が終了済み、またはStopWave済みならfalseを返します。
+bool Audio::IsVoicePlaying(VoiceId voiceId) const
+{
+	std::scoped_lock lock(sourceVoiceMutex_);
+	const auto found = std::find_if(
+		sourceVoiceCallbacks_.begin(),
+		sourceVoiceCallbacks_.end(),
+		[voiceId](const ActiveVoice& activeVoice) { return activeVoice.id == voiceId; });
+	return found != sourceVoiceCallbacks_.end() &&
+		found->callback && !found->callback->IsFinished();
 }
 
 void Audio::ReleaseFinishedVoices()
@@ -229,8 +345,8 @@ void Audio::ReleaseFinishedVoices()
 	{
 		std::scoped_lock lock(sourceVoiceMutex_);
 		for (auto it = sourceVoiceCallbacks_.begin(); it != sourceVoiceCallbacks_.end();) {
-			if ((*it)->IsFinished()) {
-				callbacksToRelease.push_back(std::move(*it));
+			if (it->callback && it->callback->IsFinished()) {
+				callbacksToRelease.push_back(std::move(it->callback));
 				it = sourceVoiceCallbacks_.erase(it);
 			} else {
 				++it;
