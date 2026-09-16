@@ -220,7 +220,7 @@
             "file_name": "floor.obj",
             "name": "LightingTestLeftWall",
             "object_type": "STATIC",
-            "tag": "LightingTest",
+            "tag": "CameraBoundary",
             "transform": {
                 "rotation": [
                     0.0,
@@ -257,7 +257,7 @@
             "file_name": "floor.obj",
             "name": "LightingTestRightWall",
             "object_type": "STATIC",
-            "tag": "LightingTest",
+            "tag": "CameraBoundary",
             "transform": {
                 "rotation": [
                     0.0,
@@ -294,7 +294,7 @@
             "file_name": "floor.obj",
             "name": "LightingTestCeiling",
             "object_type": "STATIC",
-            "tag": "LightingTest",
+            "tag": "CameraBoundary",
             "transform": {
                 "rotation": [
                     0.0,
@@ -331,7 +331,7 @@
             "file_name": "floor.obj",
             "name": "LightingTestEntranceWall",
             "object_type": "STATIC",
-            "tag": "LightingTest",
+            "tag": "CameraBoundary",
             "transform": {
                 "rotation": [
                     0.0,
@@ -368,7 +368,7 @@
             "file_name": "floor.obj",
             "name": "LightingTestExitWall",
             "object_type": "STATIC",
-            "tag": "LightingTest",
+            "tag": "CameraBoundary",
             "transform": {
                 "rotation": [
                     0.0,

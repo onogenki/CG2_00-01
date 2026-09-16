@@ -37,8 +37,8 @@ private:
 	void InitializeDefaultLighting();
 	// 背景の平面モデルと初期Spriteを作成します。
 	bool InitializeTitleObjects();
-	// SkyBoxとTitle開始時の音声を準備します。
-	void InitializeSkyBoxAndAudio();
+	// Titleを明示的に開いた時だけ、SkyBox TextureとEditor用Resource一覧を準備します。
+	void InitializeSkyBoxAndEditorResources();
 	// Camera・Light・3Dモデル・Sprite・SkyBoxを、このフレームの状態へ更新します。
 	void UpdateSceneContent();
 	// Title専用の編集UIを更新します。
@@ -61,7 +61,6 @@ private:
 
 	// Titleの背景として描画するSkyBoxです。
 	std::unique_ptr<SkyBox> skyBox_;
-
 	// アニメーションを使わないTitle用の3Dモデルです。
 	std::vector<std::unique_ptr<Object3d>> normalObjects_;
 	// アニメーション再生を行うTitle用の3Dモデルです。

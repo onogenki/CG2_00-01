@@ -2,6 +2,7 @@
 #include "CaptureManager.h"
 #include "DirectXCommon.h"
 #include "Logger.h"
+#include <utility>
 
 // アプリ全体で共有する一つのSceneManagerを返します。
 SceneManager* SceneManager::GetInstance()
@@ -80,6 +81,25 @@ bool SceneManager::ChangeScene(const std::string& sceneName)
 	return true;
 }
 
+// Scene名ごとのLoading別名を作らず、共通LoadingSceneを経由してから目的のSceneへ移動します。
+bool SceneManager::ChangeSceneWithLoading(const std::string& sceneName)
+{
+	if (sceneName.empty() || !ChangeScene("LOADING")) {
+		return false;
+	}
+
+	loadingDestinationSceneName_ = sceneName;
+	return true;
+}
+
+// LoadingSceneが切替先を受け取った時点で消し、次回のLoadingへ持ち越しません。
+std::string SceneManager::TakeLoadingDestinationSceneName()
+{
+	std::string destinationSceneName = std::move(loadingDestinationSceneName_);
+	loadingDestinationSceneName_.clear();
+	return destinationSceneName;
+}
+
 // 現在のScene名を使い、通常の切替処理と同じ経路で最初から作り直します。
 bool SceneManager::RestartCurrentScene()
 {
@@ -93,6 +113,7 @@ void SceneManager::FinalizeCurrentScene()
 	DirectXCommon::GetInstance()->WaitForGPU();
 	nextScene_.reset();
 	pendingSceneName_.clear();
+	loadingDestinationSceneName_.clear();
 	if (scene_)
 	{
 		scene_->Finalize();

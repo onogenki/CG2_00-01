@@ -39,6 +39,8 @@ public:
 	const MyMath::OBB& GetFloorObb() const { return floorObb_; }
 	// PlayerとCameraの壁回避に使う、床・壁・Mirrorを含むOBB一覧を返します。
 	const std::vector<MyMath::OBB>& GetSolidObbs() const { return solidObbs_; }
+	// JSONのCameraBoundaryタグを持つ外壁だけを返します。Cameraは室内の壁では縮みません。
+	const std::vector<MyMath::OBB>& GetCameraBoundaryObbs() const { return cameraBoundaryObbs_; }
 	// Laserを遮る、床・Door・JSON壁だけのOBB一覧を返します。
 	const std::vector<MyMath::OBB>& GetLightBlockingObbs() const { return lightBlockingObbs_; }
 	// Scene終了時に、前フレームのCollider一覧を残さず消します。
@@ -50,5 +52,6 @@ private:
 	Vector3 floorColliderLocalCenter_{};
 	MyMath::OBB floorObb_{};
 	std::vector<MyMath::OBB> solidObbs_;
+	std::vector<MyMath::OBB> cameraBoundaryObbs_;
 	std::vector<MyMath::OBB> lightBlockingObbs_;
 };

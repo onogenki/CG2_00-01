@@ -122,8 +122,7 @@ void TitleScene::Initialize()
 	if (!InitializeTitleObjects()) {
 		return;
 	}
-	InitializeSkyBoxAndAudio();
-	titleEditor_.ScanResourceShelf();
+	InitializeSkyBoxAndEditorResources();
 	isFinished_ = false;
 }
 
@@ -194,18 +193,16 @@ bool TitleScene::InitializeTitleObjects()
 	return true;
 }
 
-// SkyBoxとTitle開始時の音声を、TitleSceneが表示される一度だけ準備します。
-void TitleScene::InitializeSkyBoxAndAudio()
+// Titleを選んだ時だけ、SkyBox TextureとEditor用Resource一覧をまとめて準備します。
+void TitleScene::InitializeSkyBoxAndEditorResources()
 {
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
-	// SkyBoxの背景Textureです。
 	TextureManager::GetInstance()->LoadTexture("Resources/qwantani_moonrise_puresky_1k.dds");
 	skyBox_ = std::make_unique<SkyBox>();
 	skyBox_->Initialize(dxCommon, cameraManager->GetActiveCamera());
 	skyBox_->SetTexture("Resources/qwantani_moonrise_puresky_1k.dds");
-
-	Audio::GetInstance()->LoadFile("Resources/Alarm01.wav");
-	Audio::GetInstance()->PlayWave("Resources/Alarm01.wav");
+	// Titleを明示的に開いた時だけ、Editor用のShelfを走査します。
+	titleEditor_.ScanResourceShelf();
 }
 
 void TitleScene::Update()
@@ -269,7 +266,7 @@ void TitleScene::UpdateSceneTransition(bool isGameViewActive)
 	// EnterまたはPadの3ボタンで、本編のStage1を開きます。
 	if (input->TriggerKey(DIK_RETURN) || input->IsPadButtonPressed(0, 3))
 	{
-		SceneManager::GetInstance()->ChangeScene("STAGE1");
+		SceneManager::GetInstance()->ChangeSceneWithLoading("STAGE1");
 	}
 }
 

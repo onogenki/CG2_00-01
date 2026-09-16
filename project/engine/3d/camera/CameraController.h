@@ -106,6 +106,10 @@ private:
 	// Focusから理想位置までの線が壁に当たるなら、壁の手前の安全な位置を返す
 	Vector3 CalculateCollisionSafeCameraPosition(
 		const std::vector<MyMath::OBB>& cameraCollisionObbs) const;
+	// 補間途中でもCameraが外壁を越えないよう、現在位置を壁の内側へ収めます。
+	Vector3 ClampCameraPositionToCollisionBoundaries(
+		const Vector3& cameraPosition,
+		const std::vector<MyMath::OBB>& cameraCollisionObbs) const;
 	// 現在のカメラ位置から Focus を向く回転を計算して Camera に設定する
 	void ApplyCameraTransform();
 	// 角度が -π と +π をまたいでも、短い方向へ補間する
@@ -153,6 +157,8 @@ private:
 	float focusFollowSpeed_ = 7.0f;
 	float lookAtFollowSpeed_ = 5.5f;
 	float cameraFollowSpeed_ = 4.5f;
+	// 外壁へ近付いた時だけ、急に寄らずゆっくりCameraを縮める速さです。
+	float wallAvoidanceFollowSpeed_ = 3.0f;
 	// 矢印キーで選んだ方向へ、ロボットが向きを変えるよう素早く移動します。
 	float orbitFollowSpeed_ = 24.0f;
 	// Playerが移動している方向の少し先へFocusをずらす距離

@@ -112,6 +112,7 @@ bool StageMapRuntime::Rebuild(
 
 		RuntimeObject runtimeObject{};
 		runtimeObject.sourceName = objectData->name;
+		runtimeObject.tag = objectData->tag;
 		// Factoryを使うCreateObjectFunctionがモデル読込とObject3d初期化をまとめて行います。
 		// Runtimeは生成結果だけを見るため、ModelManagerへ直接依存しません。
 		runtimeObject.visual = createObject(objectData->fileName);
@@ -150,6 +151,7 @@ void StageMapRuntime::ApplyEdits(
 		}
 
 		const LevelLoader::ObjectData& objectData = **found;
+		runtimeObject.tag = objectData.tag;
 		runtimeObject.visual->SetTranslate(objectData.translation);
 		runtimeObject.visual->SetRotate(objectData.rotation);
 		runtimeObject.visual->SetScale(objectData.scaling);

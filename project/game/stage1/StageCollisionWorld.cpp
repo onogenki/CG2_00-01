@@ -21,6 +21,7 @@ void StageCollisionWorld::Rebuild(const Context& context)
 		floorColliderLocalCenter_,
 		floorLocalHalfSize_);
 	solidObbs_ = { floorObb_ };
+	cameraBoundaryObbs_.clear();
 	lightBlockingObbs_ = { floorObb_ };
 
 	if (context.fixedMirrors) {
@@ -50,8 +51,14 @@ void StageCollisionWorld::Rebuild(const Context& context)
 			if (!runtimeObject.visual || !runtimeObject.hasBoxCollider) {
 				continue;
 			}
-			solidObbs_.push_back(runtimeObject.GetObb());
-			lightBlockingObbs_.push_back(runtimeObject.GetObb());
+			const MyMath::OBB runtimeObb = runtimeObject.GetObb();
+			solidObbs_.push_back(runtimeObb);
+			lightBlockingObbs_.push_back(runtimeObb);
+			// CameraBoundaryは建物の外周だけへ付けるタグです。
+			// 室内の壁はここへ入れず、Playerをシルエットで見せる演出を優先します。
+			if (runtimeObject.tag == "CameraBoundary") {
+				cameraBoundaryObbs_.push_back(runtimeObb);
+			}
 		}
 	}
 }
@@ -70,5 +77,6 @@ void StageCollisionWorld::Clear()
 {
 	floorObb_ = {};
 	solidObbs_.clear();
+	cameraBoundaryObbs_.clear();
 	lightBlockingObbs_.clear();
 }

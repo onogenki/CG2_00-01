@@ -192,6 +192,9 @@
     <ClCompile Include="engine\3d\object\Object3dCommonSkybox.cpp" />
    <ClCompile Include="engine\3d\object\SkyBox.cpp" />
     <ClCompile Include="engine\audio\Audio.cpp" />
+	<ClCompile Include="engine\audio\AudioMixer.cpp" />
+    <ClCompile Include="engine\audio\BgmPlayer.cpp" />
+    <ClCompile Include="engine\audio\SoundEffectPlayer.cpp" />
     <ClCompile Include="engine\ecs\EcsSystems.cpp" />
     <ClCompile Include="engine\ecs\EcsWorld.cpp" />
     <ClCompile Include="engine\base\utility\D3DResourceLeakChecker.cpp" />
@@ -408,6 +411,7 @@
   <ItemGroup>
     <!-- Visual Studioが個別に追跡できるよう、game側もワイルドカードを使わず列挙します。 -->
     <ClCompile Include="game\GameSceneRegistration.cpp" />
+	<ClCompile Include="game\loading\LoadingScene.cpp" />
     <ClCompile Include="game\mirror\CarryableMirror.cpp" />
     <ClCompile Include="game\mirror\FixedMirror.cpp" />
     <ClCompile Include="game\mirror\Laser.cpp" />
@@ -434,6 +438,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="game\GameSceneRegistration.h" />
+	<ClInclude Include="game\loading\LoadingScene.h" />
     <ClInclude Include="game\mirror\CarryableMirror.h" />
     <ClInclude Include="game\mirror\FixedMirror.h" />
     <ClInclude Include="game\mirror\Laser.h" />
@@ -480,6 +485,9 @@
     <ClInclude Include="engine\3d\object\Object3dCommon.h" />
     <ClInclude Include="engine\3d\object\SkyBox.h" />
     <ClInclude Include="engine\audio\Audio.h" />
+	<ClInclude Include="engine\audio\AudioMixer.h" />
+    <ClInclude Include="engine\audio\BgmPlayer.h" />
+    <ClInclude Include="engine\audio\SoundEffectPlayer.h" />
     <ClInclude Include="engine\ecs\EcsSystems.h" />
     <ClInclude Include="engine\ecs\EcsWorld.h" />
     <ClInclude Include="engine\base\scene\AbstractSceneFactory.h" />

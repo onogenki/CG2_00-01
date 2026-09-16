@@ -64,6 +64,9 @@
     <Filter Include="03_GameObjects\Gameplay">
       <UniqueIdentifier>{a65b2173-0000-4000-8000-000000000000}</UniqueIdentifier>
     </Filter>
+    <Filter Include="03_Audio">
+      <UniqueIdentifier>{4bc3888c-62fd-4d8f-86ae-10c76ce91d29}</UniqueIdentifier>
+    </Filter>
     <Filter Include="04_Level">
       <UniqueIdentifier>{338417d8-0000-4000-8000-000000000000}</UniqueIdentifier>
     </Filter>
@@ -312,7 +315,16 @@
       <Filter>01_Render\3D\Object</Filter>
     </ClCompile>
     <ClCompile Include="engine\audio\Audio.cpp">
-      <Filter>08_Support</Filter>
+      <Filter>03_Audio</Filter>
+    </ClCompile>
+	<ClCompile Include="engine\audio\AudioMixer.cpp">
+	  <Filter>03_Audio</Filter>
+	</ClCompile>
+    <ClCompile Include="engine\audio\BgmPlayer.cpp">
+      <Filter>03_Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\audio\SoundEffectPlayer.cpp">
+      <Filter>03_Audio</Filter>
     </ClCompile>
     <ClCompile Include="engine\ecs\EcsSystems.cpp">
       <Filter>08_Support</Filter>
@@ -590,6 +602,9 @@
     <ClCompile Include="game\GameSceneRegistration.cpp">
       <Filter>08_Game</Filter>
     </ClCompile>
+	<ClCompile Include="game\loading\LoadingScene.cpp">
+	  <Filter>08_Game</Filter>
+	</ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\2d\particles\ParticleEmitter.h">
@@ -683,7 +698,16 @@
       <Filter>01_Render\3D\Object</Filter>
     </ClInclude>
     <ClInclude Include="engine\audio\Audio.h">
-      <Filter>08_Support</Filter>
+      <Filter>03_Audio</Filter>
+    </ClInclude>
+	<ClInclude Include="engine\audio\AudioMixer.h">
+	  <Filter>03_Audio</Filter>
+	</ClInclude>
+    <ClInclude Include="engine\audio\BgmPlayer.h">
+      <Filter>03_Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\audio\SoundEffectPlayer.h">
+      <Filter>03_Audio</Filter>
     </ClInclude>
     <ClInclude Include="engine\ecs\EcsSystems.h">
       <Filter>08_Support</Filter>
@@ -925,6 +949,9 @@
     <ClInclude Include="game\GameSceneRegistration.h">
       <Filter>08_Game</Filter>
     </ClInclude>
+	<ClInclude Include="game\loading\LoadingScene.h">
+	  <Filter>08_Game</Filter>
+	</ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="CG2_00-01.rc">

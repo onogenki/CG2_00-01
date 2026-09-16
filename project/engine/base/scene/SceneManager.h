@@ -18,6 +18,10 @@ public:
 
 	//次シーン予約
 	bool ChangeScene(const std::string& sceneName);
+	// 白いLoadingSceneを一度表示してから、指定したSceneへ切り替えます。
+	bool ChangeSceneWithLoading(const std::string& sceneName);
+	// LoadingSceneだけが一度取得する、Loading完了後の切替先です。
+	std::string TakeLoadingDestinationSceneName();
 	bool RestartCurrentScene();
 	void FinalizeCurrentScene();
 
@@ -43,6 +47,8 @@ private:
 	std::unique_ptr<BaseScene> nextScene_ = nullptr;
 	std::string currentSceneName_;
 	std::string pendingSceneName_;
+	// LoadingSceneが表示を終えた後に開く、次のScene名を一時的に保持します。
+	std::string loadingDestinationSceneName_;
 	bool isChangingScene_ = false;
 	int sceneChangeCooldownFrames_ = 0;
 
