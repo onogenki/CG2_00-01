@@ -44,7 +44,8 @@ public:
 		Matrix4x4 uvTransform;
 		float shininess;
 		float environmentCoefficient;
-		float padding2[2];
+		float specularIntensity;
+		float padding2;
 	};
 
 	struct DirectionalLight {
@@ -198,6 +199,12 @@ public:
 	void DrawSkinned(const SkinCluster& skinCluster, uint32_t textureSrvIndexOverride = UINT32_MAX);
 
 	void SetTexture(const std::string& filePath);
+	// 色付きLightの反射だけを弱め、Texture本来の色を見えやすくします。
+	void SetSpecularIntensity(float intensity) {
+		if (materialData) {
+			materialData->specularIntensity = intensity;
+		}
+	}
 
 	void SetEnvironmentCoefficient(float coefficient) {
 		if (materialData) {

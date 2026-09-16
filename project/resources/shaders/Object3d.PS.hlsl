@@ -8,7 +8,8 @@ struct Material
     float32_t4x4 uvTransform;
     float shininess;
     float environmentCoefficient;
-    float32_t2 padding;
+    float specularIntensity;
+    float padding;
 };
 
 struct DirectionalLight
@@ -110,6 +111,7 @@ PixelShaderOutput main(VertexShaderOutput input)
         gDirectionalLight.color.rgb *
         gDirectionalLight.intensity *
         specularPowDirectional *
+        gMaterial.specularIntensity *
         float32_t3(1.0f, 1.0f, 1.0f);
     
     ///
@@ -133,7 +135,8 @@ PixelShaderOutput main(VertexShaderOutput input)
     float NDotHPoint = dot(toEye, reflectedPoint);
     float specularPowPoint = pow(saturate(NDotHPoint), gMaterial.shininess);
     float32_t3 specularPointLight =
-    gPointLight.color.rgb * gPointLight.intensity * pointFactor * specularPowPoint * float32_t3(1.0f, 1.0f, 1.0f);
+    gPointLight.color.rgb * gPointLight.intensity * pointFactor * specularPowPoint *
+        gMaterial.specularIntensity * float32_t3(1.0f, 1.0f, 1.0f);
     
     ///
     ///スポットライト
@@ -167,7 +170,7 @@ PixelShaderOutput main(VertexShaderOutput input)
         float specularPowSpot = pow(saturate(dot(toEye, reflectedSpot)), gMaterial.shininess);
         specularSpotLight +=
             spotLight.color.rgb * spotLight.intensity * attenuationFactor * falloffFactor *
-            specularPowSpot * float32_t3(1.0f, 1.0f, 1.0f);
+            specularPowSpot * gMaterial.specularIntensity * float32_t3(1.0f, 1.0f, 1.0f);
     }
     
     //全ての光を合成

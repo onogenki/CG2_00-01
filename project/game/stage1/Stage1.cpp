@@ -102,6 +102,8 @@ void Stage1::InitializeSharedModels()
 	ModelManager::GetInstance()->LoadModel("sphere.obj");
 	if (Model* sphereModel = ModelManager::GetInstance()->FindModel("sphere.obj")) {
 		sphereModel->SetTexture("Resources/monsterBall.png");
+		// 青い室内Lightの反射で水色に見えないよう、球はTextureの赤・白を優先します。
+		sphereModel->SetSpecularIntensity(0.15f);
 	}
 }
 

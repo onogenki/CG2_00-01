@@ -170,6 +170,8 @@ void Model::CreateMaterialData()
 	materialData->shininess = 50.0f;
 
 	materialData->environmentCoefficient = 0.0f;
+	// 通常のModelはLightの反射をそのまま使います。
+	materialData->specularIntensity = 1.0f;
 
 	materialData->uvTransform = MakeIdentity4x4();
 }

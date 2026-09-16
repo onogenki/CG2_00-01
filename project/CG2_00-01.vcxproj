@@ -406,9 +406,53 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <!-- gameフォルダが存在する時だけ、そのゲーム固有ソースを自動でビルドへ加えます。 -->
-    <ClCompile Include="game\**\*.cpp" />
-    <ClInclude Include="game\**\*.h" />
+    <!-- Visual Studioが個別に追跡できるよう、game側もワイルドカードを使わず列挙します。 -->
+    <ClCompile Include="game\GameSceneRegistration.cpp" />
+    <ClCompile Include="game\mirror\CarryableMirror.cpp" />
+    <ClCompile Include="game\mirror\FixedMirror.cpp" />
+    <ClCompile Include="game\mirror\Laser.cpp" />
+    <ClCompile Include="game\mirror\LaserRenderer.cpp" />
+    <ClCompile Include="game\mirror\PlanarReflectionTarget.cpp" />
+    <ClCompile Include="game\stage1\debug\Stage1GameplaySmoke.cpp" />
+    <ClCompile Include="game\stage1\debug\StagePuzzleDebugUi.cpp" />
+    <ClCompile Include="game\stage1\editor\ImGuiManagerStagePuzzle.cpp" />
+    <ClCompile Include="game\stage1\editor\StageEditor.cpp" />
+    <ClCompile Include="game\stage1\editor\StageEditViewport.cpp" />
+    <ClCompile Include="game\stage1\editor\StageLevelEditor.cpp" />
+    <ClCompile Include="game\stage1\Stage1.cpp" />
+    <ClCompile Include="game\stage1\Stage1EditorUi.cpp" />
+    <ClCompile Include="game\stage1\Stage1Lighting.cpp" />
+    <ClCompile Include="game\stage1\Stage1MapLoading.cpp" />
+    <ClCompile Include="game\stage1\Stage1MirrorGameplay.cpp" />
+    <ClCompile Include="game\stage1\StageCameraEvents.cpp" />
+    <ClCompile Include="game\stage1\StageCollisionWorld.cpp" />
+    <ClCompile Include="game\stage1\StageHazardLights.cpp" />
+    <ClCompile Include="game\stage1\StageLightPuzzle.cpp" />
+    <ClCompile Include="game\stage1\StageReflectionRenderer.cpp" />
+    <ClCompile Include="game\stage1\StageSceneRenderer.cpp" />
+    <ClCompile Include="game\stage1\StageStart.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="game\GameSceneRegistration.h" />
+    <ClInclude Include="game\mirror\CarryableMirror.h" />
+    <ClInclude Include="game\mirror\FixedMirror.h" />
+    <ClInclude Include="game\mirror\Laser.h" />
+    <ClInclude Include="game\mirror\LaserRenderer.h" />
+    <ClInclude Include="game\mirror\Mirror.h" />
+    <ClInclude Include="game\mirror\PlanarReflectionTarget.h" />
+    <ClInclude Include="game\stage1\debug\Stage1GameplaySmoke.h" />
+    <ClInclude Include="game\stage1\debug\StagePuzzleDebugUi.h" />
+    <ClInclude Include="game\stage1\editor\StageEditor.h" />
+    <ClInclude Include="game\stage1\editor\StageEditViewport.h" />
+    <ClInclude Include="game\stage1\editor\StageLevelEditor.h" />
+    <ClInclude Include="game\stage1\Stage1.h" />
+    <ClInclude Include="game\stage1\StageCameraEvents.h" />
+    <ClInclude Include="game\stage1\StageCollisionWorld.h" />
+    <ClInclude Include="game\stage1\StageHazardLights.h" />
+    <ClInclude Include="game\stage1\StageLightPuzzle.h" />
+    <ClInclude Include="game\stage1\StageReflectionRenderer.h" />
+    <ClInclude Include="game\stage1\StageSceneRenderer.h" />
+    <ClInclude Include="game\stage1\StageStart.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\2d\particles\ParticleEmitter.h" />
