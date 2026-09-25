@@ -329,4 +329,6 @@ DirectXGame/imgui.ini
 Dumps/
 logs/
 imgui.ini
+# ImGuiのDock配置は各開発者のローカル画面設定なので、共有・マージしない。
+project/imgui_docking.ini
 generated/

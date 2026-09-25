@@ -69,7 +69,9 @@ Texture2D<float32_t4> gTexture : register(t0);
 SamplerState gSampler : register(s0);
 TextureCube<float32_t4> gEnvironmentTexture : register(t1);
 
-PixelShaderOutput main(VertexShaderOutput input)
+PixelShaderOutput main(
+    VertexShaderOutput input,
+    bool isFrontFace : SV_IsFrontFace)
 {
 	// ここでのinputは頂点シェーダーによりワールド座標へ変換済み。
     PixelShaderOutput output;
@@ -81,8 +83,13 @@ PixelShaderOutput main(VertexShaderOutput input)
         gMaterial.color.rgb * textureColor.rgb *
         gDirectionalLight.ambientColor * gDirectionalLight.ambientIntensity;
     
-    // 法線
+    // 厚みのない板Modelは裏側からも描画するため、裏面では法線も反転してLightを計算する。
+    // CullModeをNoneにするだけでは法線は反転しないため、Mirror・看板などが暗く消えるのを防ぐ。
     float32_t3 N = normalize(input.normal);
+    if (!isFrontFace)
+    {
+        N = -N;
+    }
     //視線ベクトル
     float32_t3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
     

@@ -10,7 +10,6 @@
 #include "Input.h"
 #include "ImGuiManager.h"
 #include "LevelLoader.h"
-#include "ModelManager.h"
 #include "Object3dCommon.h"
 #include "Object3dFactory.h"
 #include "Object3dRenderContext.h"
@@ -58,7 +57,6 @@ void Stage1::Initialize()
 	// BGMの再生役だけを準備し、音声ファイルの読込はStage1画面の表示後まで遅らせます。
 	stageBgm_.Initialize(Audio::GetInstance());
 	InitializeDefaultLighting();
-	InitializeSharedModels();
 	if (!InitializeStageGimmicks()) {
 		return;
 	}
@@ -100,13 +98,6 @@ void Stage1::InitializeDefaultLighting()
 	pointLight_.decay = 1.0f;
 }
 
-// PlayerとSwitchが共有するSphereモデルの見た目を、一度だけ設定します。
-void Stage1::InitializeSharedModels()
-{
-	// モデル自体の読込はPlayer・Mirrorを含め、すべてObject3dFactoryが担当します。
-	ModelManager::GetInstance()->LoadModel("sphere.obj");
-}
-
 // JSONの内容に関係なく必要な床・鏡・Laser・Switch・Doorを作成します。
 bool Stage1::InitializeStageGimmicks()
 {
@@ -130,6 +121,8 @@ bool Stage1::InitializeStageGimmicks()
 		{ -2.5f, -0.8f, 4.5f },
 		3.6f,
 		3.6f);
+	// 実際の開始位置はstage1.jsonのCarryableMirrorStartから反映します。
+	// ここではJSON読込に失敗した時だけ使う予備位置を渡し、勝手に所持状態へはしません。
 
 	// 通常床とは別に、Playerが持てない正方形の鏡床ギミックを配置します。
 	mirrorFloor_ = std::make_unique<FixedMirror>();
@@ -325,9 +318,7 @@ void Stage1::Update()
 	gameplaySmoke_.Update(
 		{ &hazardLights_, lightPuzzle_.IsDoorSwitchReceivingLight(), lightPuzzle_.GetDoorOpenAmount() },
 		deltaTime);
-	if (!isStageStartPlaying) {
-		UpdateMirrorGameplay();
-	}
+	UpdateMirrorGameplay();
 	UpdateLightPuzzle(deltaTime);
 	// 危険Lightの軌道・反射・Player接触は、Stage固有ギミックへまとめて任せます。
 	hazardLights_.Update(

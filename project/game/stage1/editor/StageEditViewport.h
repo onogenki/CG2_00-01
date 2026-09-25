@@ -8,6 +8,7 @@
 #include <vector>
 
 class Camera;
+class CarryableMirror;
 class FixedMirror;
 class StageMapRuntime;
 
@@ -22,6 +23,8 @@ public:
 		LevelLoader::LevelData* levelData = nullptr;
 		Camera* camera = nullptr;
 		Object3d* floor = nullptr;
+		// 持てる鏡はStage1が所有します。EditorはJSONの配置を確認・編集するためだけに参照します。
+		CarryableMirror* carryableMirror = nullptr;
 		const std::vector<std::unique_ptr<FixedMirror>>* fixedMirrors = nullptr;
 		StageMapRuntime* mapRuntime = nullptr;
 		// LevelData内で現在選択しているObjectの番号です。

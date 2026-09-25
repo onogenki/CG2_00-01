@@ -56,8 +56,6 @@ private:
 	void InitializeRenderSystems();
 	// JSONを読む前に使う、Stage1の標準照明値を設定します。
 	void InitializeDefaultLighting();
-	// PlayerとSwitchで共有するモデル・Textureを一度だけ準備します。
-	void InitializeSharedModels();
 	// JSONへ依存しない床・鏡・Laser・Switch・Doorを作成します。
 	bool InitializeStageGimmicks();
 	// JSONとCSVを最初に読み込み、Colliderを生成してHot Reload監視を開始します。

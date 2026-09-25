@@ -151,6 +151,8 @@ void Stage1GameplaySmoke::Initialize(const InitializeContext& context)
 	gameplaySmokeStartY_ = gameplaySmokeStartPosition_.y;
 	const Vector3 mirrorPosition = carryableMirror_->GetMirror().GetCenter();
 
+	// 本編ではJSONに置かれた鏡から開始するため、床に置かれた状態で拾う処理を確認します。
+	carryableMirror_->SetCarried(false);
 	// 鏡の中心にPlayerがいる条件を渡し、Eキーと同じ拾う処理を直接確認します。
 	carryableMirror_->Update(1.0f, mirrorPosition, 0.0f, true);
 	gameplaySmokePickedUpMirror_ = carryableMirror_->IsCarried();
@@ -296,14 +298,27 @@ void Stage1GameplaySmoke::Initialize(const InitializeContext& context)
 	const auto laserHitsSphere = [&](const Laser& testLaser, const Sphere& sphere) {
 		return testLaser.IsHitSphere(sphere, laserCollisionRadius_);
 	};
-	// 実際に持っている鏡をPlayer正面へ構え、鏡なしなら当たる光が遮られることを確認する。
-	const Sphere carriedPlayerSphere{ mirrorPosition, 1.2f };
-	const Vector3 carriedTestOrigin{
-		mirrorPosition.x,
-		mirrorPosition.y + 1.8f,
-		mirrorPosition.z + 2.5f,
+	// 実際に持っている鏡の現在位置と法線を使い、鏡なしなら当たる光が遮られることを確認します。
+	const Vector3 carriedMirrorCenter = carryMirror.GetCenter();
+	const Vector3 carriedMirrorNormal = carryMirror.GetNormal();
+	const Sphere carriedPlayerSphere{
+		{
+			carriedMirrorCenter.x - carriedMirrorNormal.x * 2.4f,
+			carriedMirrorCenter.y - carriedMirrorNormal.y * 2.4f,
+			carriedMirrorCenter.z - carriedMirrorNormal.z * 2.4f,
+		},
+		1.2f,
 	};
-	const Vector3 carriedTestDirection{ 0.0f, -1.8f, -2.5f };
+	const Vector3 carriedTestOrigin{
+		carriedMirrorCenter.x + carriedMirrorNormal.x * 3.0f,
+		carriedMirrorCenter.y + carriedMirrorNormal.y * 3.0f,
+		carriedMirrorCenter.z + carriedMirrorNormal.z * 3.0f,
+	};
+	const Vector3 carriedTestDirection{
+		-carriedMirrorNormal.x,
+		-carriedMirrorNormal.y,
+		-carriedMirrorNormal.z,
+	};
 	Laser carriedUnblockedLaser;
 	carriedUnblockedLaser.SetOrigin(carriedTestOrigin);
 	carriedUnblockedLaser.SetDirection(carriedTestDirection);

@@ -37,6 +37,8 @@ public:
 	// 床・壁一覧やLaser遮蔽へ渡す、持てる鏡のOBB形状データを返します。
 	const MyMath::OBB& GetObb() const { return collider_.GetShape(); }
 	bool IsCarried() const { return isCarried_; }
+	// Stage開始時の装備状態やEventから、鏡を持つ・置く状態へ明示的に切り替えます。
+	void SetCarried(bool isCarried);
 	// stage1.jsonで指定した位置へ、置かれているMirrorだけを移動します。
 	void SetDroppedPosition(const Vector3& position);
 
@@ -52,6 +54,8 @@ private:
 	float yaw_ = 0.0f;
 	float pickupDistance_ = 2.5f;
 	float holdDistance_ = 1.8f;
+	// 縦向きMirrorをPlayerの左前へ寄せ、Player本体と重ならず板として見える位置にします。
+	float verticalHoldSideOffset_ = -1.75f;
 	// 水平MirrorはPlayerから離して、前方の上下Lightを受けやすくします。
 	float horizontalHoldDistance_ = 2.70f;
 	float holdHeight_ = 0.5f;

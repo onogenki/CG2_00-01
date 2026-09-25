@@ -1,6 +1,5 @@
 #include "ImGuiManager.h"
 #include "CameraManager.h"
-#include "ModelManager.h"
 #include "Object3d.h"
 #include "ParticleEmitter.h"
 #include "ParticleManager.h"
@@ -185,7 +184,6 @@ void ImGuiManager::ModelWindow(
 	static int selectedAnimationIndex = 0;//選択されている番号
 	static int previousNormalCount = 0;
 	static int previousAnimationCount = 0;
-	static bool useMonsterBall = false;//png入れ替え
 	if (!embedded && !showModelWindow_) {
 		return;
 	}
@@ -406,21 +404,6 @@ void ImGuiManager::ModelWindow(
 			ImGui::SliderFloat("SpotLight:decay", &spotLight.decay, 0.1f, 10.0f);
 			ImGui::SliderFloat("SpotLight:cosAngle", &spotLight.cosAngle, -1.0f, 1.0f);
 			ImGui::SliderFloat("SpotLight:cosFalloffStart", &spotLight.cosFalloffStart, -1.0f, 1.0f);
-			ImGui::EndTabItem();
-		}
-		if (ImGui::BeginTabItem("Texture")) {
-			if (ImGui::Checkbox("Use MonsterBall", &useMonsterBall))
-			{//切り替えたいモデル
-				Model* targetModel = ModelManager::GetInstance()->FindModel("sphere.obj");
-				if (targetModel)
-				{
-					if (useMonsterBall) {
-						targetModel->SetTexture("Resources/monsterBall.png");
-					} else {
-						targetModel->SetTexture("Resources/uvChecker.png");
-					}
-				}
-			}
 			ImGui::EndTabItem();
 		}
 		ImGui::EndTabBar();

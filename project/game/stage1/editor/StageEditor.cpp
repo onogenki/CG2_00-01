@@ -142,6 +142,7 @@ void StageEditor::DrawViewport(Context& context)
 	viewportContext.levelData = context.levelData;
 	viewportContext.camera = context.activeCamera;
 	viewportContext.floor = context.floor;
+	viewportContext.carryableMirror = context.carryableMirror;
 	viewportContext.fixedMirrors = context.fixedMirrors;
 	viewportContext.mapRuntime = context.mapRuntime;
 	viewportContext.selectedObjectIndex = context.selectedObjectIndex;

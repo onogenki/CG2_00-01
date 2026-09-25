@@ -1,6 +1,7 @@
 #include "StageEditViewport.h"
 
 #include "Camera.h"
+#include "CarryableMirror.h"
 #include "FixedMirror.h"
 #include "LevelLoader.h"
 #include "StageMapRuntime.h"
@@ -30,6 +31,9 @@ void StageEditViewport::Draw(const Context& context)
 	for (const LevelLoader::ObjectData& objectData : context.levelData->objects) {
 		if (objectData.tag == "Floor") {
 			addObject(objectData.name, context.floor);
+		} else if (objectData.objectType == "CARRYABLE_MIRROR" && context.carryableMirror) {
+			// 固定鏡とは別に、JSONで置く持てる鏡も選択・移動できるようにします。
+			addObject(objectData.name, &context.carryableMirror->GetObject());
 		} else if (objectData.tag == "Mirror") {
 			if (fixedMirrorIndex < context.fixedMirrors->size() && (*context.fixedMirrors)[fixedMirrorIndex]) {
 				addObject(objectData.name, &(*context.fixedMirrors)[fixedMirrorIndex]->GetObject());

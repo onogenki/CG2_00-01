@@ -38,8 +38,6 @@ void StageSceneRenderer::Draw(const Context& context)
 	}
 	if (context.player) {
 		context.player->GetObject().Draw();
-		// モンスターボールの水色と混ざらない桃色で、壁の奥にいるPlayerだけを見せます。
-		context.player->GetObject().DrawOccludedSilhouette({ 1.00f, 0.18f, 0.62f, 0.72f });
 	}
 	// Laserの線は壁の向こうへ描かず、発射位置だけを黄色で見えるようにします。
 	// 将来発射装置Modelへ差し替えても、同じObject3dの呼び出しで利用できます。

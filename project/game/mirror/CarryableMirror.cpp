@@ -22,7 +22,7 @@ void CarryableMirror::Initialize(
 	if (!Object3dFactory::InitializeObject(object_, object3dCommon, modelName)) {
 		return;
 	}
-	// 小型鏡は景色を映さず、銀色に近い明るい板として表示します。
+	// 持てるMirrorは景色を映さないLaser用の鏡です。UVチェッカーではなく、反射前の鏡らしい明るい板を表示します。
 	object_.SetTextureOverride("resources/white.png");
 	// 小型Mirrorも表側だけLaserを反射します。
 	mirror_.SetReflectBackface(false);
@@ -101,12 +101,19 @@ void CarryableMirror::Update(
 			0.0f,
 			std::cos(heldYaw),
 		};
+		// Playerの右方向を使い、縦向きMirrorだけを左前へずらします。
+		const Vector3 playerRight{
+			playerForward.z,
+			0.0f,
+			-playerForward.x,
+		};
 		const float heldDistance = isHorizontalHoldMode_ ? horizontalHoldDistance_ : holdDistance_;
 		const float heldHeight = isHorizontalHoldMode_ ? holdHeight_ * 0.70f : holdHeight_;
+		const float heldSideOffset = isHorizontalHoldMode_ ? 0.0f : verticalHoldSideOffset_;
 		const Vector3 heldPosition{
-			playerPosition.x + playerForward.x * heldDistance,
+			playerPosition.x + playerForward.x * heldDistance + playerRight.x * heldSideOffset,
 			playerPosition.y + heldHeight,
-			playerPosition.z + playerForward.z * heldDistance,
+			playerPosition.z + playerForward.z * heldDistance + playerRight.z * heldSideOffset,
 		};
 		// Playerの正面から来るLaserを反射するため、板の表側もPlayerの正面へ向けます。
 		const float targetYaw = heldYaw;
@@ -135,6 +142,17 @@ void CarryableMirror::SetDroppedPosition(const Vector3& position)
 	}
 
 	ApplyTransform(position, 0.0f, 3.14159265f);
+}
+
+void CarryableMirror::SetCarried(bool isCarried)
+{
+	isCarried_ = isCarried;
+	// 持ち直す時は、前回の構え・傾きを残さず通常の縦向きMirrorから始めます。
+	if (isCarried_) {
+		aimYawOffset_ = 0.0f;
+		isHorizontalHoldMode_ = false;
+		horizontalTilt_ = 0.0f;
+	}
 }
 
 void CarryableMirror::ApplyTransform(const Vector3& position, float pitch, float yaw)
