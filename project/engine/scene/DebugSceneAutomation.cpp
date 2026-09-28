@@ -50,11 +50,18 @@ void DebugScene::InitializeTimePlaybackSmokeFromEnvironment()
 // UI自動確認を環境変数から初期化し、有効時だけ操作対象を渡します。
 void DebugScene::InitializeUiSmokeFromEnvironment()
 {
-	if (GetEnvironmentString("CG2_DEBUG_UI_SMOKE").empty()) {
+	const std::string smokeMode = GetEnvironmentString("CG2_DEBUG_UI_SMOKE");
+	if (smokeMode.empty()) {
 		return;
 	}
 
-	DebugUiSmoke::Start(uiSmoke_, gameViewCapture_.MakeTimestampString());
+	const bool isAnimationPreviewTest = smokeMode == "walk";
+	const bool isAnimationSceneTest = smokeMode == "walk-scene";
+	DebugUiSmoke::Start(
+		uiSmoke_,
+		gameViewCapture_.MakeTimestampString(),
+		isAnimationPreviewTest,
+		isAnimationSceneTest);
 }
 
 // UI変更後のParticle Effectと、Sceneを操作する二種類の自動確認を更新します。

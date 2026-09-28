@@ -6,7 +6,6 @@
 #include "SceneRenderPipeline.h"
 #include "Sprite.h"
 #include "SpriteCommon.h"
-#include "WinApp.h"
 
 // LoadingSceneが前方宣言したSprite型を、この実装ファイルで生成・破棄します。
 LoadingScene::LoadingScene() = default;
@@ -35,10 +34,6 @@ void LoadingScene::InitializeLoadingSprite()
 	loadingSprite_->Initialize(spriteCommon, "resources/white.png");
 	loadingSprite_->SetPosition({ 0.0f, 0.0f });
 	loadingSprite_->SetAnchorPoint({ 0.0f, 0.0f });
-	loadingSprite_->SetSize({
-		static_cast<float>(WinApp::kClientWidth),
-		static_cast<float>(WinApp::kClientHeight),
-	});
 }
 
 // 次Sceneの初期化中も、直前に描いた白画面がウィンドウへ残ります。
@@ -51,6 +46,12 @@ void LoadingScene::Update()
 	}
 
 	if (loadingSprite_) {
+		// 全画面背景だけはSpriteの投影に使う実サイズへ合わせ、最大化時の赤い余白を防ぎます。
+		const DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+		loadingSprite_->SetSize({
+			static_cast<float>(dxCommon->GetClientWidth()),
+			static_cast<float>(dxCommon->GetClientHeight()),
+		});
 		loadingSprite_->Update();
 	}
 }

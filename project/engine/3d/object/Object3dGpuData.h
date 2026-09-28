@@ -34,6 +34,8 @@ public:
 	void SetSpotLight(const Object3d::SpotLight& light);
 	void SetSpotLights(const std::array<Object3d::SpotLight, Object3d::kMaximumSpotLightCount>& lights);
 	const Object3d::DirectionalLight& GetDirectionalLight() const { return *directionalLightData_; }
+	// Camera用バッファの空き成分で、Objectごとの裏面の明るさを渡します。
+	void SetBackFaceBrightness(float brightness) { cameraData_->backFaceBrightness = brightness; }
 
 private:
 	// 各種類のConstant Bufferを確保してCPUから書ける状態へします。

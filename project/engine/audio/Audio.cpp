@@ -275,18 +275,7 @@ bool Audio::StopWave(VoiceId voiceId)
 // Voice番号を使って、再生途中でも音量を変更します。
 bool Audio::SetVoiceVolume(VoiceId voiceId, float volume)
 {
-	std::shared_ptr<SourceVoiceCallback> callback;
-	{
-		std::scoped_lock lock(sourceVoiceMutex_);
-		const auto found = std::find_if(
-			sourceVoiceCallbacks_.begin(),
-			sourceVoiceCallbacks_.end(),
-			[voiceId](const ActiveVoice& activeVoice) { return activeVoice.id == voiceId; });
-		if (found == sourceVoiceCallbacks_.end()) {
-			return false;
-		}
-		callback = found->callback;
-	}
+	const std::shared_ptr<SourceVoiceCallback> callback = FindVoiceCallback(voiceId);
 	return callback && callback->GetVoice() &&
 		SUCCEEDED(callback->GetVoice()->SetVolume(std::clamp(volume, 0.0f, 1.0f)));
 }
@@ -294,36 +283,14 @@ bool Audio::SetVoiceVolume(VoiceId voiceId, float volume)
 // 一時停止はVoiceを破棄せず、ResumeWaveで同じ位置から再開します。
 bool Audio::PauseWave(VoiceId voiceId)
 {
-	std::shared_ptr<SourceVoiceCallback> callback;
-	{
-		std::scoped_lock lock(sourceVoiceMutex_);
-		const auto found = std::find_if(
-			sourceVoiceCallbacks_.begin(),
-			sourceVoiceCallbacks_.end(),
-			[voiceId](const ActiveVoice& activeVoice) { return activeVoice.id == voiceId; });
-		if (found == sourceVoiceCallbacks_.end()) {
-			return false;
-		}
-		callback = found->callback;
-	}
+	const std::shared_ptr<SourceVoiceCallback> callback = FindVoiceCallback(voiceId);
 	return callback && callback->GetVoice() && SUCCEEDED(callback->GetVoice()->Stop());
 }
 
 // PauseWaveで止めたVoiceを、先頭からではなく停止位置から再開します。
 bool Audio::ResumeWave(VoiceId voiceId)
 {
-	std::shared_ptr<SourceVoiceCallback> callback;
-	{
-		std::scoped_lock lock(sourceVoiceMutex_);
-		const auto found = std::find_if(
-			sourceVoiceCallbacks_.begin(),
-			sourceVoiceCallbacks_.end(),
-			[voiceId](const ActiveVoice& activeVoice) { return activeVoice.id == voiceId; });
-		if (found == sourceVoiceCallbacks_.end()) {
-			return false;
-		}
-		callback = found->callback;
-	}
+	const std::shared_ptr<SourceVoiceCallback> callback = FindVoiceCallback(voiceId);
 	return callback && callback->GetVoice() && SUCCEEDED(callback->GetVoice()->Start());
 }
 
@@ -339,6 +306,18 @@ bool Audio::IsVoicePlaying(VoiceId voiceId) const
 		found->callback && !found->callback->IsFinished();
 }
 
+// 非破壊のVoice操作で同じ番号検索を使い、未登録ならnullptrで呼び出し元へ返します。
+std::shared_ptr<Audio::SourceVoiceCallback> Audio::FindVoiceCallback(VoiceId voiceId) const
+{
+	std::scoped_lock lock(sourceVoiceMutex_);
+	const auto found = std::find_if(
+		sourceVoiceCallbacks_.begin(),
+		sourceVoiceCallbacks_.end(),
+		[voiceId](const ActiveVoice& activeVoice) { return activeVoice.id == voiceId; });
+	return found != sourceVoiceCallbacks_.end() ? found->callback : nullptr;
+}
+
+// Callbackは終了フラグだけを立て、実際のVoice破棄はゲーム側のUpdateでまとめて行います。
 void Audio::ReleaseFinishedVoices()
 {
 	std::vector<std::shared_ptr<SourceVoiceCallback>> callbacksToRelease;

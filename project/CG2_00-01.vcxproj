@@ -60,16 +60,22 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IntDir>$(SolutionDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
     <OutDir>$(SolutionDir)..\generated\outputs\$(Configuration)\</OutDir>
+    <!-- F5時もresourcesをProject直下から読むため、実行時の基準フォルダを固定します。 -->
+    <LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
     <IncludePath>$(SolutionDir)imgui;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
     <IntDir>$(SolutionDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
     <OutDir>$(SolutionDir)..\generated\outputs\$(Configuration)\</OutDir>
+    <!-- F5時もresourcesをProject直下から読むため、実行時の基準フォルダを固定します。 -->
+    <LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
     <IncludePath>$(SolutionDir)imgui;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IntDir>$(SolutionDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
     <OutDir>$(SolutionDir)..\generated\outputs\$(Configuration)\</OutDir>
+    <!-- Release実行でもresourcesをProject直下から読むため、基準フォルダを固定します。 -->
+    <LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
     <IncludePath>$(SolutionDir)imgui;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -260,6 +266,7 @@
 	<ClCompile Include="engine\scene\DebugSceneAutomation.cpp" />
 	<ClCompile Include="engine\scene\DebugSceneContexts.cpp" />
     <ClCompile Include="engine\scene\TitleScene.cpp" />
+    <ClCompile Include="engine\scene\TitleObjectManager.cpp" />
     <ClCompile Include="externals\imgui\imgui.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
@@ -414,6 +421,7 @@
 	<ClCompile Include="game\loading\LoadingScene.cpp" />
     <ClCompile Include="game\mirror\CarryableMirror.cpp" />
     <ClCompile Include="game\mirror\FixedMirror.cpp" />
+    <ClCompile Include="game\mirror\StageMirrorFactory.cpp" />
     <ClCompile Include="game\mirror\Laser.cpp" />
     <ClCompile Include="game\mirror\LaserRenderer.cpp" />
     <ClCompile Include="game\mirror\PlanarReflectionTarget.cpp" />
@@ -441,6 +449,7 @@
 	<ClInclude Include="game\loading\LoadingScene.h" />
     <ClInclude Include="game\mirror\CarryableMirror.h" />
     <ClInclude Include="game\mirror\FixedMirror.h" />
+    <ClInclude Include="game\mirror\StageMirrorFactory.h" />
     <ClInclude Include="game\mirror\Laser.h" />
     <ClInclude Include="game\mirror\LaserRenderer.h" />
     <ClInclude Include="game\mirror\Mirror.h" />
@@ -547,6 +556,7 @@
 	<ClInclude Include="engine\debug\DebugUiSmoke.h" />
     <ClInclude Include="engine\scene\DebugScene.h" />
     <ClInclude Include="engine\scene\TitleScene.h" />
+    <ClInclude Include="engine\scene\TitleObjectManager.h" />
     <ClInclude Include="externals\imgui\imconfig.h" />
     <ClInclude Include="externals\imgui\imgui.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>

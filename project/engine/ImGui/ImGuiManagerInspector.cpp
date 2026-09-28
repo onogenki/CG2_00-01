@@ -6,14 +6,39 @@
 #include "Sprite.h"
 #include <algorithm>
 #include <cstddef>
+#include <cstdio>
 #include <string>
+
+#ifdef USE_IMGUI
+namespace
+{
+	// 調整した座標・サイズ・基準点を、計算式なしのC++コードとしてコピーします。
+	void DrawSpritePlacementCopy(const Sprite& sprite)
+	{
+		if (ImGui::Button("Copy Placement C++")) {
+			const Vector2& position = sprite.GetPosition();
+			const Vector2& size = sprite.GetSize();
+			const Vector2& anchor = sprite.GetAnchorPoint();
+			char code[1024]{};
+			std::snprintf(code, sizeof(code),
+				"// Inspectorで調整した配置値です。spriteは配置したいSpriteに置き換えます。\n"
+				"sprite->SetPosition({ %.6ff, %.6ff });\n"
+				"sprite->SetSize({ %.6ff, %.6ff });\n"
+				"sprite->SetAnchorPoint({ %.6ff, %.6ff });\n"
+				"sprite->SetRotation(%.6ff);\n",
+				position.x, position.y, size.x, size.y, anchor.x, anchor.y, sprite.GetRotation());
+			ImGui::SetClipboardText(code);
+		}
+		ImGui::TextDisabled("Pos / Size: render pixels. Ctrl+click a value to type it.");
+	}
+}
+#endif
 
 // Sprite・Model・Particle・Cameraを編集する共通Inspector UIです。
 int ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprites, bool embedded, int forcedSpriteIndex)
 {
 #ifdef USE_IMGUI
 
-	static float my_color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 	static int selectedSpriteIndex = 0;
 
 	
@@ -26,14 +51,15 @@ int ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprit
 	}
 	ImGui::Separator();
 
-	// ここで色を変えたら、配列内の全スプライトに色を適用する
+	// 選択したSpriteの現在色を読み、他のSpriteの編集値を表示しないようにします。
 	if (forcedSpriteIndex >= 0 && forcedSpriteIndex < static_cast<int>(sprites.size())) {
 		selectedSpriteIndex = forcedSpriteIndex;
 		Sprite* targetSprite = sprites[forcedSpriteIndex].get();
 		if (targetSprite) {
 			ImGui::Text("Selected 2D Texture / Sprite %d", forcedSpriteIndex);
-			if (ImGui::ColorEdit4("Color", my_color)) {
-				targetSprite->SetColor({ my_color[0], my_color[1], my_color[2], my_color[3] });
+			Vector4 color = targetSprite->GetColor();
+			if (ImGui::ColorEdit4("Color", &color.x)) {
+				targetSprite->SetColor(color);
 			}
 			Vector2 pos = targetSprite->GetPosition();
 			if (ImGui::DragFloat2("Pos", &pos.x, 1.0f)) {
@@ -67,6 +93,7 @@ int ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprit
 			if (ImGui::DragFloat2("TexSize", &texSize.x, 1.0f)) {
 				targetSprite->SetTextureSize(texSize);
 			}
+			DrawSpritePlacementCopy(*targetSprite);
 		}
 		if (!embedded) {
 			ImGui::End();
@@ -98,8 +125,11 @@ int ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprit
 		ImGui::EndCombo();
 	}
 
-	if (ImGui::ColorEdit4("Color", my_color) && sprites[selectedSpriteIndex]) {
-		sprites[selectedSpriteIndex]->SetColor({ my_color[0], my_color[1], my_color[2], my_color[3] });
+	if (sprites[selectedSpriteIndex]) {
+		Vector4 color = sprites[selectedSpriteIndex]->GetColor();
+		if (ImGui::ColorEdit4("Color", &color.x)) {
+			sprites[selectedSpriteIndex]->SetColor(color);
+		}
 	}
 
 	ImGui::Separator();
@@ -148,6 +178,7 @@ int ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprit
 		if (ImGui::DragFloat2("TexSize", &texSize.x, 1.0f)) {
 			sprites[i]->SetTextureSize(texSize);
 		}
+		DrawSpritePlacementCopy(*sprites[i]);
 
 		ImGui::Separator();
 		ImGui::PopID();// IDをポップ

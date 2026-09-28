@@ -28,7 +28,8 @@ private:
 	ShapeType shapeType_;
 	// falseなら判定対象にせず、見た目だけ残せます。
 	bool isEnabled_ = true;
-	// trueなら押し戻さず、侵入した事実だけをイベントに使います。
+	// Trigger扱いの印です。Checkは重なりを返し、SphereCollider自身のResolveは押し戻しません。
+	// GetShapeで取り出した生のOBBにはこの印がないため、床・壁一覧へ入れるかは収集側が判断します。
 	bool isTrigger_ = false;
 };
 

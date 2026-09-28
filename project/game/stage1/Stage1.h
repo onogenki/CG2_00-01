@@ -59,7 +59,8 @@ private:
 	// JSONへ依存しない床・鏡・Laser・Switch・Doorを作成します。
 	bool InitializeStageGimmicks();
 	// JSONとCSVを最初に読み込み、Colliderを生成してHot Reload監視を開始します。
-	void InitializeStageMap();
+	// 読込失敗時は予備座標のままStageを続行しないため、成功したかを返します。
+	bool InitializeStageMap();
 	// Player、通常追従Camera、開始演出Cameraを順に作成します。
 	bool InitializePlayerAndCamera();
 	// 本編を所有しない自動動作確認へ、必要なStage固有データだけを渡します。
@@ -115,12 +116,6 @@ private:
 	void ApplyStageStartSettings(
 		const LevelLoader::ObjectData* playerStartData,
 		const LevelLoader::ObjectData* carryableMirrorData);
-	// JSONの固定Mirror一覧から、反射TextureとColliderを持つ実行中Mirror一覧を作成します。
-	bool CreateFixedMirrors(
-		const std::vector<const LevelLoader::ObjectData*>& mirrorDataList,
-		std::vector<std::unique_ptr<FixedMirror>>& outFixedMirrors);
-	// EditorのTransform変更を、既存の固定MirrorとColliderへ再生成せず反映します。
-	bool ApplyFixedMirrorEdits(const std::vector<const LevelLoader::ObjectData*>& mirrorDataList);
 	// 通常3D配置物とCamera Eventを、JSON一覧から作り直してStageへ確定します。
 	bool RebuildStageRuntime(
 		const std::vector<const LevelLoader::ObjectData*>& additionalObjects,

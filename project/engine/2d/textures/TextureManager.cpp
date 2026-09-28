@@ -181,19 +181,20 @@ const DirectX::TexMetadata& TextureManager::GetMetaData(const std::string& fileP
 {
 	//読み込み済みかチェック
 	assert(textureDatas.contains(filePath));
-	return textureDatas[filePath].metadata;
+	// 取得時に空の登録を作ると、後のLoadTextureが「読込済み」と誤認するためatで参照します。
+	return textureDatas.at(filePath).metadata;
 }
 
 uint32_t TextureManager::GetSrvIndex(const std::string& filePath)
 {
 	// 読み込み済みかチェック
 	assert(textureDatas.contains(filePath));
-	return textureDatas[filePath].srvIndex;
+	return textureDatas.at(filePath).srvIndex;
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE TextureManager::GetSrvHandleGPU(const std::string& filePath)
 {
 	// 読み込み済みかチェック
 	assert(textureDatas.contains(filePath));
-	return textureDatas[filePath].srvHandleGPU;
+	return textureDatas.at(filePath).srvHandleGPU;
 }

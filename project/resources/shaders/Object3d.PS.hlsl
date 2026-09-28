@@ -57,6 +57,7 @@ struct PixelShaderOutput
 struct Camera
 {
     float32_t3 worldPosition;
+    float32_t backFaceBrightness;
 };
 
 ConstantBuffer<Material> gMaterial : register(b0);
@@ -204,5 +205,11 @@ PixelShaderOutput main(
     }
     
    
+    // 元の法線側を表面とします。携帯鏡の+Z法線と同じため、縦持ち・横持ちの両方で判別できます。
+    // 通常Objectは倍率1なので、既存の材質・明るさを維持します。
+    if (dot(input.normal, toEye) < 0.0f)
+    {
+        output.color.rgb *= gCamera.backFaceBrightness;
+    }
     return output;
 }

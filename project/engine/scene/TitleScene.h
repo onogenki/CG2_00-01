@@ -2,12 +2,10 @@
 #include "Object3d.h"
 #include "BaseScene.h"
 #include "TitleEditor.h"
+#include "TitleObjectManager.h"
 #include <memory>
-#include <string>
-#include <vector>
 
 class SkyBox;
-class Sprite;
 
 class TitleScene : public BaseScene
 {
@@ -46,27 +44,15 @@ private:
 	// TitleからDebugまたはStage1へ移る入力を確認します。
 	void UpdateSceneTransition(bool isGameViewActive);
 
-	// ---------- Title固有の生成ルール ----------
-
-	// 指定した3DモデルをTitleの通常モデル一覧へ追加します。
-	bool AddModelToTitle(const std::string& fileName);
-	// 指定したTextureをTitleのSprite一覧へ追加します。
-	bool AddTextureToTitle(const std::string& textureFilePath);
-	// Edit Viewから追加したTitleモデル・Spriteだけを削除します。
-	void ClearAddedTitleObjects();
-	// TitleEditorへ渡す、TitleScene所有データと追加・削除操作の窓口を作ります。
+	// TitleEditorへManager所有の一覧を貸し、追加・削除操作を結び付けます。
 	TitleEditor::Context MakeTitleEditorContext();
 
 	// ---------- 空・3Dモデル・Sprite ----------
 
 	// Titleの背景として描画するSkyBoxです。
 	std::unique_ptr<SkyBox> skyBox_;
-	// アニメーションを使わないTitle用の3Dモデルです。
-	std::vector<std::unique_ptr<Object3d>> normalObjects_;
-	// アニメーション再生を行うTitle用の3Dモデルです。
-	std::vector<std::unique_ptr<Object3d>> animationObjects_;
-	// Title上へ追加した2D画像です。
-	std::vector<std::unique_ptr<Sprite>> addedSprites_;
+	// モデル・Spriteの生成と寿命はManagerが所有し、Sceneは更新・描画の順番を決めます。
+	TitleObjectManager titleObjects_{};
 	// TitleのModel Shelf・Inspector・Edit Viewを担当するUI部品です。
 	TitleEditor titleEditor_{};
 
@@ -79,14 +65,6 @@ private:
 	// 円すい状の範囲だけを照らす光です。
 	Object3d::SpotLight spotLight_{};
 
-	// ---------- Edit Viewの削除境界 ----------
-
-	// Initialize時からあるモデル数です。追加分だけを消す境界に使います。
-	size_t baseNormalObjectCount_ = 0;
-	// Initialize時からあるAnimationモデル数です。追加分だけを消す境界に使います。
-	size_t baseAnimationObjectCount_ = 0;
-	//最初からタイトルに置くスプライトの数です。追加したスプライトだけを削除できるようにします。
-	size_t baseSpriteCount_ = 0;
 	// ---------- Titleの進行状態 ----------
 	// trueになると、SceneManagerがTitleSceneを終了できます。
 	bool isFinished_ = false;

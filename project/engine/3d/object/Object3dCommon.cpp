@@ -15,7 +15,12 @@ void Object3dCommon::Initialize(DirectXCommon* dxCommon)
 	CreateMirrorRootSignature();
 	CreateMirrorGraphicsPipeline();
 
-	//スキニング用の生成
+	// 骨ありModelは、元から使っていたVertex Shader方式で頂点を変形します。
+	// Compute Shader方式は比較用として残しますが、通常描画には使いません。
+	CreateSkinningRootSignature();
+	CreateSkinningGraphicsPipeline();
+
+	// Compute Shader方式の設定も、将来の比較・検証用に初期化します。
 	CreateSkinningComputeRootSignature();
 	CreateSkinningComputePipeline();
 

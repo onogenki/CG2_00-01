@@ -175,6 +175,28 @@ Object、Player、Mirror、Light Puzzleの所有者は引き続き`Stage1`で、
 Playerの入力を携帯Mirrorへ渡す処理、固定Mirror・鏡床・携帯Mirrorを反射対象として集める処理、危険LightをMirrorで反射する処理を置く実装ファイルです。
 DoorやSwitchの進行規則は`StageLightPuzzle`、いつMirror処理を呼ぶかは`Stage1::Update()`が担当します。
 
+### 固定鏡の配置を変えたい時
+
+`StageMirrorFactory`は、Levelの配置データを固定鏡へ変換するゲーム側の窓口です。
+既存の`FixedMirror`へJSON依存を持ち込まず、汎用の`Object3dFactory`へ鏡専用の反射設定も混ぜません。
+
+| 責任 | 担当 |
+| --- | --- |
+| JSONを読み、Mirrorタグを分類する | `LevelLoader` → `StageMapObjectIndex` |
+| 生成と編集反映を選び、鏡一覧を所有する | `Stage1::ApplyStageMapData()` |
+| 配置データから鏡を生成する | `StageMirrorFactory::CreateFixedMirrors()` |
+| 既存の鏡へ位置・Y回転・幅・高さ・BOX設定を反映する | `StageMirrorFactory::ApplyFixedMirrorEdits()` |
+| モデル・反射Texture・Colliderを所有して同期する | `FixedMirror` |
+
+初期化・再読込では、Sceneが仮一覧を用意してFactoryへ渡し、生成成功後に本番一覧へ移します。
+失敗時は途中まで生成した仮一覧を採用しません。この保証は固定鏡一覧についてのもので、Stage全体の変更取消を保証するものではありません。
+Editorの位置変更では既存の鏡を更新し、反射Textureを作り直しません。
+
+配置の調整は`resources/levels/stage1.json`のMirrorタグを持つオブジェクト、またはEdit Viewの`StageMirror`で行います。
+`plane.obj`の元サイズが幅・高さともに2なので、`scaling.x/y × 2`が鏡の幅・高さです。
+BOXの`collider.size`はローカル全辺長で、Factoryが半辺長へ変換し、`FixedMirror`がモデルのTransformに合わせます。
+表示・衝突の仕組みを変える時だけ`FixedMirror`を読み、配置調整のために描画基盤を書き換えないようにします。
+
 `Stage1Lighting.cpp`
 
 Puzzle Laserと危険Lightの線分を、壁や床を照らすSpotLight配列へ変換する実装ファイルです。
@@ -656,13 +678,32 @@ Stage1本編はPlayer・Mirror・Door・Cameraを更新し、Smoke Testの記録
 `TitleEditor`
 
 Title画面のModel Shelf、Inspector、3D/2D Edit Viewの選択状態を担当します。
-TitleSceneはCamera・Light・Title固有のモデル配置・Scene切替を所有したまま、
+TitleSceneはCamera・Light・Scene切替を担当し、モデル・Spriteは`TitleObjectManager`が所有します。
 `TitleEditor`へ一覧と「追加・削除する操作窓口」だけを渡します。
 
 初期配置の通常モデル・Animationモデル・Spriteの数はそれぞれ保持します。
 `Clear Title Added`は、この境界より後に追加したものだけを消すため、将来のTitle演出用Animationを消しません。
 
 TitleEditorは`BaseScene`を継承しません。画面全体ではなく、TitleScene内で使うUI部品だからです。
+
+### Titleの配置を変えたい時
+
+`TitleObjectManager`は、Title用の通常モデル・Animationモデル・Spriteと、初期配置の件数をまとめて所有します。
+汎用の`Object3dCollection`にはTitleだけの画像配置ルールを追加せず、3Dモデルの生成には既存の`Object3dFactory`を使います。
+
+| 変更したいこと | 読む関数 |
+| --- | --- |
+| 最初から置く背景モデル・画像 | `TitleObjectManager::Initialize()` |
+| Shelfから追加するモデルの位置・Animation | `TitleObjectManager::AddModel()` |
+| 追加画像の位置・サイズの直接指定 | `TitleObjectManager::AddTexture()`の4引数版。2引数版はShelf用の仮配置（180,160、長辺180以内） |
+| 追加分だけを消し、初期配置を残す | `TitleObjectManager::ClearAdded()` |
+| Camera・Lightの更新と描画準備 | `TitleScene::UpdateSceneContent()` → `Object3dRenderContext` |
+| 描画する順番 | `TitleScene::Draw()` → `SceneRenderPipeline` |
+| Enter／Spaceで切り替えるScene | `TitleScene::UpdateSceneTransition()` |
+
+実行順は、Scene初期化 → Managerの初期配置 → 毎フレームのCamera更新 → 描画準備 → Editor操作 → 描画です。
+Editorから追加した物は次フレームの描画準備でCamera・Lightを受け取ります。
+終了時はSceneがGPU完了を待ってからManagerを解放します。Editorは一覧を借りるだけで、別の所有一覧を作りません。
 
 ## Stage Edit UI
 
@@ -715,10 +756,11 @@ Title再起動確認は終了コード0で成功です。どの確認もゲー�
 | Stage1の携帯Mirror操作・反射対象一覧・危険Light反射 | Stage1MirrorGameplay |
 | Stage1のLaser・危険LightをSpotLightへ変換 | Stage1Lighting |
 | JSON/CSVから通常モデルを作る | StageMapRuntime |
+| Levelの固定鏡データを生成・編集反映する | StageMirrorFactory |
 | Playerを追従する通常Camera | CameraController |
 | TriggerでCameraを変える | StageCameraEvents |
 | 時間で動く危険Light | StageHazardLights |
-| Stage1だけの鏡パズル | Stage1 |
+| Stage1だけの鏡パズルの規則 | StageLightPuzzle（呼び出す順番はStage1） |
 | Stage全体のColliderを用途別一覧へまとめる | StageCollisionWorld |
 | Stage1のEdit View全体 | StageEditor |
 | 一つのモデルの描画 | Object3d |
@@ -770,6 +812,7 @@ Title再起動確認は終了コード0で成功です。どの確認もゲー�
 | Stage1のCollider・Event・Camera確認表示 | StagePuzzleDebugUi |
 | Stage1自動確認の結果収集・ログ出力 | Stage1GameplaySmoke |
 | Title画面のModel Shelf・Inspector・Edit View | TitleEditor |
+| Titleのモデル・Spriteの生成・配置・所有・追加分の解放 | TitleObjectManager |
 | Stage JSONの3D選択・ギズモ編集 | StageEditViewport |
 | Stage JSONのモデル・Event・Camera Area追加／削除 | StageLevelEditor |
 | Enemyを生成・一覧管理する | EnemyManager |

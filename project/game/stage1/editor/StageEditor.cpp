@@ -22,6 +22,21 @@ void StageEditor::Draw(Context& context)
 		return;
 	}
 
+#ifdef USE_IMGUI
+	// Objectの見た目だけを動かさず、Player自身の位置・速度・Colliderも同期します。
+	if (context.player) {
+		if (ImGui::Begin("Stage Player")) {
+			Vector3 position = context.player->GetPosition();
+			if (ImGui::DragFloat3("Player Position", &position.x, 0.05f)) {
+				context.player->SetPosition(position);
+				context.playerPosition = position;
+			}
+			ImGui::TextDisabled("Runtime position only. Restart restores PlayerStart.");
+		}
+		ImGui::End();
+	}
+#endif
+
 	DrawCollision(context);
 	if (!context.autoMapReload || !context.mapReloadStatus || !context.levelData ||
 		!context.selectedObjectIndex) {

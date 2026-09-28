@@ -12,7 +12,9 @@ class Object3dCommon;
 class CarryableMirror
 {
 public:
-	void Initialize(
+	// ModelとColliderの初期化に成功した時だけtrueを返します。
+	// falseならStageは鏡なしで続行せず、原因を初期化時に止められます。
+	bool Initialize(
 		Object3dCommon* object3dCommon,
 		const std::string& modelName,
 		const Vector3& startPosition,
@@ -52,12 +54,13 @@ private:
 	float width_ = 1.4f;
 	float height_ = 1.0f;
 	float yaw_ = 0.0f;
-	float pickupDistance_ = 2.5f;
+	// 横持ちから置いた直後の鏡も、同じ位置から拾い直せる距離です。
+	float pickupDistance_ = 4.0f;
 	float holdDistance_ = 1.8f;
-	// 縦向きMirrorをPlayerの左前へ寄せ、Player本体と重ならず板として見える位置にします。
-	float verticalHoldSideOffset_ = -1.75f;
+	// 0ならPlayerの正面です。左右へずらしたい場合だけ、この値を変更します。
+	float verticalHoldSideOffset_ = 0.0f;
 	// 水平MirrorはPlayerから離して、前方の上下Lightを受けやすくします。
-	float horizontalHoldDistance_ = 2.70f;
+	float horizontalHoldDistance_ = 3.40f;
 	float holdHeight_ = 0.5f;
 	// Playerが旋回した時に、鏡が目標方向へ追従する速さです。
 	float holdTurnFollowSpeed_ = 9.0f;

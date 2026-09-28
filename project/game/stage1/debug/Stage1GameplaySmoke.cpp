@@ -527,6 +527,29 @@ void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
 	gameplaySmokeDoorStartsClosed_ =
 		gameplaySmokeDoorStartsClosed_ ||
 		(!context.isDoorSwitchReceivingLight && context.doorOpenAmount <= 0.01f);
+	// 置いたMirrorのOBBが、実際にPlayerへ渡す障害物一覧へ含まれるかを確認します。
+	// Collider単体の存在だけでなく、StageCollisionWorldへの登録漏れもここで検出できます。
+	if (gameplaySmokeDroppedMirror_ && carryableMirror_ &&
+		!carryableMirror_->IsCarried() && context.solidObbs) {
+		const MyMath::OBB& droppedMirrorObb = carryableMirror_->GetObb();
+		gameplaySmokeDroppedMirrorIsSolid_ = std::any_of(
+			context.solidObbs->begin(),
+			context.solidObbs->end(),
+			[&droppedMirrorObb](const MyMath::OBB& solidObb)
+			{
+				const Vector3 centerDifference{
+					solidObb.center.x - droppedMirrorObb.center.x,
+					solidObb.center.y - droppedMirrorObb.center.y,
+					solidObb.center.z - droppedMirrorObb.center.z,
+				};
+				const Vector3 sizeDifference{
+					solidObb.size.x - droppedMirrorObb.size.x,
+					solidObb.size.y - droppedMirrorObb.size.y,
+					solidObb.size.z - droppedMirrorObb.size.z,
+				};
+				return Length(centerDifference) < 0.001f && Length(sizeDifference) < 0.001f;
+			});
+	}
 	// 床の端へ歩かせる検証は、Stageの床形状が変わると成立しません。
 	// 開始演出後に床から離れた位置へ一度だけ移し、重力と落下だけを独立して確認します。
 	if (gameplaySmokeSawGrounded_ &&
@@ -561,6 +584,7 @@ void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
 		gameplaySmokeEnemyManagerSpawn_ &&
 		gameplaySmokePickedUpMirror_ &&
 		gameplaySmokeDroppedMirror_ &&
+		gameplaySmokeDroppedMirrorIsSolid_ &&
 		gameplaySmokeCarryMirrorReflectedLaser_ &&
 		gameplaySmokeCarryMirrorBackfaceIgnored_ &&
 		gameplaySmokeCarryMirrorHorizontalControl_ &&
@@ -588,6 +612,7 @@ void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
 			<< " enemyManager=" << gameplaySmokeEnemyManagerSpawn_
 			<< " picked=" << gameplaySmokePickedUpMirror_
 			<< " dropped=" << gameplaySmokeDroppedMirror_
+			<< " droppedMirrorSolid=" << gameplaySmokeDroppedMirrorIsSolid_
 			<< " carryLaser=" << gameplaySmokeCarryMirrorReflectedLaser_
 			<< " carryBackface=" << gameplaySmokeCarryMirrorBackfaceIgnored_
 			<< " carryHorizontal=" << gameplaySmokeCarryMirrorHorizontalControl_
