@@ -38,6 +38,8 @@ public:
 	struct UpdateContext
 	{
 		const StageHazardLights* hazardLights = nullptr;
+		// Stage1がPlayerへ渡す障害物一覧です。持てるMirrorが床にある時だけ含まれます。
+		const std::vector<MyMath::OBB>* solidObbs = nullptr;
 		bool isDoorSwitchReceivingLight = false;
 		float doorOpenAmount = 0.0f;
 	};
@@ -83,6 +85,8 @@ private:
 	bool gameplaySmokePickedUpMirror_ = false;
 	// 携帯MirrorをEキー操作で置けたかを記録します。
 	bool gameplaySmokeDroppedMirror_ = false;
+	// 床へ置いた携帯Mirrorが、Stage1のPlayer用障害物一覧に含まれたかを記録します。
+	bool gameplaySmokeDroppedMirrorIsSolid_ = false;
 	// 携帯MirrorがLaserを反射したかを記録します。
 	bool gameplaySmokeCarryMirrorReflectedLaser_ = false;
 	// 携帯Mirrorの裏面がLaserを反射しないかを記録します。

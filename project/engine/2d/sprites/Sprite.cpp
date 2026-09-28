@@ -180,6 +180,13 @@ void Sprite::Draw()
 
 //画像をセットする関数
 void Sprite::SetTexture(const std::string& textureFilePath) {
+	// Loadingなど、Sceneが事前読込していない画像も、サイズを参照する前に必ず読み込みます。
+	// 同じ画像の再読込はTextureManagerが省くため、Sprite側でGPU資源を重複所有しません。
+	const bool isLoaded = TextureManager::GetInstance()->LoadTexture(textureFilePath);
+	assert(isLoaded);
+	if (!isLoaded) {
+		return;
+	}
 	//TextureManagerから、その画像のインデックス番号を取得
 	textureFilePath_ = textureFilePath;
 

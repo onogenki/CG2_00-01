@@ -138,6 +138,7 @@ void Object3dGpuData::CreateCameraData(DirectXCommon* dxCommon)
 	cameraResource_ = dxCommon->CreateBufferResource(sizeof(Object3d::CameraForGPU));
 	cameraResource_->Map(0, nullptr, reinterpret_cast<void**>(&cameraData_));
 	cameraData_->worldPosition = { 0.0f, 0.0f, 10.0f };
+	cameraData_->backFaceBrightness = 1.0f;
 }
 
 // 壁越しシルエット専用の色を、Objectごとに変更できるConstant Bufferへ保存します。

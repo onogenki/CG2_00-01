@@ -7,7 +7,11 @@
 #include <fstream>
 
 // 環境変数を確認済みのDebugSceneから呼ばれ、UI自動確認の初期状態を作ります。
-void DebugUiSmoke::Start(State& state, const std::string& timestamp)
+void DebugUiSmoke::Start(
+	State& state,
+	const std::string& timestamp,
+	bool isAnimationPreviewTest,
+	bool isAnimationSceneTest)
 {
 	state.isEnabled = true;
 	state.isFinished = false;
@@ -15,6 +19,9 @@ void DebugUiSmoke::Start(State& state, const std::string& timestamp)
 	state.frame = 0;
 	state.stage = 0;
 	state.modelFile.clear();
+	state.isAnimationPreviewTest = isAnimationPreviewTest;
+	state.isAnimationSceneTest = isAnimationSceneTest;
+	state.animationObjectIndex = 0;
 
 	std::error_code errorCode;
 	std::filesystem::create_directories("logs", errorCode);
@@ -45,16 +52,45 @@ void DebugUiSmoke::Update(State& state, const Context& context)
 		const auto modelIt = std::find_if(
 			context.modelLibrary->begin(),
 			context.modelLibrary->end(),
-			[](const SceneEditor::ShelfEntry& entry)
+			[&state](const SceneEditor::ShelfEntry& entry)
 			{
+				if (state.isAnimationPreviewTest || state.isAnimationSceneTest) {
+					return entry.canLoad && entry.hasAnimation && entry.fileName == "walk.gltf";
+				}
 				return entry.canLoad && !entry.hasAnimation && !entry.isTexture;
 			});
 		if (modelIt == context.modelLibrary->end()) {
-			Finish(state, false, "No loadable non-animation model was found in resources.");
+			Finish(
+				state,
+				false,
+				(state.isAnimationPreviewTest || state.isAnimationSceneTest)
+					? "walk.gltf was not found as a loadable animation model."
+					: "No loadable non-animation model was found in resources.");
 			return;
 		}
 
 		state.modelFile = modelIt->fileName;
+		if (state.isAnimationSceneTest) {
+			// 棚の「Add Selected」と同じ生成・登録・選択を通し、通常のScene描画を保ちます。
+			const size_t normalBefore = context.normalObjects->size();
+			const size_t animationBefore = context.animationObjects->size();
+			if (!context.addModel(state.modelFile) ||
+				context.normalObjects->size() != normalBefore ||
+				context.animationObjects->size() != animationBefore + 1) {
+				Finish(state, false, "walk.gltf was not added to the scene animation list.");
+				return;
+			}
+			state.animationObjectIndex = animationBefore;
+			const SelectionState selection = context.getSelectionState();
+			if (!selection.hasSelectedObject || !selection.selectedObjectIsAnimation ||
+				selection.selectedObjectIndex != state.animationObjectIndex) {
+				Finish(state, false, "Scene walk.gltf was not selected for inspector/gizmo editing.");
+				return;
+			}
+			state.stage = 1;
+			state.frame = 0;
+			return;
+		}
 		if (!context.enterModelPreview(state.modelFile)) {
 			Finish(state, false, "EnterModelPreview failed for " + state.modelFile);
 			return;
@@ -70,9 +106,35 @@ void DebugUiSmoke::Update(State& state, const Context& context)
 			Finish(state, false, "Preview AABB could not be built.");
 			return;
 		}
+		if (state.isAnimationPreviewTest) {
+			// 単体PreviewはほかのModelや2D Spriteに隠れないため、walk.gltfの描画確認に使います。
+			state.isPendingCapture = true;
+			state.stage = 2;
+			state.frame = 0;
+			return;
+		}
 
 		state.stage = 1;
 		state.frame = 0;
+		return;
+	}
+
+	if (state.isAnimationSceneTest) {
+		// Scene本来のUpdateを30回・90回通した画像を残し、静止Previewだけで判断しないようにします。
+		if (context.getPreviewState().isModelPreviewMode ||
+			state.animationObjectIndex >= context.animationObjects->size()) {
+			Finish(state, false, "The scene animation path was replaced or the added model was removed.");
+			return;
+		}
+		const Object3d* addedObject = context.animationObjects->at(state.animationObjectIndex).get();
+		if (!addedObject || addedObject->GetModelName() != state.modelFile ||
+			!addedObject->IsSkeletal() || !addedObject->IsAnimating() || addedObject->GetAnimationDuration() <= 0.0f) {
+			Finish(state, false, "Added walk.gltf has no active skeletal animation.");
+			return;
+		}
+		if ((state.stage == 1 && state.frame == 30) || (state.stage == 2 && state.frame == 90)) {
+			state.isPendingCapture = true;
+		}
 		return;
 	}
 
@@ -197,11 +259,36 @@ void DebugUiSmoke::UpdateAfterDraw(State& state, const Context& context)
 		return;
 	}
 
+	const std::string capturePrefix = state.isAnimationSceneTest
+		? "CG2_walk_scene_frame" + std::to_string(state.frame) + "_"
+		: "CG2_ui_smoke_";
 	const std::filesystem::path screenshotPath =
 		context.gameViewCapture->GetCaptureDirectory("Screenshots") /
-		("CG2_ui_smoke_" + context.gameViewCapture->MakeTimestampString() + ".bmp");
+		(capturePrefix + context.gameViewCapture->MakeTimestampString() + ".bmp");
 	if (!context.gameViewCapture->SavePixelsAsBmp(screenshotPath, pixels, width, height)) {
 		Finish(state, false, "SavePixelsAsBmp failed: " + screenshotPath.string());
+		return;
+	}
+	if (state.isAnimationSceneTest) {
+		// 保存成功と画面上の可視性は別なので、ログは描画確認用画像を作れた事実だけを記録します。
+		const Object3d& addedObject = *context.animationObjects->at(state.animationObjectIndex);
+		const Vector3& position = addedObject.GetTranslate();
+		const std::string captureMessage = "scene=DEBUG model=" + state.modelFile +
+			" frame=" + std::to_string(state.frame) +
+			" animationTime=" + std::to_string(addedObject.GetAnimationTime()) +
+			" animationDuration=" + std::to_string(addedObject.GetAnimationDuration()) +
+			" position=" + std::to_string(position.x) + "," + std::to_string(position.y) + "," + std::to_string(position.z) +
+			" screenshot=" + screenshotPath.string();
+		state.isPendingCapture = false;
+		if (state.stage == 1) {
+			std::ofstream log(state.logPath, std::ios::app);
+			if (log) {
+				log << "CAPTURE: " << captureMessage << '\n';
+			}
+			state.stage = 2;
+			return;
+		}
+		Finish(state, true, "Scene animation capture completed; inspect both images. " + captureMessage);
 		return;
 	}
 

@@ -40,6 +40,7 @@ public:
 	void Initialize();
 	void Update();
 
+	// 音源を共有キャッシュへ読み込みます。再生は行いません。読込失敗時はfalseです。
 	bool LoadFile(const std::string& filename);
 	// 単発の効果音を指定音量で再生します。SoundEffectPlayerはAudioMixerのSE音量を渡します。
 	bool PlayWave(const std::string& filename, float volume = 1.0f);
@@ -52,6 +53,7 @@ public:
 	// Pause中でもVoiceを破棄せず、同じ再生位置から戻せます。
 	bool PauseWave(VoiceId voiceId);
 	bool ResumeWave(VoiceId voiceId);
+	// 未終了のVoiceが残っているかを返します。Pause中もtrueで、音が出ていることとは別です。
 	bool IsVoicePlaying(VoiceId voiceId) const;
 	void Unload();
 
@@ -77,5 +79,9 @@ private:
 
 	// 単発音とループ音の共通生成を行い、成功時は操作用の番号を返します。
 	VoiceId PlayWaveInternal(const std::string& filename, bool isLooping, float volume);
+	// 一覧をロックして既存VoiceのCallbackを借ります。未登録番号で空のVoiceは作りません。
+	// 保持するのはCallbackの寿命だけです。Voice操作と破棄は従来どおりゲーム側の同じスレッドで行います。
+	std::shared_ptr<SourceVoiceCallback> FindVoiceCallback(VoiceId voiceId) const;
+	// 完了通知を受けたVoiceを一覧から外して破棄します。FrameworkのUpdateから呼びます。
 	void ReleaseFinishedVoices();
 };

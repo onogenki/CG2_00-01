@@ -1,40 +1,10 @@
-// スキニング済み頂点をワールド・クリップ空間へ変換する頂点シェーダー。
 struct Well
 {
     float32_t4x4 skeletonSpaceMatrix;
     float32_t4x4 skeletonSpaceInverseTransposeMatrix;
 };
 
-//SkinningObject3d.VS.hlslで作ったものと同じPalette
 StructuredBuffer<Well> gMatrixPalette : register(t0);
-//VertexBufferViewのstream0として利用していた入力頂点
-StructuredBuffer<Vertex> gInputVertices : register(t1);
-//VertexBufferViewのStream1として利用していた入力インフルエンス
-StructuredBuffer<VertexInfluence> gInfluences : register(t2);
-//Skinning計算後の頂点データ。SkinnedVertex
-RWStructuredBuffer<vertex> gOutputVertices : register(u0);
-//Skinningに関するちょっとした情報
-ConstantBuffer<SkinningInformation> gSkinningInformation : register(b0);
-
-RWStructuredBuffer<Vertex> gOutputVertices : register(u0);
-
-resourceDesc.Flags=D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-
-struct vertex
-{
-    float32_t4 position;
-    float32_t2 texcoord;
-    float32_t3 normal;
-};
-struct VertexInfluence
-{
-    float32_t4 weight;
-    int32_t4 index;
-};
-struct SkinningInformation
-{
-    uint32_t numVertices;
-};
 
 struct TransformationMatrix
 {
@@ -68,39 +38,31 @@ struct Skinned
     float32_t3 normal;
 };
 
-// 最大4個のジョイント行列を重み付きで合成する。
+// 頂点へ最大4本のBone行列を重み付きで適用し、Animation後の頂点を作ります。
 Skinned Skinning(VertexShaderInput input)
 {
     Skinned skinned;
-    //Skinningの処理をする
-    //位置の変換
     skinned.position = mul(input.position, gMatrixPalette[input.index.x].skeletonSpaceMatrix) * input.weight.x;
     skinned.position += mul(input.position, gMatrixPalette[input.index.y].skeletonSpaceMatrix) * input.weight.y;
     skinned.position += mul(input.position, gMatrixPalette[input.index.z].skeletonSpaceMatrix) * input.weight.z;
     skinned.position += mul(input.position, gMatrixPalette[input.index.w].skeletonSpaceMatrix) * input.weight.w;
-    skinned.position.w = 1.0f; //確実に1を入れる
-    //法線の変換
-    skinned.normal = mul(input.normal, (float32_t3x3) gMatrixPalette[input.index.x].skeletonSpaceInverseTransposeMatrix) * input.weight.x;
-    skinned.normal += mul(input.normal, (float32_t3x3) gMatrixPalette[input.index.y].skeletonSpaceInverseTransposeMatrix) * input.weight.y;
-    skinned.normal += mul(input.normal, (float32_t3x3) gMatrixPalette[input.index.z].skeletonSpaceInverseTransposeMatrix) * input.weight.z;
-    skinned.normal += mul(input.normal, (float32_t3x3) gMatrixPalette[input.index.w].skeletonSpaceInverseTransposeMatrix) * input.weight.w;
-    skinned.normal = normalize(skinned.normal); //正規化して戻してあげる
-    
+    skinned.position.w = 1.0f;
+
+    skinned.normal = mul(input.normal, (float32_t3x3)gMatrixPalette[input.index.x].skeletonSpaceInverseTransposeMatrix) * input.weight.x;
+    skinned.normal += mul(input.normal, (float32_t3x3)gMatrixPalette[input.index.y].skeletonSpaceInverseTransposeMatrix) * input.weight.y;
+    skinned.normal += mul(input.normal, (float32_t3x3)gMatrixPalette[input.index.z].skeletonSpaceInverseTransposeMatrix) * input.weight.z;
+    skinned.normal += mul(input.normal, (float32_t3x3)gMatrixPalette[input.index.w].skeletonSpaceInverseTransposeMatrix) * input.weight.w;
+    skinned.normal = normalize(skinned.normal);
     return skinned;
 }
 
 VertexShaderOutput main(VertexShaderInput input)
 {
-    //まずSkinning計算を行って、Skinning後の頂点情報を手に入れる。
-    //ここでの頂点もSkeletonSpace
     VertexShaderOutput output;
     Skinned skinned = Skinning(input);
-    
-    //Skinning結果を使って変換
     output.position = mul(skinned.position, gTransformationMatrix.WVP);
     output.worldPosition = mul(skinned.position, gTransformationMatrix.World).xyz;
     output.texcoord = input.texcoord;
-	// 非一様スケールでも正しい法線になるよう逆転置行列を使う。
-	output.normal = normalize(mul(skinned.normal, (float32_t3x3) gTransformationMatrix.WorldInverseTranspose));
+    output.normal = normalize(mul(skinned.normal, (float32_t3x3)gTransformationMatrix.WorldInverseTranspose));
     return output;
 }

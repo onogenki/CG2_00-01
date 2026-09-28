@@ -1,5 +1,4 @@
 #include "TitleScene.h"
-#include "Audio.h"
 #include "Camera.h"
 #include "CameraManager.h"
 #include "DirectXCommon.h"
@@ -9,15 +8,12 @@
 #include "SceneRenderPipeline.h"
 #include "SkyBox.h"
 #include "TextureManager.h"
-#include "Object3dFactory.h"
 #include "Object3dRenderContext.h"
 #include "PostEffect.h"
 #include "ImGuiManager.h"
 #include "Input.h"
 #include "SceneManager.h"
 #include <dinput.h>
-#include <algorithm>
-#include <cstddef>
 #include <cmath>
 using namespace MyMath;
 
@@ -27,90 +23,31 @@ TitleScene::TitleScene() = default;
 // TitleSceneが所有する前方宣言型を、完全な型を読み込んだ場所で解放します。
 TitleScene::~TitleScene() = default;
 
-// Shelfから選ばれたモデルを作り、通常モデルまたはAnimationモデルの一覧へ追加します。
-bool TitleScene::AddModelToTitle(const std::string& fileName)
-{
-	auto object = Object3dFactory::Create(object3dCommon, fileName, true);
-	if (!object) {
-		return false;
-	}
-	// Camera・LightはUpdateのObject3dRenderContextが全モデルへ一括設定します。
-	// 生成時はTitle固有の位置・Animationだけを決めます。
-	// 追加順にX方向へずらし、同じ場所にモデルが重なって見えない状態を防ぎます。
-	const float offset = static_cast<float>(normalObjects_.size() + animationObjects_.size()) * 1.4f;
-	object->SetTranslate({ -2.0f + offset, 0.0f, 6.0f });
-	object->SetScale({ 1.0f, 1.0f, 1.0f });
-	if (object->IsSkeletal()) {
-		Object3dFactory::LoadAndPlayAnimation(*object, fileName);
-		animationObjects_.push_back(std::move(object));
-	} else {
-		normalObjects_.push_back(std::move(object));
-	}
-	return true;
-}
-
-// Shelfから選ばれたTextureをSpriteにし、Title画面のグリッド位置へ追加します。
-bool TitleScene::AddTextureToTitle(const std::string& textureFilePath)
-{
-	auto sprite = std::make_unique<Sprite>();
-	sprite->Initialize(spriteCommon, textureFilePath);
-	sprite->SetAnchorPoint({ 0.5f, 0.5f });
-	const Vector2 originalSize = sprite->GetSize();
-	// 縦横比は保ったまま、長辺だけを180px以内へ縮小します。
-	const float largestSide = (std::max)(originalSize.x, originalSize.y);
-	if (largestSide > 180.0f && largestSide > 0.0f) {
-		const float scale = 180.0f / largestSide;
-		sprite->SetSize({ originalSize.x * scale, originalSize.y * scale });
-	}
-	//初期スプライトを数えず、追加したテクスチャだけを並べる
-	// 追加分だけを0番から数え、4列ごとのグリッド位置へ並べます。
-	const size_t addedSpriteIndex = addedSprites_.size() - baseSpriteCount_;
-	const float x = 180.0f + static_cast<float>(addedSpriteIndex % 4) * 190.0f;
-	const float y = 160.0f + static_cast<float>(addedSpriteIndex / 4) * 160.0f;
-	sprite->SetPosition({ x, y });
-	addedSprites_.push_back(std::move(sprite));
-	return true;
-}
-
-// Model Shelfから追加した要素だけを消し、Title開始時の背景モデル・Spriteは残します。
-void TitleScene::ClearAddedTitleObjects()
-{
-	if (normalObjects_.size() > baseNormalObjectCount_) {
-		normalObjects_.resize(baseNormalObjectCount_);
-	}
-	if (animationObjects_.size() > baseAnimationObjectCount_) {
-		animationObjects_.resize(baseAnimationObjectCount_);
-	}
-	if (addedSprites_.size() > baseSpriteCount_) {
-		addedSprites_.resize(baseSpriteCount_);
-	}
-}
-
-// TitleEditorへ、TitleSceneが所有する一覧とTitle固有の生成・削除ルールを渡します。
+// TitleEditorへManager所有の一覧を貸し、生成・削除操作も同じManagerへ渡します。
 TitleEditor::Context TitleScene::MakeTitleEditorContext()
 {
 	TitleEditor::Context context{};
 	context.camera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
-	context.normalObjects = &normalObjects_;
-	context.animationObjects = &animationObjects_;
-	context.sprites = &addedSprites_;
+	context.normalObjects = &titleObjects_.GetNormalObjects();
+	context.animationObjects = &titleObjects_.GetAnimationObjects();
+	context.sprites = &titleObjects_.GetSprites();
 	context.directionalLight = &directionalLight_;
 	context.pointLight = &pointLight_;
 	context.spotLight = &spotLight_;
-	context.baseNormalObjectCount = baseNormalObjectCount_;
-	context.baseAnimationObjectCount = baseAnimationObjectCount_;
-	context.baseSpriteCount = baseSpriteCount_;
+	context.baseNormalObjectCount = titleObjects_.GetBaseNormalObjectCount();
+	context.baseAnimationObjectCount = titleObjects_.GetBaseAnimationObjectCount();
+	context.baseSpriteCount = titleObjects_.GetBaseSpriteCount();
 	context.addModel = [this](const std::string& fileName)
 	{
-		return AddModelToTitle(fileName);
+		return titleObjects_.AddModel(object3dCommon, fileName);
 	};
 	context.addTexture = [this](const std::string& textureFilePath)
 	{
-		return AddTextureToTitle(textureFilePath);
+		return titleObjects_.AddTexture(spriteCommon, textureFilePath);
 	};
 	context.clearAdded = [this]()
 	{
-		ClearAddedTitleObjects();
+		titleObjects_.ClearAdded();
 	};
 	return context;
 }
@@ -164,31 +101,13 @@ void TitleScene::InitializeDefaultLighting()
 	spotLight_.cosFalloffStart = 1.0f;
 }
 
-// Titleの初期3DモデルとSpriteを作り、Edit Viewで保護する件数を記録します。
+// Titleの生成はManagerへ任せ、Sceneは成功後のUI選択だけを決めます。
 bool TitleScene::InitializeTitleObjects()
 {
-	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
-	auto terrain = Object3dFactory::Create(object3dCommon, "plane.obj");
-	if (!terrain) {
+	spriteCommon = SpriteCommon::GetInstance();
+	if (!titleObjects_.Initialize(object3dCommon, spriteCommon, DirectXCommon::GetInstance())) {
 		return false;
 	}
-	// Camera・LightはUpdateのObject3dRenderContextが通常モデル一覧へ一括設定します。
-	terrain->GetTransform().translate = { 1.0f, -2.0f, 10.0f };
-	normalObjects_.push_back(std::move(terrain));
-	baseNormalObjectCount_ = normalObjects_.size();
-	baseAnimationObjectCount_ = animationObjects_.size();
-
-	spriteCommon = SpriteCommon::GetInstance();
-	spriteCommon->Initialize(dxCommon);
-
-	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
-
-	//初期スプライトもInspectorで編集できる一覧へ入れる
-	auto titleSprite = std::make_unique<Sprite>();
-	titleSprite->Initialize(spriteCommon, "Resources/uvChecker.png");
-	titleSprite->SetPosition({ 0.0f, 0.0f });
-	addedSprites_.push_back(std::move(titleSprite));
-	baseSpriteCount_ = addedSprites_.size();
 	titleEditor_.SelectSprite(0);
 	return true;
 }
@@ -214,6 +133,7 @@ void TitleScene::Update()
 	UpdateSceneTransition(isGameViewActive);
 }
 
+// Cameraを更新してから、RenderContextでManager所有の描画対象を準備します。
 void TitleScene::UpdateSceneContent()
 {
 	// Cameraの更新は、モデルがCameraを参照する前に完了させます。
@@ -227,16 +147,17 @@ void TitleScene::UpdateSceneContent()
 		directionalLight_,
 		pointLight_,
 		spotLight_);
-	renderContext.UpdateObjects(normalObjects_);
-	renderContext.UpdateObjects(animationObjects_);
+	renderContext.UpdateObjects(titleObjects_.GetNormalObjects());
+	renderContext.UpdateObjects(titleObjects_.GetAnimationObjects());
 
-	for (auto& sprite : addedSprites_) {
+	for (auto& sprite : titleObjects_.GetSprites()) {
 		sprite->Update();
 	}
 	skyBox_->Update();
 }
 
 
+// 更新済みの描画対象をEditorへ貸し、最後にViewport操作を受け付けます。
 void TitleScene::UpdateEditorUi(bool isGameViewActive)
 {
 	// Titleの編集UIは、3DモデルとSpriteを更新した後の状態を表示します。
@@ -249,6 +170,7 @@ void TitleScene::UpdateEditorUi(bool isGameViewActive)
 }
 
 
+// 入力先がGame Viewの時だけ、従来のキーで次のSceneを予約します。
 void TitleScene::UpdateSceneTransition(bool isGameViewActive)
 {
 	// Game Viewが操作対象でない時は、Editor操作をScene切替入力として扱いません。
@@ -275,14 +197,14 @@ void TitleScene::Draw()
 	// 共通PipelineがRenderTextureへの描画開始を行い、Titleは描画対象だけを並べます。
 	SceneRenderPipeline::Begin(DirectXCommon::GetInstance());
 
-	SceneRenderPipeline::DrawObjects(object3dCommon, normalObjects_);
-	SceneRenderPipeline::DrawObjects(object3dCommon, animationObjects_);
+	SceneRenderPipeline::DrawObjects(object3dCommon, titleObjects_.GetNormalObjects());
+	SceneRenderPipeline::DrawObjects(object3dCommon, titleObjects_.GetAnimationObjects());
 	//skyBox描画
 	if (skyBox_) {
 		skyBox_->Draw();
 	}
 
-	SceneRenderPipeline::DrawSprites(spriteCommon, addedSprites_);
+	SceneRenderPipeline::DrawSprites(spriteCommon, titleObjects_.GetSprites());
 
 	// PostEffect・SwapChain・ImGui・Presentは、全Scene共通のPipelineへ任せます。
 	SceneRenderPipeline::End(
@@ -294,14 +216,9 @@ void TitleScene::Finalize()
 {
 	//GPUの完了待ち
 	DirectXCommon::GetInstance()->WaitForGPU();
-	addedSprites_.clear();
+	titleObjects_.Finalize();
 	skyBox_.reset();
-	normalObjects_.clear();
-	animationObjects_.clear();
 	titleEditor_.Finalize();
-	baseNormalObjectCount_ = 0;
-	baseAnimationObjectCount_ = 0;
-	baseSpriteCount_ = 0;
 	mainCamera.reset();
 	cameraManager.reset();
 	isFinished_ = false;

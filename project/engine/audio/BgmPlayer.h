@@ -16,22 +16,28 @@ public:
 	void Stop(float fadeOutSeconds = 0.0f);
 	void Pause();
 	void Resume();
-	// 次のUpdateを待たず、指定音量へ即座に変更します。
+	// フェードを終え、曲の指定音量×Mixer音量を次のUpdateを待たずVoiceへ反映します。
 	void SetVolume(float volume);
 	// フェード中の音量を更新します。SceneのUpdateから一度だけ呼びます。
 	void Update(float deltaTime);
 
+	// 未終了のVoiceを保持しているかを返します。Pause中もtrueなのでIsPausedと併せて使います。
 	bool IsPlaying() const;
 	bool IsPaused() const { return isPaused_; }
 	const std::string& GetFilename() const { return filename_; }
 
 private:
+	// Frameworkが初期化した共有Audioを借ります。BGM終了時はStopでVoice番号を返却します。
 	Audio* audio_ = nullptr;
+	// Audioが所有する一曲分の再生番号です。この部品がAudioやVoiceをdeleteすることはありません。
 	Audio::VoiceId voiceId_ = Audio::kInvalidVoiceId;
+	// 再生を開始できた音源のパスです。
 	std::string filename_;
+	// Mixer倍率を掛ける前の曲音量と、フェードの目標値・一秒当たりの変化量です。
 	float currentVolume_ = 1.0f;
 	float targetVolume_ = 1.0f;
 	float fadeSpeed_ = 0.0f;
+	// フェード終了時にStopを呼ぶかと、Pauseでフェードも止めているかを表します。
 	bool stopWhenSilent_ = false;
 	bool isPaused_ = false;
 

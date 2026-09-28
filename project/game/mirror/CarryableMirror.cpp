@@ -9,7 +9,7 @@
 
 using namespace MyMath;
 
-void CarryableMirror::Initialize(
+bool CarryableMirror::Initialize(
 	Object3dCommon* object3dCommon,
 	const std::string& modelName,
 	const Vector3& startPosition,
@@ -20,15 +20,18 @@ void CarryableMirror::Initialize(
 	height_ = (std::max)(height, 0.1f);
 	// 値として所有するMirrorモデルも、Factoryの共通初期化経路を使います。
 	if (!Object3dFactory::InitializeObject(object_, object3dCommon, modelName)) {
-		return;
+		return false;
 	}
-	// 小型鏡は景色を映さず、銀色に近い明るい板として表示します。
+	// 持てるMirrorは景色を映さないLaser用の鏡です。UVチェッカーではなく、反射前の鏡らしい明るい板を表示します。
 	object_.SetTextureOverride("resources/white.png");
+	// Laserを反射しない裏側だけを少し暗くし、持ち方にかかわらず表裏を区別します。
+	object_.SetBackFaceBrightness(0.60f);
 	// 小型Mirrorも表側だけLaserを反射します。
 	mirror_.SetReflectBackface(false);
-	// plane.objの板に厚みを持たせ、Playerが鏡をすり抜けないようにします。
+	// 薄い鏡板と同じ形をColliderにも使い、見た目と当たり判定を一致させます。
 	collider_.SetLocalShape({}, { 1.0f, 1.0f, 0.05f });
 	ApplyTransform(startPosition, 0.0f, 3.14159265f);
+	return true;
 }
 
 void CarryableMirror::Update(
@@ -101,12 +104,19 @@ void CarryableMirror::Update(
 			0.0f,
 			std::cos(heldYaw),
 		};
+		// 左右の調整値が0なら、縦向きMirrorもPlayerの正面に置きます。
+		const Vector3 playerRight{
+			playerForward.z,
+			0.0f,
+			-playerForward.x,
+		};
 		const float heldDistance = isHorizontalHoldMode_ ? horizontalHoldDistance_ : holdDistance_;
 		const float heldHeight = isHorizontalHoldMode_ ? holdHeight_ * 0.70f : holdHeight_;
+		const float heldSideOffset = isHorizontalHoldMode_ ? 0.0f : verticalHoldSideOffset_;
 		const Vector3 heldPosition{
-			playerPosition.x + playerForward.x * heldDistance,
+			playerPosition.x + playerForward.x * heldDistance + playerRight.x * heldSideOffset,
 			playerPosition.y + heldHeight,
-			playerPosition.z + playerForward.z * heldDistance,
+			playerPosition.z + playerForward.z * heldDistance + playerRight.z * heldSideOffset,
 		};
 		// Playerの正面から来るLaserを反射するため、板の表側もPlayerの正面へ向けます。
 		const float targetYaw = heldYaw;
@@ -137,11 +147,24 @@ void CarryableMirror::SetDroppedPosition(const Vector3& position)
 	ApplyTransform(position, 0.0f, 3.14159265f);
 }
 
+void CarryableMirror::SetCarried(bool isCarried)
+{
+	isCarried_ = isCarried;
+	// 持ち直す時は、前回の構え・傾きを残さず通常の縦向きMirrorから始めます。
+	if (isCarried_) {
+		aimYawOffset_ = 0.0f;
+		isHorizontalHoldMode_ = false;
+		horizontalTilt_ = 0.0f;
+	}
+}
+
 void CarryableMirror::ApplyTransform(const Vector3& position, float pitch, float yaw)
 {
+	// 引数で受け取った向きを保持し、見た目・Laser用Mirror・Colliderを同じ向きへそろえます。
 	yaw_ = yaw;
 	object_.SetTranslate(position);
 	object_.SetRotate({ pitch, yaw_, 0.0f });
+	// plane.objは幅・高さが2.0なので、半分のScaleで指定サイズへそろえます。
 	object_.SetScale({ width_ * 0.5f, height_ * 0.5f, 1.0f });
 
 	mirror_.SetCenter(position);

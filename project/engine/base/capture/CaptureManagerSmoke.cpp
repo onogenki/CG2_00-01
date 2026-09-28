@@ -58,15 +58,18 @@ void CaptureManager::UpdateSmokeBeforeCapture()
 
 	if (sceneName == "STAGE1") {
 		++smokeDebugFrame_;
-		// 最初の静止状態と、Playerが移動した後の状態をそれぞれ保存します。
+		// 開始演出中・Player移動後・通常Cameraへの引継ぎ後をそれぞれ保存します。
 		const bool captureInitialState =
 			smokeDebugFrame_ >= 5 && smokeDebugFrame_ <= 8;
 		const bool captureMovedState =
 			smokeDebugFrame_ >= 60 && smokeDebugFrame_ <= 63;
-		if (captureInitialState || captureMovedState) {
+		// StageStartのCamera移動が終わった後も撮影し、開始位置の配置物を確認します。
+		const bool captureGameplayState =
+			smokeDebugFrame_ >= 300 && smokeDebugFrame_ <= 303;
+		if (captureInitialState || captureMovedState || captureGameplayState) {
 			QueuePhotoCapture();
 		}
-		if (smokeDebugFrame_ == 90) {
+		if (smokeDebugFrame_ == 340) {
 			std::error_code errorCode;
 			bool filesExist = !smokePhotoPaths_.empty();
 			for (const std::filesystem::path& path : smokePhotoPaths_) {

@@ -10,7 +10,6 @@
 #include "Input.h"
 #include "ImGuiManager.h"
 #include "LevelLoader.h"
-#include "ModelManager.h"
 #include "Object3dCommon.h"
 #include "Object3dFactory.h"
 #include "Object3dRenderContext.h"
@@ -19,6 +18,7 @@
 #include "SceneRenderPipeline.h"
 #include "SrvManager.h"
 #include "StageMapObjectIndex.h"
+#include "StageMirrorFactory.h"
 #include "StageReflectionRenderer.h"
 #include "StageSceneRenderer.h"
 #include "debug/StagePuzzleDebugUi.h"
@@ -58,11 +58,13 @@ void Stage1::Initialize()
 	// BGMの再生役だけを準備し、音声ファイルの読込はStage1画面の表示後まで遅らせます。
 	stageBgm_.Initialize(Audio::GetInstance());
 	InitializeDefaultLighting();
-	InitializeSharedModels();
 	if (!InitializeStageGimmicks()) {
 		return;
 	}
-	InitializeStageMap();
+	// JSONが読めない時に予備座標の鏡を表示しないよう、Stage開始をここで止めます。
+	if (!InitializeStageMap()) {
+		return;
+	}
 	if (!InitializePlayerAndCamera()) {
 		return;
 	}
@@ -100,13 +102,6 @@ void Stage1::InitializeDefaultLighting()
 	pointLight_.decay = 1.0f;
 }
 
-// PlayerとSwitchが共有するSphereモデルの見た目を、一度だけ設定します。
-void Stage1::InitializeSharedModels()
-{
-	// モデル自体の読込はPlayer・Mirrorを含め、すべてObject3dFactoryが担当します。
-	ModelManager::GetInstance()->LoadModel("sphere.obj");
-}
-
 // JSONの内容に関係なく必要な床・鏡・Laser・Switch・Doorを作成します。
 bool Stage1::InitializeStageGimmicks()
 {
@@ -124,12 +119,19 @@ bool Stage1::InitializeStageGimmicks()
 	floor_->SetTranslate({ 0.0f, -3.500001f, 5.0f });
 
 	carryableMirror_ = std::make_unique<CarryableMirror>();
-	carryableMirror_->Initialize(
+	if (!carryableMirror_->Initialize(
 		object3dCommon,
+		// 以前から携帯Mirrorに使っていた白い板Modelを使います。
 		"plane.obj",
 		{ -2.5f, -0.8f, 4.5f },
 		3.6f,
-		3.6f);
+		3.6f)) {
+		// 持てるMirrorが作れないStageは、見えないまま続行させません。
+		carryableMirror_.reset();
+		return false;
+	}
+	// 実際の開始位置はstage1.jsonのCarryableMirrorStartから反映します。
+	// ここではJSON読込に失敗した時だけ使う予備位置を渡し、勝手に所持状態へはしません。
 
 	// 通常床とは別に、Playerが持てない正方形の鏡床ギミックを配置します。
 	mirrorFloor_ = std::make_unique<FixedMirror>();
@@ -206,11 +208,13 @@ bool Stage1::InitializeStageGimmicks()
 }
 
 // Stage1用JSONとCSVを読み、ColliderとHot Reload監視を開始します。
-void Stage1::InitializeStageMap()
+bool Stage1::InitializeStageMap()
 {
 	stageMapHotReload_.SetFilePath(kStageMapFilePath);
 	stageMapChipHotReload_.SetFilePath(kStageMapChipFilePath);
-	ReloadStageMap();
+	if (!ReloadStageMap()) {
+		return false;
+	}
 	// 最初のPlayer更新より前に、閉じたDoorのColliderとLaser経路を作ります。
 	UpdateLightPuzzle(0.0f);
 	collisionWorld_.Rebuild({
@@ -223,6 +227,7 @@ void Stage1::InitializeStageMap()
 	});
 	stageMapHotReload_.Synchronize();
 	stageMapChipHotReload_.Synchronize();
+	return true;
 }
 
 // Player、通常追従Camera、開始演出を、この順番で作成します。
@@ -323,11 +328,14 @@ void Stage1::Update()
 	UpdateStageBgm(deltaTime);
 	// 本編のDoor・危険Lightの結果だけを、自動確認部品へ渡します。
 	gameplaySmoke_.Update(
-		{ &hazardLights_, lightPuzzle_.IsDoorSwitchReceivingLight(), lightPuzzle_.GetDoorOpenAmount() },
+		{
+			&hazardLights_,
+			&collisionWorld_.GetSolidObbs(),
+			lightPuzzle_.IsDoorSwitchReceivingLight(),
+			lightPuzzle_.GetDoorOpenAmount(),
+		},
 		deltaTime);
-	if (!isStageStartPlaying) {
-		UpdateMirrorGameplay();
-	}
+	UpdateMirrorGameplay();
 	UpdateLightPuzzle(deltaTime);
 	// 危険Lightの軌道・反射・Player接触は、Stage固有ギミックへまとめて任せます。
 	hazardLights_.Update(
@@ -712,81 +720,6 @@ void Stage1::ApplyStageStartSettings(
 	}
 }
 
-// JSONの固定Mirror一覧から、反射TextureとColliderを持つ実行中Mirror一覧を作成します。
-bool Stage1::CreateFixedMirrors(
-	const std::vector<const LevelLoader::ObjectData*>& mirrorDataList,
-	std::vector<std::unique_ptr<FixedMirror>>& outFixedMirrors)
-{
-	outFixedMirrors.clear();
-	outFixedMirrors.reserve(mirrorDataList.size());
-	for (const LevelLoader::ObjectData* mirrorData : mirrorDataList) {
-		if (!mirrorData) {
-			return false;
-		}
-
-		auto fixedMirror = std::make_unique<FixedMirror>();
-		if (!fixedMirror->Initialize(
-			object3dCommon,
-			DirectXCommon::GetInstance(),
-			SrvManager::GetInstance(),
-			mirrorData->fileName.empty() ? "plane.obj" : mirrorData->fileName,
-			mirrorData->translation,
-			mirrorData->rotation.y,
-			std::abs(mirrorData->scaling.x) * 2.0f,
-			std::abs(mirrorData->scaling.y) * 2.0f,
-			512)) {
-			return false;
-		}
-
-		if (mirrorData->hasCollider && mirrorData->collider.type == "BOX") {
-			fixedMirror->SetColliderShape(
-				mirrorData->collider.center,
-				{
-					std::abs(mirrorData->collider.size.x) * 0.5f,
-					std::abs(mirrorData->collider.size.y) * 0.5f,
-					std::abs(mirrorData->collider.size.z) * 0.5f,
-				});
-		}
-		outFixedMirrors.push_back(std::move(fixedMirror));
-	}
-	return true;
-}
-
-// EditorのTransform変更を、既存の固定MirrorとColliderへ再生成せず反映します。
-bool Stage1::ApplyFixedMirrorEdits(
-	const std::vector<const LevelLoader::ObjectData*>& mirrorDataList)
-{
-	if (fixedMirrors_.size() != mirrorDataList.size()) {
-		return false;
-	}
-
-	for (size_t index = 0; index < mirrorDataList.size(); ++index) {
-		const LevelLoader::ObjectData* mirrorData = mirrorDataList[index];
-		FixedMirror* fixedMirror = fixedMirrors_[index].get();
-		if (!mirrorData || !fixedMirror) {
-			return false;
-		}
-
-		fixedMirror->GetYawForEdit() = mirrorData->rotation.y;
-		fixedMirror->GetMirror().SetCenter(mirrorData->translation);
-		fixedMirror->GetMirror().SetSize(
-			std::abs(mirrorData->scaling.x) * 2.0f,
-			std::abs(mirrorData->scaling.y) * 2.0f);
-		if (mirrorData->hasCollider && mirrorData->collider.type == "BOX") {
-			fixedMirror->SetColliderShape(
-				mirrorData->collider.center,
-				{
-					std::abs(mirrorData->collider.size.x) * 0.5f,
-					std::abs(mirrorData->collider.size.y) * 0.5f,
-					std::abs(mirrorData->collider.size.z) * 0.5f,
-				});
-		} else {
-			fixedMirror->SyncVisualAndCollider();
-		}
-	}
-	return true;
-}
-
 // 通常3D配置物とCamera Eventを、JSON一覧から作り直してStageへ確定します。
 bool Stage1::RebuildStageRuntime(
 	const std::vector<const LevelLoader::ObjectData*>& additionalObjects,
@@ -947,7 +880,7 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 		rebuildRuntimeObjects || fixedMirrors_.size() != mirrorDataList.size();
 	std::vector<std::unique_ptr<FixedMirror>> rebuiltFixedMirrors;
 	if (rebuildFixedMirrors) {
-		if (!CreateFixedMirrors(mirrorDataList, rebuiltFixedMirrors)) {
+		if (!StageMirrorFactory::CreateFixedMirrors(object3dCommon, mirrorDataList, rebuiltFixedMirrors)) {
 			return false;
 		}
 	}
@@ -957,9 +890,16 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 	// ---------- 鏡データの反映 ----------
 	if (rebuildFixedMirrors) {
 		fixedMirrors_ = std::move(rebuiltFixedMirrors);
-	} else if (!ApplyFixedMirrorEdits(mirrorDataList)) {
+	} else if (!StageMirrorFactory::ApplyFixedMirrorEdits(mirrorDataList, fixedMirrors_)) {
 		return false;
 	}
+	// Inspector・JSONで変えた基準角度をPuzzleにも渡し、次の更新で元へ戻るのを防ぎます。
+	// プレイ中の充電による回転量は保持し、Levelデータとは分けて扱います。
+	StageLightPuzzle::Settings& puzzleSettings = lightPuzzle_.GetSettings();
+	puzzleSettings.largeMirrorBaseYaw = mirrorDataList.front()->rotation.y;
+	fixedMirrors_.front()->GetYawForEdit() = puzzleSettings.largeMirrorBaseYaw +
+		puzzleSettings.largeMirrorTargetYawOffset * lightPuzzle_.GetLargeMirrorRotationAmountForEdit();
+	fixedMirrors_.front()->SyncVisualAndCollider();
 
 	if (rebuildRuntimeObjects) {
 		if (!RebuildStageRuntime(

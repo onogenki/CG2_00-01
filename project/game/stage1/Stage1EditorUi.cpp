@@ -57,13 +57,18 @@ void Stage1::DrawStagePuzzleDebugUi()
 			}
 			FixedMirror& fixedMirror = *fixedMirrors_.front();
 			Mirror& mirror = fixedMirror.GetMirror();
+			// Puzzleが毎フレーム角度を計算するので、編集角度を元の設定にも戻します。
+			// 進行中の回転量はJSONへ焼き込まず、基準角度だけを保存します。
+			StageLightPuzzle::Settings& settings = lightPuzzle_.GetSettings();
+			settings.largeMirrorBaseYaw = fixedMirror.GetYaw() -
+				settings.largeMirrorTargetYawOffset * lightPuzzle_.GetLargeMirrorRotationAmountForEdit();
 			std::function<bool(std::vector<LevelLoader::ObjectData>&)> syncMirrorData;
 			syncMirrorData = [&](std::vector<LevelLoader::ObjectData>& objects)
 			{
 				for (LevelLoader::ObjectData& objectData : objects) {
 					if (objectData.tag == "Mirror") {
 						objectData.translation = mirror.GetCenter();
-						objectData.rotation.y = fixedMirror.GetYaw();
+						objectData.rotation.y = settings.largeMirrorBaseYaw;
 						objectData.scaling.x = mirror.GetWidth() * 0.5f;
 						objectData.scaling.y = mirror.GetHeight() * 0.5f;
 						stageMapReloadStatus_ = "Mirror edited in memory. Press Save Map to keep it.";

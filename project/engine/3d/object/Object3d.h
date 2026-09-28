@@ -73,7 +73,11 @@ public:
 	struct CameraForGPU
 	{
 		Vector3 worldPosition;
+		// 通常は1。板の裏面を区別したいObjectだけ、1より小さくします。
+		float backFaceBrightness = 1.0f;
 	};
+	// HLSLのfloat3 + floatと同じ16byte配置を維持します。
+	static_assert(sizeof(CameraForGPU) == 16);
 
 	struct ReflectionData
 	{
@@ -151,6 +155,8 @@ public:
 	// 複数のLightを同時に設定し、暗い部屋でもそれぞれのLightが周囲を照らせるようにします。
 	void SetSpotLights(const std::array<SpotLight, kMaximumSpotLightCount>& lights);
 	void SetEnvironmentCoefficient(float coefficient);
+	// 共有Modelの材質を変えず、このObjectの裏面だけを暗くします。
+	void SetBackFaceBrightness(float brightness);
 	// このObject3dだけ、Model本来の画像とは別のTextureを使用する
 	void SetTextureOverride(const std::string& texturePath);
 	void ClearTextureOverride() { textureSrvIndexOverride_ = UINT32_MAX; }

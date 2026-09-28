@@ -9,13 +9,14 @@
 class Camera;
 
 // Title画面のModel Shelf・Inspector・Edit ViewをまとめるUI部品です。
-// TitleSceneは実データを所有し、TitleEditorは選択状態とUI操作だけを所有します。
+// モデル・SpriteはTitleObjectManager、Camera・LightはTitleSceneが所有します。
+// TitleEditorはそれらをContextで借り、選択状態とUI操作だけを所有します。
 class TitleEditor
 {
 public:
 	struct Context
 	{
-		// TitleSceneが所有するCamera・モデル・Sprite・Lightです。TitleEditorは所有しません。
+		// SceneのCamera・Lightと、Managerのモデル・Spriteを借ります。TitleEditorは所有しません。
 		Camera* camera = nullptr;
 		std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
 		std::vector<std::unique_ptr<Object3d>>* animationObjects = nullptr;

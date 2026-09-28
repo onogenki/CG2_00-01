@@ -34,21 +34,16 @@ void StageSceneRenderer::Draw(const Context& context)
 		context.object3dCommon->SetCommonDrawSetting();
 	}
 	if (context.carryableMirror) {
+		// 反射Cameraで使ったWVPが残らないよう、Game View用Cameraを描画直前に必ず設定し直します。
+		// Playerと同じ通常Object3d経路で描くため、Mirror専用Pipelineへ依存しません。
+		context.carryableMirror->GetObject().UpdateCameraForDraw(context.activeCamera);
+		context.object3dCommon->SetCommonDrawSetting();
 		context.carryableMirror->GetObject().Draw();
 	}
 	if (context.player) {
 		context.player->GetObject().Draw();
-		// モンスターボールの水色と混ざらない桃色で、壁の奥にいるPlayerだけを見せます。
-		context.player->GetObject().DrawOccludedSilhouette({ 1.00f, 0.18f, 0.62f, 0.72f });
 	}
-	// Laserの線は壁の向こうへ描かず、発射位置だけを黄色で見えるようにします。
-	// 将来発射装置Modelへ差し替えても、同じObject3dの呼び出しで利用できます。
-	if (context.laserEmitter) {
-		context.laserEmitter->DrawOccludedSilhouette({ 1.00f, 0.88f, 0.12f, 0.88f });
-	}
-	if (context.doorLaserEmitter) {
-		context.doorLaserEmitter->DrawOccludedSilhouette({ 1.00f, 0.48f, 0.08f, 0.88f });
-	}
+	// 発射装置はsceneObjectsの通常描画だけにし、壁越しのシルエットを重ねません。
 	// 後続Objectが通常Pipelineを前提にできるよう、描画設定を戻します。
 	context.object3dCommon->SetCommonDrawSetting();
 	context.lightPuzzle->Draw(*context.activeCamera);

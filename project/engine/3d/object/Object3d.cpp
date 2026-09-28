@@ -6,6 +6,7 @@
 #include "SrvManager.h"
 #include "TextureManager.h"
 #include <cassert>
+#include <algorithm>
 #include "MyMath.h"
 using namespace MyMath;
 
@@ -158,10 +159,9 @@ void Object3d::Draw()
 
 	ID3D12GraphicsCommandList* commandList = object3dCommon->GetDxCommon()->GetCommandList();
 	if (isSkeletal_) {
-		// 骨ありモデルだけは、先にCompute Shaderで変形済み頂点を作る。
-		object3dCommon->SetSkinningComputeSetting();
-		model_->DispatchSkinning(skinCluster_);
-		object3dCommon->SetCommonDrawSetting();
+		// 骨ありModelは、元から使っていたVertex Shader方式で骨行列と頂点影響度を渡して描きます。
+		// これによりwalk.gltfなどのAnimation Modelを、通常Modelと別の正しい頂点形式で描画します。
+		object3dCommon->SetSkinningCommonDrawSetting();
 		if (gpuData_) {
 			gpuData_->BindForObjectDraw(commandList);
 		}
@@ -169,10 +169,10 @@ void Object3d::Draw()
 		const std::string& environmentTexturePath = object3dCommon->GetEnvironmentTexturePath();
 		if (!environmentTexturePath.empty() && GetEnvironmentCoefficient() > 0.0f) {
 			commandList->SetGraphicsRootDescriptorTable(
-				7,
+				8,
 				TextureManager::GetInstance()->GetSrvHandleGPU(environmentTexturePath));
 		}
-		model_->DrawSkinned(skinCluster_, textureSrvIndexOverride_);
+		model_->Draw(skinCluster_, textureSrvIndexOverride_);
 		return;
 	}
 
@@ -245,6 +245,14 @@ void Object3d::SetTextureOverride(const std::string& texturePath)
 {
 	TextureManager::GetInstance()->LoadTexture(texturePath);
 	textureSrvIndexOverride_ = TextureManager::GetInstance()->GetSrvIndex(texturePath);
+}
+
+// 共用の材質ではなくObject専用の値を変更し、他のplane.objへ影響させません。
+void Object3d::SetBackFaceBrightness(float brightness)
+{
+	if (gpuData_) {
+		gpuData_->SetBackFaceBrightness(std::clamp(brightness, 0.0f, 1.0f));
+	}
 }
 
 // Sceneから渡された平行光を、このObject3dのGPU描画データへ設定します。

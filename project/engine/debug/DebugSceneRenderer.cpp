@@ -40,6 +40,8 @@ void DebugSceneRenderer::Draw(const Context& context)
 			*context.animationObjects,
 			SceneRenderPipeline::ObjectDrawFilter::kSkeletalOnly);
 		if (context.handWeapon) {
+			// 骨ありModelの直後なので、通常の武器Modelへ骨用の頂点設定を持ち越さないようにします。
+			context.object3dCommon->SetCommonDrawSetting();
 			context.handWeapon->Draw();
 		}
 

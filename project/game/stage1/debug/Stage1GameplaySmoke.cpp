@@ -151,6 +151,8 @@ void Stage1GameplaySmoke::Initialize(const InitializeContext& context)
 	gameplaySmokeStartY_ = gameplaySmokeStartPosition_.y;
 	const Vector3 mirrorPosition = carryableMirror_->GetMirror().GetCenter();
 
+	// 本編ではJSONに置かれた鏡から開始するため、床に置かれた状態で拾う処理を確認します。
+	carryableMirror_->SetCarried(false);
 	// 鏡の中心にPlayerがいる条件を渡し、Eキーと同じ拾う処理を直接確認します。
 	carryableMirror_->Update(1.0f, mirrorPosition, 0.0f, true);
 	gameplaySmokePickedUpMirror_ = carryableMirror_->IsCarried();
@@ -296,14 +298,27 @@ void Stage1GameplaySmoke::Initialize(const InitializeContext& context)
 	const auto laserHitsSphere = [&](const Laser& testLaser, const Sphere& sphere) {
 		return testLaser.IsHitSphere(sphere, laserCollisionRadius_);
 	};
-	// 実際に持っている鏡をPlayer正面へ構え、鏡なしなら当たる光が遮られることを確認する。
-	const Sphere carriedPlayerSphere{ mirrorPosition, 1.2f };
-	const Vector3 carriedTestOrigin{
-		mirrorPosition.x,
-		mirrorPosition.y + 1.8f,
-		mirrorPosition.z + 2.5f,
+	// 実際に持っている鏡の現在位置と法線を使い、鏡なしなら当たる光が遮られることを確認します。
+	const Vector3 carriedMirrorCenter = carryMirror.GetCenter();
+	const Vector3 carriedMirrorNormal = carryMirror.GetNormal();
+	const Sphere carriedPlayerSphere{
+		{
+			carriedMirrorCenter.x - carriedMirrorNormal.x * 2.4f,
+			carriedMirrorCenter.y - carriedMirrorNormal.y * 2.4f,
+			carriedMirrorCenter.z - carriedMirrorNormal.z * 2.4f,
+		},
+		1.2f,
 	};
-	const Vector3 carriedTestDirection{ 0.0f, -1.8f, -2.5f };
+	const Vector3 carriedTestOrigin{
+		carriedMirrorCenter.x + carriedMirrorNormal.x * 3.0f,
+		carriedMirrorCenter.y + carriedMirrorNormal.y * 3.0f,
+		carriedMirrorCenter.z + carriedMirrorNormal.z * 3.0f,
+	};
+	const Vector3 carriedTestDirection{
+		-carriedMirrorNormal.x,
+		-carriedMirrorNormal.y,
+		-carriedMirrorNormal.z,
+	};
 	Laser carriedUnblockedLaser;
 	carriedUnblockedLaser.SetOrigin(carriedTestOrigin);
 	carriedUnblockedLaser.SetDirection(carriedTestDirection);
@@ -512,6 +527,29 @@ void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
 	gameplaySmokeDoorStartsClosed_ =
 		gameplaySmokeDoorStartsClosed_ ||
 		(!context.isDoorSwitchReceivingLight && context.doorOpenAmount <= 0.01f);
+	// 置いたMirrorのOBBが、実際にPlayerへ渡す障害物一覧へ含まれるかを確認します。
+	// Collider単体の存在だけでなく、StageCollisionWorldへの登録漏れもここで検出できます。
+	if (gameplaySmokeDroppedMirror_ && carryableMirror_ &&
+		!carryableMirror_->IsCarried() && context.solidObbs) {
+		const MyMath::OBB& droppedMirrorObb = carryableMirror_->GetObb();
+		gameplaySmokeDroppedMirrorIsSolid_ = std::any_of(
+			context.solidObbs->begin(),
+			context.solidObbs->end(),
+			[&droppedMirrorObb](const MyMath::OBB& solidObb)
+			{
+				const Vector3 centerDifference{
+					solidObb.center.x - droppedMirrorObb.center.x,
+					solidObb.center.y - droppedMirrorObb.center.y,
+					solidObb.center.z - droppedMirrorObb.center.z,
+				};
+				const Vector3 sizeDifference{
+					solidObb.size.x - droppedMirrorObb.size.x,
+					solidObb.size.y - droppedMirrorObb.size.y,
+					solidObb.size.z - droppedMirrorObb.size.z,
+				};
+				return Length(centerDifference) < 0.001f && Length(sizeDifference) < 0.001f;
+			});
+	}
 	// 床の端へ歩かせる検証は、Stageの床形状が変わると成立しません。
 	// 開始演出後に床から離れた位置へ一度だけ移し、重力と落下だけを独立して確認します。
 	if (gameplaySmokeSawGrounded_ &&
@@ -546,6 +584,7 @@ void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
 		gameplaySmokeEnemyManagerSpawn_ &&
 		gameplaySmokePickedUpMirror_ &&
 		gameplaySmokeDroppedMirror_ &&
+		gameplaySmokeDroppedMirrorIsSolid_ &&
 		gameplaySmokeCarryMirrorReflectedLaser_ &&
 		gameplaySmokeCarryMirrorBackfaceIgnored_ &&
 		gameplaySmokeCarryMirrorHorizontalControl_ &&
@@ -573,6 +612,7 @@ void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
 			<< " enemyManager=" << gameplaySmokeEnemyManagerSpawn_
 			<< " picked=" << gameplaySmokePickedUpMirror_
 			<< " dropped=" << gameplaySmokeDroppedMirror_
+			<< " droppedMirrorSolid=" << gameplaySmokeDroppedMirrorIsSolid_
 			<< " carryLaser=" << gameplaySmokeCarryMirrorReflectedLaser_
 			<< " carryBackface=" << gameplaySmokeCarryMirrorBackfaceIgnored_
 			<< " carryHorizontal=" << gameplaySmokeCarryMirrorHorizontalControl_

@@ -7,13 +7,13 @@
 class Object3dCommon;
 class Object3dRenderContext;
 
-// Sceneが所有するEnemyの一覧と、出現処理をまとめるクラスです。
+// Enemyの一覧と寿命を所有し、Sceneから出現処理を依頼されるクラスです。
 // Stageは個別Enemyをnewせず、必ずEnemyManager::Spawnで追加します。
 class EnemyManager
 {
 public:
 	// Scene開始時にEnemy一覧を空にしてから、モデル生成で使う共通3D設定を受け取ります。
-	// Object3dCommonの寿命はSceneが所有するため、EnemyManagerは非所有で参照します。
+	// Object3dCommonは共有のSingletonです。SceneもEnemyManagerも借りるだけで、解放しません。
 	void Initialize(Object3dCommon* object3dCommon);
 	// SpawnDataに従ってEnemyを一体生成します。失敗時はnullptrです。
 	Enemy* Spawn(const Enemy::SpawnData& spawnData);
@@ -39,7 +39,7 @@ public:
 	const Enemy* GetEnemy(size_t index) const;
 
 private:
-	// EnemyモデルをFactory経由で作るための共通3D設定です。寿命はSceneが所有します。
+	// EnemyモデルをFactory経由で作るための共通3D設定です。共有Singletonへの非所有参照です。
 	Object3dCommon* object3dCommon_ = nullptr;
 	// EnemyManagerだけがEnemyの寿命を所有します。
 	std::vector<std::unique_ptr<Enemy>> enemies_;

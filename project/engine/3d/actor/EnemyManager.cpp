@@ -1,6 +1,6 @@
 #include "EnemyManager.h"
 
-// Sceneが所有する共通3D設定を保存し、以後のSpawnで毎回渡さないようにします。
+// Sceneから借りた共通3D設定への参照を保存し、以後のSpawnで毎回渡さないようにします。
 void EnemyManager::Initialize(Object3dCommon* object3dCommon)
 {
 	// 同じManagerを次のStageで再利用しても、前StageのEnemyを残しません。

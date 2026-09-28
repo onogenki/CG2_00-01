@@ -646,6 +646,7 @@ void ImGuiManager::SceneWindow(const char* sceneName)
 }
 #endif
 
+// Inputのクライアント座標を使い、Releaseではウィンドウ全体をゲーム操作領域とします。
 bool ImGuiManager::IsMouseOverGameView(float mouseScreenX, float mouseScreenY) const
 {
 #ifdef USE_IMGUI
@@ -656,7 +657,10 @@ bool ImGuiManager::IsMouseOverGameView(float mouseScreenX, float mouseScreenY) c
 		mouseScreenY >= gameViewImageMin_.y &&
 		mouseScreenY <= gameViewImageMin_.y + gameViewImageSize_.y;
 #else
-	return false;
+	const DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+	return mouseScreenX >= 0.0f && mouseScreenY >= 0.0f &&
+		mouseScreenX < static_cast<float>(dxCommon->GetClientWidth()) &&
+		mouseScreenY < static_cast<float>(dxCommon->GetClientHeight());
 #endif
 }
 
