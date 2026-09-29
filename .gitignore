@@ -331,4 +331,8 @@ logs/
 imgui.ini
 # ImGuiのDock配置は各開発者のローカル画面設定なので、共有・マージしない。
 project/imgui_docking.ini
+
+# 実行時の撮影画像は各自のローカル記録です。フォルダの.gitkeepだけ共有します。
+project/resources/Captures/Screenshots/*
+!project/resources/Captures/Screenshots/.gitkeep
 generated/

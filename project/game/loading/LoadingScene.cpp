@@ -34,6 +34,13 @@ void LoadingScene::InitializeLoadingSprite()
 	loadingSprite_->Initialize(spriteCommon, "resources/white.png");
 	loadingSprite_->SetPosition({ 0.0f, 0.0f });
 	loadingSprite_->SetAnchorPoint({ 0.0f, 0.0f });
+	// 最初のDrawまでUpdateが呼ばれなくても、その時点の画面サイズで白く覆います。
+	const DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+	loadingSprite_->SetSize({
+		static_cast<float>(dxCommon->GetClientWidth()),
+		static_cast<float>(dxCommon->GetClientHeight()),
+	});
+	loadingSprite_->Update();
 }
 
 // 次Sceneの初期化中も、直前に描いた白画面がウィンドウへ残ります。
@@ -59,7 +66,9 @@ void LoadingScene::Update()
 // Loading中はDockやDebug UIを描かず、白い画面だけをSwapChainへ出します。
 void LoadingScene::Draw()
 {
-	SceneRenderPipeline::Begin(DirectXCommon::GetInstance());
+	// Spriteが画面端へ届かない一瞬も赤を出さないよう、Loadingだけ描画先全体を白で消去します。
+	const Vector4 whiteClearColor{ 1.0f, 1.0f, 1.0f, 1.0f };
+	SceneRenderPipeline::Begin(DirectXCommon::GetInstance(), &whiteClearColor);
 	if (loadingSprite_) {
 		spriteCommon->SetCommonDrawSetting();
 		loadingSprite_->Draw();

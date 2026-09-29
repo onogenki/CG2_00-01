@@ -28,9 +28,6 @@ public:
 		FixedMirror* mirrorFloor = nullptr;
 		CarryableMirror* carryableMirror = nullptr;
 		Player* player = nullptr;
-		// Laserの発射場所を表すModelです。Sceneが所有し、Rendererは描画だけします。
-		Object3d* laserEmitter = nullptr;
-		Object3d* doorLaserEmitter = nullptr;
 		const StageLightPuzzle* lightPuzzle = nullptr;
 		const StageHazardLights* hazardLights = nullptr;
 	};

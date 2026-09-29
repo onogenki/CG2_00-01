@@ -18,6 +18,8 @@
 #include "SceneRenderPipeline.h"
 #include "SrvManager.h"
 #include "StageMapObjectIndex.h"
+#include "MapChipRegistry.h"
+#include "StageMapChipFactory.h"
 #include "StageMirrorFactory.h"
 #include "StageReflectionRenderer.h"
 #include "StageSceneRenderer.h"
@@ -102,7 +104,7 @@ void Stage1::InitializeDefaultLighting()
 	pointLight_.decay = 1.0f;
 }
 
-// JSONの内容に関係なく必要な床・鏡・Laser・Switch・Doorを作成します。
+// CollectionとFactoryへ生成を依頼し、必須の床・携帯鏡・Puzzle部品がそろったか確認します。
 bool Stage1::InitializeStageGimmicks()
 {
 	StageLightPuzzle::Settings& puzzleSettings = lightPuzzle_.GetSettings();
@@ -118,40 +120,26 @@ bool Stage1::InitializeStageGimmicks()
 	// floor.objの高さは3.0なので、上面がY=-2.0になる中心位置に置きます。
 	floor_->SetTranslate({ 0.0f, -3.500001f, 5.0f });
 
-	carryableMirror_ = std::make_unique<CarryableMirror>();
-	if (!carryableMirror_->Initialize(
+	// 実際の配置は後でstage1.jsonから反映します。Factoryは所持状態へ切り替えません。
+	carryableMirror_ = StageMirrorFactory::CreateCarryableMirror(
 		object3dCommon,
 		// 以前から携帯Mirrorに使っていた白い板Modelを使います。
 		"plane.obj",
 		{ -2.5f, -0.8f, 4.5f },
 		3.6f,
-		3.6f)) {
+		3.6f);
+	if (!carryableMirror_) {
 		// 持てるMirrorが作れないStageは、見えないまま続行させません。
-		carryableMirror_.reset();
 		return false;
 	}
-	// 実際の開始位置はstage1.jsonのCarryableMirrorStartから反映します。
-	// ここではJSON読込に失敗した時だけ使う予備位置を渡し、勝手に所持状態へはしません。
 
-	// 通常床とは別に、Playerが持てない正方形の鏡床ギミックを配置します。
-	mirrorFloor_ = std::make_unique<FixedMirror>();
-	if (mirrorFloor_->Initialize(
+	// 鏡床は従来通り任意の部品です。生成失敗ならnullptrのまま、ほかの部品を準備します。
+	mirrorFloor_ = StageMirrorFactory::CreateMirrorFloor(
 		object3dCommon,
-		dxCommon,
-		SrvManager::GetInstance(),
 		"plane.obj",
 		mirrorFloorPosition_,
-		0.0f,
 		mirrorFloorWidth_,
-		mirrorFloorHeight_,
-		256)) {
-		mirrorFloor_->SetPitch(-1.57079633f);
-		mirrorFloor_->SyncVisualAndCollider();
-		// 鏡床は上下どちらから来たLightも反射する特殊ギミックです。
-		mirrorFloor_->GetMirror().SetReflectBackface(true);
-	} else {
-		mirrorFloor_.reset();
-	}
+		mirrorFloorHeight_);
 
 	// 白い小球をLaserの発射装置として置き、光がどこから出るかを見えるようにします。
 	laserEmitter_ = sceneObjects_.Create("sphere.obj");
@@ -418,8 +406,6 @@ void Stage1::Draw()
 	sceneRendererContext.mirrorFloor = mirrorFloor_.get();
 	sceneRendererContext.carryableMirror = carryableMirror_.get();
 	sceneRendererContext.player = player_.get();
-	sceneRendererContext.laserEmitter = laserEmitter_;
-	sceneRendererContext.doorLaserEmitter = doorLaserEmitter_;
 	sceneRendererContext.lightPuzzle = &lightPuzzle_;
 	sceneRendererContext.hazardLights = &hazardLights_;
 	StageSceneRenderer::Draw(sceneRendererContext);
@@ -689,16 +675,15 @@ void Stage1::ApplyStageLighting()
 // Player開始位置、持てるMirror位置、StageStart演出設定を読込済みLevelDataから反映します。
 void Stage1::ApplyStageStartSettings(
 	const LevelLoader::ObjectData* playerStartData,
-	const LevelLoader::ObjectData* carryableMirrorData)
+	const LevelLoader::ObjectData* carryableMirrorData,
+	const MapChipField::Chip* csvPlayerStartChip)
 {
 	// P0がCSVにあればJSONのPlayerStartより優先します。
 	// Hot Reload時にはPlayerを移動させないため、実際の配置はInitializeで一度だけ行います。
-	const MapChipField::Chip* playerStartChip =
-		stageMapChipField_.FindFirst(MapChipType::PlayerStart);
-	hasStagePlayerStart_ = playerStartChip != nullptr || playerStartData != nullptr;
-	if (playerStartChip) {
+	hasStagePlayerStart_ = csvPlayerStartChip != nullptr || playerStartData != nullptr;
+	if (csvPlayerStartChip) {
 		stagePlayerStartPosition_ = stageMapChipField_.GetPosition(
-			*playerStartChip,
+			*csvPlayerStartChip,
 			kStageMapChipOrigin,
 			kStageMapChipCellSize);
 		stagePlayerStartPosition_.y = kStageMapChipPlayerY;
@@ -720,31 +705,17 @@ void Stage1::ApplyStageStartSettings(
 	}
 }
 
-// 通常3D配置物とCamera Eventを、JSON一覧から作り直してStageへ確定します。
-bool Stage1::RebuildStageRuntime(
+// モデルの読込失敗時に旧配置を残すため、通常3D配置物を仮Runtimeへ作ります。
+bool Stage1::BuildStageRuntime(
 	const std::vector<const LevelLoader::ObjectData*>& additionalObjects,
-	const std::vector<const LevelLoader::ObjectData*>& eventTriggerDataList,
-	const std::vector<const LevelLoader::ObjectData*>& eventCameraDataList,
-	const std::vector<const LevelLoader::ObjectData*>& cameraAreaDataList)
+	StageMapRuntime& outRuntime)
 {
-	StageMapRuntime rebuiltMapRuntime;
-	if (!rebuiltMapRuntime.Rebuild(
+	return outRuntime.Rebuild(
 		additionalObjects,
 		[this](const std::string& modelName)
 		{
 			return CreateRuntimeObject(modelName);
-		})) {
-		return false;
-	}
-
-	stageMapRuntime_ = std::move(rebuiltMapRuntime);
-	stageCameraEvents_.Rebuild(
-		eventTriggerDataList,
-		eventCameraDataList,
-		cameraAreaDataList,
-		cameraManager.get(),
-		cameraController_.get());
-	return true;
+		});
 }
 
 // Editorで変更した通常3D配置物とCamera Eventを、再生成せず反映します。
@@ -782,7 +753,7 @@ void Stage1::ApplyFloorData(const LevelLoader::ObjectData& floorData)
 	}
 }
 
-// 読込済みJSONを分類し、既存の床・鏡・Camera・追加モデルへ反映します。
+// 読込済みJSON/CSVの必要なモデルを先に仮生成し、成功後に床・鏡・Cameraへ反映します。
 bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 {
 	// JSONのObjectDataを分類し、既存の床・鏡・Camera・追加モデルへ反映する中心処理です。
@@ -803,65 +774,26 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 	const std::vector<const LevelLoader::ObjectData*>& cameraAreaDataList = objectIndex.GetCameraAreas();
 	std::vector<LevelLoader::ObjectData> mapChipObjectDataList;
 
-	// CSVの各記号をStage1の処理へ振り分けます。
-	// E0・G0・C0・L0は、対応するゲーム物を作るまで表示も当たり判定も持ちません。
-	// MapChipField自身はモデル名やEnemyを知らず、Stage固有の処理だけをここへ置きます。
-	for (const MapChipField::Chip& chip : stageMapChipField_.GetChips()) {
-		switch (MapChipField::GetType(chip)) {
-		case MapChipType::PlayerStart:
-			// P0の開始位置はApplyStageStartSettingsで反映します。
-			break;
-
-		case MapChipType::Block: {
-			if (chip.subId != 0) {
-				break;
+	// Stage1が使う番号だけを登録します。追加時は種類・番号と処理をここへ一組増やします。
+	// E0・G0・C0・L0は未登録なので、今は表示も当たり判定も持ちません。
+	MapChipRegistry chipRegistry;
+	const MapChipField::Chip* csvPlayerStartChip = nullptr;
+	chipRegistry.Register(MapChipType::PlayerStart, 0,
+		[&csvPlayerStartChip](const MapChipField::Chip& chip)
+		{
+			if (!csvPlayerStartChip) {
+				csvPlayerStartChip = &chip;
 			}
-
-			// B0は、1x1x1のブロックと同じ大きさのBOX Colliderを持ちます。
-			LevelLoader::ObjectData blockData{};
-			blockData.type = "MESH";
-			blockData.name =
-				"MapChip_B0_" + std::to_string(chip.column) + "_" + std::to_string(chip.row);
-			blockData.tag = "MapChip";
-			blockData.objectType = "MAP_CHIP";
-			blockData.fileName = "block.obj";
-			blockData.translation = stageMapChipField_.GetPosition(
-				chip,
-				kStageMapChipOrigin,
-				kStageMapChipCellSize);
-			blockData.translation.y = kStageMapChipFloorY;
-			blockData.scaling = { 1.0f, 1.0f, 1.0f };
-			blockData.hasCollider = true;
-			blockData.collider.type = "BOX";
-			blockData.collider.size = {
-				kStageMapChipCellSize,
-				kStageMapChipCellSize,
-				kStageMapChipCellSize,
-			};
-			mapChipObjectDataList.push_back(std::move(blockData));
-			break;
-		}
-
-		case MapChipType::EnemySpawn:
-			// E0は、EnemyManagerへ追加する時にこの分岐へSpawn処理を一行だけ追加します。
-			break;
-
-		case MapChipType::Gimmick:
-			// G0は、対応するギミックを作る時にこの分岐へ初期化処理を追加します。
-			break;
-
-		case MapChipType::Checkpoint:
-			// C0は、中間ポイント機能を作る時にこの分岐へ登録処理を追加します。
-			break;
-
-		case MapChipType::Goal:
-			// L0は、ゴール機能を作る時にこの分岐へ登録処理を追加します。
-			break;
-
-		case MapChipType::Unknown:
-			// 未登録の記号は、描画も当たり判定も持たない空のマスとして扱います。
-			break;
-		}
+		});
+	chipRegistry.Register(MapChipType::Block, 0,
+		[this, &mapChipObjectDataList](const MapChipField::Chip& chip)
+		{
+			mapChipObjectDataList.push_back(StageMapChipFactory::CreateBlockData(
+				stageMapChipField_, chip, kStageMapChipOrigin,
+				kStageMapChipCellSize, kStageMapChipFloorY));
+		});
+	for (const MapChipField::Chip& chip : stageMapChipField_.GetChips()) {
+		chipRegistry.Run(chip);
 	}
 	for (const LevelLoader::ObjectData& blockData : mapChipObjectDataList) {
 		additionalObjects.push_back(&blockData);
@@ -872,9 +804,6 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 		return false;
 	}
 
-	ApplyStageStartSettings(playerStartData, carryableMirrorData);
-	ApplyStageLighting();
-
 	// Mirrorタグの数だけ固定鏡を作るため、JSONへMirrorを追加すれば複数配置できます。
 	const bool rebuildFixedMirrors =
 		rebuildRuntimeObjects || fixedMirrors_.size() != mirrorDataList.size();
@@ -883,8 +812,23 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 		if (!StageMirrorFactory::CreateFixedMirrors(object3dCommon, mirrorDataList, rebuiltFixedMirrors)) {
 			return false;
 		}
+	} else {
+		// 編集反映の途中でnullptrに当たり、床などだけ新しくならないよう先に確認します。
+		for (size_t index = 0; index < fixedMirrors_.size(); ++index) {
+			if (!fixedMirrors_[index] || !mirrorDataList[index]) {
+				return false;
+			}
+		}
 	}
 
+	StageMapRuntime rebuiltMapRuntime;
+	if (rebuildRuntimeObjects && !BuildStageRuntime(additionalObjects, rebuiltMapRuntime)) {
+		return false;
+	}
+
+	// 失敗し得る生成が終わってから、Sceneが所有する状態をまとめて更新します。
+	ApplyStageStartSettings(playerStartData, carryableMirrorData, csvPlayerStartChip);
+	ApplyStageLighting();
 	ApplyFloorData(*floorData);
 
 	// ---------- 鏡データの反映 ----------
@@ -902,13 +846,13 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 	fixedMirrors_.front()->SyncVisualAndCollider();
 
 	if (rebuildRuntimeObjects) {
-		if (!RebuildStageRuntime(
-			additionalObjects,
+		stageMapRuntime_ = std::move(rebuiltMapRuntime);
+		stageCameraEvents_.Rebuild(
 			eventTriggerDataList,
 			eventCameraDataList,
-			cameraAreaDataList)) {
-			return false;
-		}
+			cameraAreaDataList,
+			cameraManager.get(),
+			cameraController_.get());
 	} else {
 		ApplyStageRuntimeEdits(
 			additionalObjects,

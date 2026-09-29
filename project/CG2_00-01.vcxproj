@@ -238,6 +238,7 @@
     <ClCompile Include="engine\level\FileHotReload.cpp" />
     <ClCompile Include="engine\level\LevelLoader.cpp" />
     <ClCompile Include="engine\level\MapChipField.cpp" />
+    <ClCompile Include="engine\level\MapChipRegistry.cpp" />
 	<ClCompile Include="engine\level\StageMapObjectIndex.cpp" />
 	<ClCompile Include="engine\level\StageMapRuntime.cpp" />
     <ClCompile Include="engine\math\MyMath.cpp" />
@@ -418,6 +419,7 @@
   <ItemGroup>
     <!-- Visual Studioが個別に追跡できるよう、game側もワイルドカードを使わず列挙します。 -->
     <ClCompile Include="game\GameSceneRegistration.cpp" />
+	<ClCompile Include="game\StartupRouteSmoke.cpp" />
 	<ClCompile Include="game\loading\LoadingScene.cpp" />
     <ClCompile Include="game\mirror\CarryableMirror.cpp" />
     <ClCompile Include="game\mirror\FixedMirror.cpp" />
@@ -435,6 +437,7 @@
     <ClCompile Include="game\stage1\Stage1EditorUi.cpp" />
     <ClCompile Include="game\stage1\Stage1Lighting.cpp" />
     <ClCompile Include="game\stage1\Stage1MapLoading.cpp" />
+    <ClCompile Include="game\stage1\StageMapChipFactory.cpp" />
     <ClCompile Include="game\stage1\Stage1MirrorGameplay.cpp" />
     <ClCompile Include="game\stage1\StageCameraEvents.cpp" />
     <ClCompile Include="game\stage1\StageCollisionWorld.cpp" />
@@ -446,6 +449,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="game\GameSceneRegistration.h" />
+	<ClInclude Include="game\StartupRouteSmoke.h" />
 	<ClInclude Include="game\loading\LoadingScene.h" />
     <ClInclude Include="game\mirror\CarryableMirror.h" />
     <ClInclude Include="game\mirror\FixedMirror.h" />
@@ -460,6 +464,7 @@
     <ClInclude Include="game\stage1\editor\StageEditViewport.h" />
     <ClInclude Include="game\stage1\editor\StageLevelEditor.h" />
     <ClInclude Include="game\stage1\Stage1.h" />
+    <ClInclude Include="game\stage1\StageMapChipFactory.h" />
     <ClInclude Include="game\stage1\StageCameraEvents.h" />
     <ClInclude Include="game\stage1\StageCollisionWorld.h" />
     <ClInclude Include="game\stage1\StageHazardLights.h" />
@@ -524,6 +529,7 @@
     <ClInclude Include="engine\level\FileHotReload.h" />
     <ClInclude Include="engine\level\LevelLoader.h" />
     <ClInclude Include="engine\level\MapChipField.h" />
+    <ClInclude Include="engine\level\MapChipRegistry.h" />
 	<ClInclude Include="engine\level\StageMapObjectIndex.h" />
 	<ClInclude Include="engine\level\StageMapRuntime.h" />
     <ClInclude Include="engine\math\Matrix4x4.h" />

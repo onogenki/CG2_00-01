@@ -422,7 +422,8 @@ void ImGuiManager::ModelWindow(
 			ImGui::DragFloat("PointLight:intensity", &pointLight.intensity, 0.01f, 0.0f, 10.0f);
 			ImGui::ColorEdit3("PointLight:color", &pointLight.color.x);
 			ImGui::DragFloat("PointLight:radius", &pointLight.radius, 0.1f);
-			ImGui::DragFloat("PointLight:decay", &pointLight.decay, 0.1f, 10.0f);
+			// 下限10・上限省略だと直感的に調整できないため、ほかのLightと同じ範囲にします。
+			ImGui::DragFloat("PointLight:decay", &pointLight.decay, 0.1f, 0.1f, 10.0f);
 
 			ImGui::Separator();
 

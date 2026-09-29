@@ -69,7 +69,7 @@ void Audio::Initialize()
 	}
 }
 
-//音声データの読み込み
+// 音源をPCMへ読み込み、成功したデータだけを共有キャッシュへ登録します。ここでは再生しません。
 bool Audio::LoadFile(const std::string& filename)
 {
 
@@ -91,6 +91,8 @@ bool Audio::LoadFile(const std::string& filename)
 	}
 
 	//PCM形式にフォーマット指定する
+	// Media Foundationの特殊なストリーム番号を、APIが受け取るDWORDとして明示します。
+	const DWORD audioStreamIndex = static_cast<DWORD>(MF_SOURCE_READER_FIRST_AUDIO_STREAM);
 	ComPtr<IMFMediaType> pPCMType;
 	result = MFCreateMediaType(&pPCMType);
 	if (FAILED(result)) {
@@ -98,14 +100,14 @@ bool Audio::LoadFile(const std::string& filename)
 	}
 	pPCMType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
 	pPCMType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
-	result = pReader->SetCurrentMediaType((DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, nullptr, pPCMType.Get());
+	result = pReader->SetCurrentMediaType(audioStreamIndex, nullptr, pPCMType.Get());
 	if (FAILED(result)) {
 		return false;
 	}
 
 	//実際にセットされたメディアタイプを取得する
 	ComPtr<IMFMediaType>pOutType;
-	result = pReader->GetCurrentMediaType((DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, &pOutType);
+	result = pReader->GetCurrentMediaType(audioStreamIndex, &pOutType);
 	if (FAILED(result)) {
 		return false;
 	}
@@ -126,10 +128,10 @@ bool Audio::LoadFile(const std::string& filename)
 	while (true)
 	{
 		ComPtr<IMFSample> pSample;
-		DWORD stramIndex = 0, flags = 0;
+		DWORD streamIndex = 0, flags = 0;
 		LONGLONG llTimeStamp = 0;
 		//サンプルを読み込む
-		result = pReader->ReadSample(MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, &stramIndex, &flags, &llTimeStamp, &pSample);
+		result = pReader->ReadSample(audioStreamIndex, 0, &streamIndex, &flags, &llTimeStamp, &pSample);
 		if (FAILED(result)) {
 			return false;
 		}

@@ -65,7 +65,7 @@ public:
 	// falseにすると、手動Cameraで移動中も背後へ自動整列しない
 	void SetAutoRecenterEnabled(bool enabled) { isAutoRecenterEnabled_ = enabled; }
 	// falseにすると、壁がCameraとPlayerの間にあってもCamera位置をPlayer側へ縮めません。
-	// 壁に隠れた対象は、Scene側のDrawOccludedSilhouetteで見せる用途に使います。
+	// これはCamera位置だけの設定です。壁越し表示はObject側の明示的な描画呼び出しが必要です。
 	void SetWallAvoidanceEnabled(bool enabled) { isWallAvoidanceEnabled_ = enabled; }
 	// 持ち物を構えている間など、通常Cameraが設定距離より近付かないようにします。
 	// 壁回避による一時的な接近は安全のため許可します。
@@ -73,6 +73,8 @@ public:
 
 	float GetDistance() const { return distance_; }
 	float GetOrbitYaw() const { return orbitYaw_; }
+	// 補間中でも、指定した通常Cameraの目標角度を編集画面へ表示します。
+	float GetTargetOrbitYaw() const { return targetOrbitYaw_; }
 	float GetOrbitPitch() const { return orbitPitch_; }
 	int GetOrbitStepIndex() const { return orbitStepIndex_; }
 	int GetDistanceStepIndex() const { return distanceStepIndex_; }

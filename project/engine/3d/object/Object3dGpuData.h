@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Object3d.h"
+#include <cstdint>
+#include <vector>
 #include <wrl.h>
 
 class Camera;
@@ -18,7 +20,7 @@ public:
 	// World行列とCameraを使い、通常描画用の行列・Camera位置を更新します。
 	void UpdateTransform(const Matrix4x4& worldMatrix, const Camera* camera);
 	// 通常モデル描画で使う各Constant BufferをRoot Parameterへ設定します。
-	void BindForObjectDraw(ID3D12GraphicsCommandList* commandList) const;
+	bool BindForObjectDraw(ID3D12GraphicsCommandList* commandList);
 	// 壁越しシルエット描画で使う行列と色をRoot Parameterへ設定します。
 	void BindForOccludedSilhouetteDraw(
 		ID3D12GraphicsCommandList* commandList,
@@ -38,6 +40,24 @@ public:
 	void SetBackFaceBrightness(float brightness) { cameraData_->backFaceBrightness = brightness; }
 
 private:
+	// 鏡と通常画面が同じ行列を上書きしないよう、一回の描画に使う値を保持します。
+	struct DrawMatrices
+	{
+		Microsoft::WRL::ComPtr<ID3D12Resource> transformResource;
+		Object3d::TransformationMatrix* transformData = nullptr;
+		Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource;
+		Object3d::CameraForGPU* cameraData = nullptr;
+	};
+	// SwapChainの枠が再利用可能になるまで、描画ごとの行列を残します。
+	struct FrameMatrices
+	{
+		uint64_t serial = 0;
+		size_t nextDraw = 0;
+		std::vector<DrawMatrices> draws;
+	};
+	static constexpr size_t kFrameSlotCount = 2;
+	// 描画一回分の行列・Camera位置バッファを作成します。
+	bool CreateDrawMatrices(DrawMatrices& matrices);
 	// 各種類のConstant Bufferを確保してCPUから書ける状態へします。
 	void CreateTransformationMatrixData(DirectXCommon* dxCommon);
 	void CreateDirectionalLightData(DirectXCommon* dxCommon);
@@ -61,4 +81,6 @@ private:
 	Object3d::PointLight* pointLightData_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> spotLightResource_;
 	Object3d::SpotLightSet* spotLightData_ = nullptr;
+	DirectXCommon* dxCommon_ = nullptr;
+	FrameMatrices frameMatrices_[kFrameSlotCount]{};
 };

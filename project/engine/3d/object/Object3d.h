@@ -100,7 +100,7 @@ public:
 
 	void Draw();
 	// 通常描画済みの壁より奥にある部分だけを、指定色の半透明シルエットとして重ねます。
-	// SceneはPlayer・Enemyなど必要なObjectだけに、この関数を追加して使えます。
+	// 通常描画では自動実行しません。壁越しに見せたいObjectだけ、Scene側で明示的に呼びます。
 	void DrawOccludedSilhouette(const Vector4& color);
 	// 反射CameraのTextureを鏡面へ投影して描画する
 	void DrawMirror(uint32_t reflectionTextureSrvIndex, const Matrix4x4& reflectionViewProjection);

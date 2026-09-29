@@ -9,6 +9,7 @@ class Object3d;
 class Object3dCommon;
 class Sprite;
 class SpriteCommon;
+struct Vector4;
 
 // Scene共通の描画開始・PostEffect・ImGui出力の順番をまとめる部品です。
 // 各Sceneはこの部品を使い、「何を描くか」だけをDraw関数に書きます。
@@ -27,7 +28,7 @@ public:
 	};
 
 	// RenderTextureへの描画を始める前に、DirectXとSRVの共通設定を行います。
-	static void Begin(DirectXCommon* directXCommon);
+	static void Begin(DirectXCommon* directXCommon, const Vector4* clearColorOverride = nullptr);
 	// Object3dの共通Pipelineを設定してから、指定条件に合う一覧をまとめて描画します。
 	static void DrawObjects(
 		Object3dCommon* object3dCommon,

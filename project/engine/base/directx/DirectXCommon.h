@@ -20,7 +20,7 @@ public:
 	void ResizeIfNeeded();
 
 	//描画前処理
-	void PreDraw();
+	void PreDraw(const Vector4* clearColorOverride = nullptr);
 	// Scene描画後、ImGuiを描画するSwapChainへ描画先を切り替える
 	void PreDrawForPostEffectTexture();
 	void PreDrawForDepthBasedOutlineTexture();
@@ -79,6 +79,9 @@ public:
 
 	ID3D12CommandQueue* GetCommandQueue() const { return commandQueue.Get(); }
 	ID3D12CommandAllocator* GetCommandAllocator() const { return commandAllocators_[frameIndex_].Get(); }
+	// 描画中のSwapChain枠とフレーム番号です。枠のFence待ち後だけ同じUpload領域を再利用できます。
+	UINT GetFrameIndex() const { return frameIndex_; }
+	uint64_t GetFrameSerial() const { return frameSerial_; }
 	uint32_t GetRenderTextureSrvIndex() const { return renderTextureSrvIndex_; }
 	uint32_t GetPostEffectTextureSrvIndex() const { return postEffectTextureSrvIndex_; }
 	uint32_t GetGaussianBlurTextureSrvIndex() const { return gaussianBlurTextureSrvIndex_; }
@@ -155,6 +158,7 @@ private:
 	UINT64 fenceVal = 0;
 	UINT64 frameFenceValues_[2] = {};
 	UINT frameIndex_ = 0;
+	uint64_t frameSerial_ = 0;
 	std::array<CaptureReadbackSlot, kCaptureReadbackSlotCount_> captureReadbackSlots_{};
 	UINT64 captureSequence_ = 0;
 

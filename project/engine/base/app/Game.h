@@ -1,33 +1,8 @@
 #pragma once
 
-#include <vector>
-#include <wrl.h>
-#include <xaudio2.h>
-#include "Audio.h"
-#include "Object3d.h"
-#include "Sprite.h"
-#include "ParticleEmitter.h"
-#include "Transform.h"
 #include "Framework.h"
-#include "TitleScene.h"
-#include "DebugScene.h"
+#include "StartupRouteSmoke.h"
 #include <string>
-
-class WinApp;
-class DirectXCommon;
-class SrvManager;
-class ImGuiManager;
-class Input;
-class Object3dCommon;
-class CameraManager;
-class Camera;
-class SpriteCommon;
-
-// 現在Gameが管理する大まかな画面状態。
-enum class SceneType {
-	TITLE,
-	DEBUG
-};
 
 class Game : public Framework
 {
@@ -46,9 +21,8 @@ private:
 	// 有効時は一定フレームごとにシーンを切り替え、初期化・破棄を検証する。
 	void UpdateSceneStress();
 
-	SceneType currentScene_ = SceneType::TITLE;
-
-	int selectedUI = 0;
+	// 起動順だけの自動確認をGameから呼び、撮影テストとは独立させます。
+	StartupRouteSmoke startupRouteSmoke_;
 
 	bool sceneStressEnabled_ = false;
 	std::string sceneStressTarget_ = "DEBUG";

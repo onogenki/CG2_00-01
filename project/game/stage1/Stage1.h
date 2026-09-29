@@ -115,13 +115,12 @@ private:
 	// Player開始位置、持てるMirror位置、StageStart演出設定を読込済みLevelDataから反映します。
 	void ApplyStageStartSettings(
 		const LevelLoader::ObjectData* playerStartData,
-		const LevelLoader::ObjectData* carryableMirrorData);
-	// 通常3D配置物とCamera Eventを、JSON一覧から作り直してStageへ確定します。
-	bool RebuildStageRuntime(
+		const LevelLoader::ObjectData* carryableMirrorData,
+		const MapChipField::Chip* csvPlayerStartChip);
+	// 通常3D配置物を仮のRuntimeへ生成します。成功後の採用はApplyStageMapDataが決めます。
+	bool BuildStageRuntime(
 		const std::vector<const LevelLoader::ObjectData*>& additionalObjects,
-		const std::vector<const LevelLoader::ObjectData*>& eventTriggerDataList,
-		const std::vector<const LevelLoader::ObjectData*>& eventCameraDataList,
-		const std::vector<const LevelLoader::ObjectData*>& cameraAreaDataList);
+		StageMapRuntime& outRuntime);
 	// Editorで変更した通常3D配置物とCamera Eventを、再生成せず反映します。
 	void ApplyStageRuntimeEdits(
 		const std::vector<const LevelLoader::ObjectData*>& additionalObjects,

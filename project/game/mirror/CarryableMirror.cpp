@@ -25,7 +25,7 @@ bool CarryableMirror::Initialize(
 	// 持てるMirrorは景色を映さないLaser用の鏡です。UVチェッカーではなく、反射前の鏡らしい明るい板を表示します。
 	object_.SetTextureOverride("resources/white.png");
 	// Laserを反射しない裏側だけを少し暗くし、持ち方にかかわらず表裏を区別します。
-	object_.SetBackFaceBrightness(0.60f);
+	object_.SetBackFaceBrightness(0.35f);
 	// 小型Mirrorも表側だけLaserを反射します。
 	mirror_.SetReflectBackface(false);
 	// 薄い鏡板と同じ形をColliderにも使い、見た目と当たり判定を一致させます。
@@ -34,6 +34,7 @@ bool CarryableMirror::Initialize(
 	return true;
 }
 
+// 入力で持ち方を切り替え、HoldSettingsの位置へ見た目・Laser面・Colliderを一緒に動かします。
 void CarryableMirror::Update(
 	float deltaTime,
 	const Vector3& playerPosition,
@@ -98,7 +99,12 @@ void CarryableMirror::Update(
 			aimYawOffset_ += (0.0f - aimYawOffset_) * returnRate;
 		}
 
-		const float heldYaw = playerFacingYaw + aimYawOffset_;
+		const float targetYaw = playerFacingYaw + aimYawOffset_;
+		// 位置だけ先に旋回すると板がPlayer正面から横へずれるため、位置と向きを同じ角度で補間します。
+		const float yawDifference = std::remainder(targetYaw - yaw_, 2.0f * 3.14159265f);
+		const float followSpeed = isRotatingHeldMirror ? holdTurnFollowSpeed_ * 2.5f : holdTurnFollowSpeed_;
+		const float followRate = 1.0f - std::exp(-followSpeed * (std::max)(deltaTime, 0.0f));
+		const float heldYaw = yaw_ + yawDifference * followRate;
 		const Vector3 playerForward{
 			std::sin(heldYaw),
 			0.0f,
@@ -110,25 +116,20 @@ void CarryableMirror::Update(
 			0.0f,
 			-playerForward.x,
 		};
-		const float heldDistance = isHorizontalHoldMode_ ? horizontalHoldDistance_ : holdDistance_;
-		const float heldHeight = isHorizontalHoldMode_ ? holdHeight_ * 0.70f : holdHeight_;
-		const float heldSideOffset = isHorizontalHoldMode_ ? 0.0f : verticalHoldSideOffset_;
+		const float heldDistance = isHorizontalHoldMode_
+			? holdSettings_.horizontalDistance : holdSettings_.verticalDistance;
+		const float heldHeight = isHorizontalHoldMode_
+			? holdSettings_.horizontalHeight : holdSettings_.verticalHeight;
+		const float heldSideOffset = isHorizontalHoldMode_ ? 0.0f : holdSettings_.verticalSide;
 		const Vector3 heldPosition{
 			playerPosition.x + playerForward.x * heldDistance + playerRight.x * heldSideOffset,
 			playerPosition.y + heldHeight,
 			playerPosition.z + playerForward.z * heldDistance + playerRight.z * heldSideOffset,
 		};
-		// Playerの正面から来るLaserを反射するため、板の表側もPlayerの正面へ向けます。
-		const float targetYaw = heldYaw;
-		// 角度の差を-π～πへ収めると、359度から0度へ回る時も遠回りしません。
-		const float yawDifference = std::remainder(targetYaw - yaw_, 2.0f * 3.14159265f);
-		// 指数補間で、フレームレートに依存せず自然に鏡の向きだけを追従させます。
-		const float followSpeed = isRotatingHeldMirror ? holdTurnFollowSpeed_ * 2.5f : holdTurnFollowSpeed_;
-		const float followRate = 1.0f - std::exp(-followSpeed * (std::max)(deltaTime, 0.0f));
-		const float smoothedYaw = yaw_ + yawDifference * followRate;
+		// 同じheldYawをLaser面・見た目・Colliderへ渡し、持ち替え中も三者をそろえます。
 		const float horizontalBasePitch = isHorizontalFacingUp_ ? -1.57079633f : 1.57079633f;
 		const float targetPitch = isHorizontalHoldMode_ ? horizontalBasePitch + horizontalTilt_ : 0.0f;
-		ApplyTransform(heldPosition, targetPitch, smoothedYaw);
+		ApplyTransform(heldPosition, targetPitch, heldYaw);
 	} else {
 		// 落とした後もColliderを現在のTransformへ追従させます。
 		wasRightMouseHeld_ = false;

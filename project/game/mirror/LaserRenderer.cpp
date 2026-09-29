@@ -14,29 +14,65 @@ bool LaserRenderer::Initialize(DirectXCommon* dxCommon, size_t maximumSegmentCou
 	}
 	dxCommon_ = dxCommon;
 	maximumSegmentCount_ = (std::max)(maximumSegmentCount, size_t{ 1 });
-
-	vertexResource_ = dxCommon_->CreateBufferResource(
-		// 一本のLightを二枚の板で交差させ、どの方向から見ても円柱に近い太さに見せます。
-		sizeof(Vertex) * maximumSegmentCount_ * 12);
-	constantResource_ = dxCommon_->CreateBufferResource(sizeof(ConstantData));
-	if (!vertexResource_ || !constantResource_) {
-		return false;
+	// 通常画面と鏡画面の二回分を、二つのSwapChain枠へ先に用意します。
+	for (FrameResources& frame : frameResources_) {
+		frame.draws.resize(kInitialDrawSlotsPerFrame);
+		for (DrawResources& resources : frame.draws) {
+			if (!CreateDrawResources(resources)) {
+				return false;
+			}
+		}
 	}
-
-	if (FAILED(vertexResource_->Map(0, nullptr, reinterpret_cast<void**>(&mappedVertices_))) ||
-		FAILED(constantResource_->Map(0, nullptr, reinterpret_cast<void**>(&mappedConstantData_)))) {
-		return false;
-	}
-
-	vertexBufferView_.BufferLocation = vertexResource_->GetGPUVirtualAddress();
-	vertexBufferView_.SizeInBytes = static_cast<UINT>(sizeof(Vertex) * maximumSegmentCount_ * 12);
-	vertexBufferView_.StrideInBytes = sizeof(Vertex);
 	return CreateRootSignature() && CreateGraphicsPipeline();
 }
 
+// 頂点とCamera定数を一回のDrawだけが書くUpload領域として準備します。
+bool LaserRenderer::CreateDrawResources(DrawResources& resources)
+{
+	resources.vertexResource = dxCommon_->CreateBufferResource(
+		// 一本のLightを二枚の板で交差させ、どの方向から見ても円柱に近い太さに見せます。
+		sizeof(Vertex) * maximumSegmentCount_ * 12);
+	resources.constantResource = dxCommon_->CreateBufferResource(sizeof(ConstantData));
+	if (!resources.vertexResource || !resources.constantResource) {
+		return false;
+	}
+
+	if (FAILED(resources.vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&resources.mappedVertices))) ||
+		FAILED(resources.constantResource->Map(0, nullptr, reinterpret_cast<void**>(&resources.mappedConstantData)))) {
+		return false;
+	}
+
+	resources.vertexBufferView.BufferLocation = resources.vertexResource->GetGPUVirtualAddress();
+	resources.vertexBufferView.SizeInBytes = static_cast<UINT>(sizeof(Vertex) * maximumSegmentCount_ * 12);
+	resources.vertexBufferView.StrideInBytes = sizeof(Vertex);
+	return true;
+}
+
+// 鏡と通常画面を別領域へ記録し、GPUが先の描画データを読む前の上書きを防ぎます。
 void LaserRenderer::Draw(const std::vector<LaserSegment>& segments, const Camera& camera)
 {
-	if (!mappedVertices_ || !mappedConstantData_ || segments.empty()) {
+	if (!dxCommon_ || segments.empty()) {
+		return;
+	}
+	const UINT frameIndex = dxCommon_->GetFrameIndex();
+	if (frameIndex >= kFrameSlotCount) {
+		return;
+	}
+	FrameResources& frame = frameResources_[frameIndex];
+	if (frame.serial != dxCommon_->GetFrameSerial()) {
+		frame.serial = dxCommon_->GetFrameSerial();
+		frame.nextDraw = 0;
+	}
+	if (frame.nextDraw == frame.draws.size()) {
+		// 将来Passが増えても、同じフレーム内の描画値を上書きしません。
+		frame.draws.emplace_back();
+		if (!CreateDrawResources(frame.draws.back())) {
+			frame.draws.pop_back();
+			return;
+		}
+	}
+	DrawResources& resources = frame.draws[frame.nextDraw++];
+	if (!resources.mappedVertices || !resources.mappedConstantData) {
 		return;
 	}
 
@@ -105,7 +141,7 @@ void LaserRenderer::Draw(const std::vector<LaserSegment>& segments, const Camera
 				{ { endLeft.x, endLeft.y, endLeft.z, 1.0f }, 0.0f, 1.0f },
 			};
 			for (const Vertex& vertex : quadVertices) {
-				mappedVertices_[drawVertexCount++] = vertex;
+				resources.mappedVertices[drawVertexCount++] = vertex;
 			}
 		};
 		appendQuad(side);
@@ -116,15 +152,15 @@ void LaserRenderer::Draw(const std::vector<LaserSegment>& segments, const Camera
 			appendQuad(crossSide);
 		}
 	}
-	mappedConstantData_->viewProjection = camera.GetViewProjectionMatrix();
-	mappedConstantData_->color = color_;
+	resources.mappedConstantData->viewProjection = camera.GetViewProjectionMatrix();
+	resources.mappedConstantData->color = color_;
 
 	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
 	commandList->SetGraphicsRootSignature(rootSignature_.Get());
 	commandList->SetPipelineState(graphicsPipelineState_.Get());
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
-	commandList->SetGraphicsRootConstantBufferView(0, constantResource_->GetGPUVirtualAddress());
+	commandList->IASetVertexBuffers(0, 1, &resources.vertexBufferView);
+	commandList->SetGraphicsRootConstantBufferView(0, resources.constantResource->GetGPUVirtualAddress());
 	commandList->DrawInstanced(static_cast<UINT>(drawVertexCount), 1, 0, 0);
 }
 

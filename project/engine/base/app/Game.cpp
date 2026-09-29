@@ -1,22 +1,10 @@
 #include "Game.h"
 
-#include "SrvManager.h"
-#include "ImGuiManager.h"
-#include "Logger.h"
-#include "TextureManager.h"
-#include "ModelManager.h"
-#include "ParticleManager.h"
-#include "Object3dCommon.h"
-#include "CameraManager.h"
-#include "Camera.h"
-#include "SpriteCommon.h"
 #include"SceneFactory.h"
 #include "SceneManager.h"
 #include <algorithm>
 #include <cstdlib>
 #include <string>
-
-using namespace MyMath;
 
 namespace {
 std::string GetEnvironmentString(const char* name)
@@ -47,6 +35,9 @@ void Game::Initialize()
 	const std::string startSceneName = GetEnvironmentString("CG2_START_SCENE");
 	SceneManager::GetInstance()->ChangeScene(startSceneName.empty() ? "LOADING" : startSceneName);
 	InitializeSceneStressFromEnvironment();
+	startupRouteSmoke_.Initialize(
+		GetEnvironmentString("CG2_STARTUP_ROUTE_SMOKE") == "1",
+		startSceneName.empty());
 }
 
 void Game::Update()
@@ -54,11 +45,16 @@ void Game::Update()
 	//基底クラスのUpdateを呼ぶだけで、マネージャー経由でシーンを更新
 	Framework::Update();
 	UpdateSceneStress();
+	startupRouteSmoke_.Update();
+	if (startupRouteSmoke_.IsFinished()) {
+		endRequest_ = true;
+	}
 }
 
 void Game::Draw()
 {
 	SceneManager::GetInstance()->Draw();
+	startupRouteSmoke_.AfterDraw();
 }
 
 void Game::Finalize()

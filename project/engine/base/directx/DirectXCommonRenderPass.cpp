@@ -4,7 +4,7 @@
 
 // Scene、PostEffect、SwapChainを切り替えるフレーム描画処理をまとめる。
 // Device初期化やTexture Resource作成から分離し、描画順を追いやすくする。
-void DirectXCommon::PreDraw()
+void DirectXCommon::PreDraw(const Vector4* clearColorOverride)
 {
 	if (isDepthStencilShaderResource_)
 	{
@@ -44,12 +44,13 @@ void DirectXCommon::PreDraw()
 	// Sceneの描画先をRenderTextureにする。Sceneでは深度も使用する
 	commandList_->OMSetRenderTargets(1, &renderTextureRtvHandle_, false, &dsvHandle_);
 
-	// Resource生成時のClearValueと同じ赤色でRenderTextureをクリアする
+	// Loadingだけは白を使い、それ以外は従来の消去色でRenderTextureをクリアします。
+	const Vector4& sceneClearColor = clearColorOverride ? *clearColorOverride : renderTextureClearColor_;
 	const float clearColor[] = {
-		renderTextureClearColor_.x,
-		renderTextureClearColor_.y,
-		renderTextureClearColor_.z,
-		renderTextureClearColor_.w
+		sceneClearColor.x,
+		sceneClearColor.y,
+		sceneClearColor.z,
+		sceneClearColor.w
 	};
 	commandList_->ClearRenderTargetView(renderTextureRtvHandle_, clearColor, 0, nullptr);
 
@@ -308,6 +309,8 @@ void DirectXCommon::PostDraw()
 	assert(SUCCEEDED(hr));
 	hr = GetCommandList()->Reset(commandAllocators_[frameIndex_].Get(), nullptr);
 	assert(SUCCEEDED(hr));
+	// 次のUpdate/Drawは新しいフレームとして扱い、描画回ごとのUpload領域を先頭から使います。
+	++frameSerial_;
 
 	//FPS固定
 	UpdateFixFPS();

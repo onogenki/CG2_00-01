@@ -10,6 +10,8 @@ class StageMapObjectIndex
 public:
 	// LevelDataのobjectsとchildrenを最後まで調べ、用途別の一覧を作り直します。
 	void Build(const LevelLoader::LevelData& levelData);
+	// 編集用に、childrenを含むPlayerStartを元のLevelDataから探します。
+	static LevelLoader::ObjectData* FindPlayerStartForEdit(LevelLoader::LevelData& levelData);
 
 	// Stageに一枚だけ必要な床を返します。見つからない場合はnullptrです。
 	const LevelLoader::ObjectData* GetFloor() const { return floor_; }

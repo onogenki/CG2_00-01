@@ -57,6 +57,16 @@ void SceneEditor::ScanResourceShelf(ShelfState& state)
 			errorCode.clear();
 			continue;
 		}
+		// 撮影結果は配置用素材ではないため、Title初期化で全画像をTexture登録しません。
+		// フォルダ自体は残し、CaptureManagerからの保存・再生には影響させません。
+		if (it->is_directory(errorCode) && it->path().filename() == "Captures") {
+			it.disable_recursion_pending();
+			continue;
+		}
+		if (errorCode) {
+			errorCode.clear();
+			continue;
+		}
 		if (!it->is_regular_file(errorCode) || errorCode) {
 			errorCode.clear();
 			continue;
