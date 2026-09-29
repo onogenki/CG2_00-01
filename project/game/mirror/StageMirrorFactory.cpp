@@ -1,5 +1,6 @@
 #include "StageMirrorFactory.h"
 
+#include "CarryableMirror.h"
 #include "DirectXCommon.h"
 #include "FixedMirror.h"
 #include "SrvManager.h"
@@ -23,6 +24,49 @@ namespace
 			});
 		return true;
 	}
+}
+
+// 携帯鏡自身にModelとColliderの準備を任せ、生成できた時だけSceneへ渡します。
+std::unique_ptr<CarryableMirror> StageMirrorFactory::CreateCarryableMirror(
+	Object3dCommon* object3dCommon,
+	const std::string& modelName,
+	const Vector3& position,
+	float width,
+	float height)
+{
+	auto mirror = std::make_unique<CarryableMirror>();
+	if (!mirror->Initialize(object3dCommon, modelName, position, width, height)) {
+		return nullptr;
+	}
+	return mirror;
+}
+
+// 鏡床固有の向き・両面反射・Collider同期をまとめ、Sceneに設定漏れを作らないようにします。
+std::unique_ptr<FixedMirror> StageMirrorFactory::CreateMirrorFloor(
+	Object3dCommon* object3dCommon,
+	const std::string& modelName,
+	const Vector3& position,
+	float width,
+	float height)
+{
+	auto mirror = std::make_unique<FixedMirror>();
+	if (!mirror->Initialize(
+		object3dCommon,
+		DirectXCommon::GetInstance(),
+		SrvManager::GetInstance(),
+		modelName,
+		position,
+		0.0f,
+		width,
+		height,
+		256)) {
+		return nullptr;
+	}
+	mirror->SetPitch(-1.57079633f);
+	mirror->SyncVisualAndCollider();
+	// 鏡床は上下どちらから来たLightも反射する特殊ギミックです。
+	mirror->GetMirror().SetReflectBackface(true);
+	return mirror;
 }
 
 // Sceneの本番一覧とは別の仮一覧へ、反射TextureとColliderを持つMirrorを順番に作ります。

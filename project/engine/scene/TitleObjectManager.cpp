@@ -31,7 +31,10 @@ bool TitleObjectManager::Initialize(
 	baseAnimationObjectCount_ = animationObjects_.size();
 
 	spriteCommon->Initialize(directXCommon);
-	TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png");
+	// 初期画像が読めなければ、未登録Textureを参照するSpriteを作らず失敗を伝えます。
+	if (!TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png")) {
+		return false;
+	}
 	auto titleSprite = std::make_unique<Sprite>();
 	titleSprite->Initialize(spriteCommon, "Resources/uvChecker.png");
 	titleSprite->SetPosition({ 0.0f, 0.0f });
@@ -65,7 +68,10 @@ bool TitleObjectManager::AddModel(Object3dCommon* object3dCommon, const std::str
 // Shelfで追加した画像だけは縦横比を保った仮サイズにし、画像を引き伸ばさないようにします。
 bool TitleObjectManager::AddTexture(SpriteCommon* spriteCommon, const std::string& textureFilePath)
 {
-	TextureManager::GetInstance()->LoadTexture(textureFilePath);
+	// 寸法取得前に読込結果を確認し、欠損画像でGetMetaDataを呼ばないようにします。
+	if (!spriteCommon || !TextureManager::GetInstance()->LoadTexture(textureFilePath)) {
+		return false;
+	}
 	const auto& metadata = TextureManager::GetInstance()->GetMetaData(textureFilePath);
 	Vector2 size{ static_cast<float>(metadata.width), static_cast<float>(metadata.height) };
 	const float largestSide = (std::max)(size.x, size.y);
@@ -81,6 +87,10 @@ bool TitleObjectManager::AddTexture(
 	SpriteCommon* spriteCommon, const std::string& textureFilePath,
 	const Vector2& position, const Vector2& size)
 {
+	// 直接配置の経路でも同じ読込確認を行い、失敗した画像を一覧に残しません。
+	if (!spriteCommon || !TextureManager::GetInstance()->LoadTexture(textureFilePath)) {
+		return false;
+	}
 	auto sprite = std::make_unique<Sprite>();
 	sprite->Initialize(spriteCommon, textureFilePath);
 	sprite->SetAnchorPoint({ 0.5f, 0.5f });

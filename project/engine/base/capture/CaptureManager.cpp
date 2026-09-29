@@ -59,6 +59,7 @@ CaptureManager* CaptureManager::GetInstance()
 	return &instance;
 }
 
+// 撮影機能を初期化し、対応しない構成のSmokeは待ち続けず失敗を記録します。
 void CaptureManager::Initialize()
 {
 	if (initialized_) {
@@ -121,6 +122,12 @@ void CaptureManager::Initialize()
 			log << "START common capture smoke\n";
 		}
 	}
+#ifndef USE_IMGUI
+	// Releaseには撮影更新が無いため、Smokeを開始したまま無限待機させません。
+	if (smokeEnabled_) {
+		FinishSmoke(false, "Capture smoke requires a Development or Debug build with USE_IMGUI.");
+	}
+#endif
 #ifdef USE_IMGUI
 	StartVideoEncoder();
 	StartReplayEncoder();

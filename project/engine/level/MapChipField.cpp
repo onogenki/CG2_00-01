@@ -48,17 +48,24 @@ namespace
 	}
 }
 
+// ファイルを開き、セルの解析はストリーム版と共通の処理へ任せます。
 bool MapChipField::LoadCsv(const std::string& filePath)
 {
 	std::ifstream file(filePath);
-	if (file.fail()) {
+	return LoadCsv(file);
+}
+
+// 空白マスも列番号に数え、有効な記号だけを一時一覧へ読み取って最後に置き換えます。
+bool MapChipField::LoadCsv(std::istream& stream)
+{
+	if (stream.fail()) {
 		return false;
 	}
 
 	std::vector<Chip> loadedChips;
 	std::string line;
 	uint32_t row = 0;
-	while (std::getline(file, line)) {
+	while (std::getline(stream, line)) {
 		std::istringstream lineStream(line);
 		std::string cell;
 		uint32_t column = 0;

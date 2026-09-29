@@ -151,6 +151,7 @@ void Object3d::UpdateCameraForDraw(Camera* drawCamera)
 	}
 }
 
+// 自分の頂点形式に合う描画設定を選び、直前のモデルの種類に依存せず描画します。
 void Object3d::Draw()
 {
 	if (!model_) {
@@ -162,8 +163,8 @@ void Object3d::Draw()
 		// 骨ありModelは、元から使っていたVertex Shader方式で骨行列と頂点影響度を渡して描きます。
 		// これによりwalk.gltfなどのAnimation Modelを、通常Modelと別の正しい頂点形式で描画します。
 		object3dCommon->SetSkinningCommonDrawSetting();
-		if (gpuData_) {
-			gpuData_->BindForObjectDraw(commandList);
+		if (!gpuData_ || !gpuData_->BindForObjectDraw(commandList)) {
+			return;
 		}
 
 		const std::string& environmentTexturePath = object3dCommon->GetEnvironmentTexturePath();
@@ -176,9 +177,11 @@ void Object3d::Draw()
 		return;
 	}
 
-	// 通常モデルは、Sceneが設定した共通Pipelineへ行列・Lightだけを渡して描画する。
-	if (gpuData_) {
-		gpuData_->BindForObjectDraw(commandList);
+	// Animation・SkyBox・鏡の直後でも、通常モデル用の頂点形式とRoot Signatureへ戻します。
+	// Root Signatureを切り替えた後で、このObjectの行列・Light・Textureを設定します。
+	object3dCommon->SetCommonDrawSetting();
+	if (!gpuData_ || !gpuData_->BindForObjectDraw(commandList)) {
+		return;
 	}
 	const std::string& environmentTexturePath = object3dCommon->GetEnvironmentTexturePath();
 	if (!environmentTexturePath.empty() && GetEnvironmentCoefficient() > 0.0f) {

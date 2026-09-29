@@ -2,6 +2,7 @@
 
 #include "Vector3.h"
 #include <cstdint>
+#include <iosfwd>
 #include <string>
 #include <vector>
 
@@ -38,6 +39,8 @@ public:
 
 	// CSVを読み、B0やP0などの有効なマップチップだけを保持します。
 	bool LoadCsv(const std::string& filePath);
+	// ファイルを作らず、同じ読込処理を文字列ストリームなどで確認するための入口です。
+	bool LoadCsv(std::istream& stream);
 	// 読み込んだ全マップチップを返します。
 	const std::vector<Chip>& GetChips() const { return chips_; }
 	// P・E・Bなどの記号を、共通のマップチップ種類へ変換します。

@@ -12,13 +12,13 @@
 #include "SrvManager.h"
 
 // RenderTextureへSceneを描画する前に、共通のDirectXとSRV設定を行います。
-void SceneRenderPipeline::Begin(DirectXCommon* directXCommon)
+void SceneRenderPipeline::Begin(DirectXCommon* directXCommon, const Vector4* clearColorOverride)
 {
 	if (!directXCommon) {
 		return;
 	}
 
-	directXCommon->PreDraw();
+	directXCommon->PreDraw(clearColorOverride);
 	SrvManager::GetInstance()->PreDraw();
 }
 

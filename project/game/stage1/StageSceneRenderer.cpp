@@ -19,6 +19,7 @@ void StageSceneRenderer::Draw(const Context& context)
 		return;
 	}
 
+	// 発射装置もこの一覧に含まれます。壁などのJSON配置物と同じ通常深度で描きます。
 	SceneRenderPipeline::DrawObjects(context.object3dCommon, *context.sceneObjects);
 	context.stageMapRuntime->Draw();
 	for (const std::unique_ptr<FixedMirror>& fixedMirror : *context.fixedMirrors) {

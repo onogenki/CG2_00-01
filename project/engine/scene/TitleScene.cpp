@@ -13,6 +13,7 @@
 #include "ImGuiManager.h"
 #include "Input.h"
 #include "SceneManager.h"
+#include "Logger.h"
 #include <dinput.h>
 #include <cmath>
 using namespace MyMath;
@@ -52,15 +53,22 @@ TitleEditor::Context TitleScene::MakeTitleEditorContext()
 	return context;
 }
 
+// 必須素材がすべて読めた時だけ、Titleの更新・描画を有効にします。
 void TitleScene::Initialize()
 {
+	isInitialized_ = false;
+	isFinished_ = false;
 	InitializeRenderSystems();
 	InitializeDefaultLighting();
 	if (!InitializeTitleObjects()) {
+		Logger::Log("Title initialization failed: a required model or sprite texture could not be loaded.");
 		return;
 	}
-	InitializeSkyBoxAndEditorResources();
-	isFinished_ = false;
+	if (!InitializeSkyBoxAndEditorResources()) {
+		Logger::Log("Title initialization failed: the skybox texture could not be loaded.");
+		return;
+	}
+	isInitialized_ = true;
 }
 
 // DirectX・Camera・Object3d共通設定を、TitleScene用に初期化します。
@@ -113,21 +121,33 @@ bool TitleScene::InitializeTitleObjects()
 }
 
 // Titleを選んだ時だけ、SkyBox TextureとEditor用Resource一覧をまとめて準備します。
-void TitleScene::InitializeSkyBoxAndEditorResources()
+bool TitleScene::InitializeSkyBoxAndEditorResources()
 {
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
-	TextureManager::GetInstance()->LoadTexture("Resources/qwantani_moonrise_puresky_1k.dds");
+	// DDSが無いままSkyBoxを描くと、未登録SRVを参照してしまいます。
+	if (!TextureManager::GetInstance()->LoadTexture("Resources/qwantani_moonrise_puresky_1k.dds")) {
+		return false;
+	}
 	skyBox_ = std::make_unique<SkyBox>();
 	skyBox_->Initialize(dxCommon, cameraManager->GetActiveCamera());
 	skyBox_->SetTexture("Resources/qwantani_moonrise_puresky_1k.dds");
-	// Titleを明示的に開いた時だけ、Editor用のShelfを走査します。
+	// Releaseには編集UIがないため、素材棚の走査・サムネイル読込を行いません。
+#ifdef USE_IMGUI
 	titleEditor_.ScanResourceShelf();
+#endif
+	return true;
 }
 
+// 素材欠損時はScene切替入力だけを扱い、未生成の描画物を更新しません。
 void TitleScene::Update()
 {
 	// Game Viewが操作対象かどうかと入力機器は、このフレームで一度だけ取得します。
 	const bool isGameViewActive = ImGuiManager::GetInstance()->IsGameViewActive();
+	if (!isInitialized_) {
+		// 素材欠損時も入力で次Sceneへ進めます。未生成のSkyBox・Spriteには触れません。
+		UpdateSceneTransition(isGameViewActive);
+		return;
+	}
 	UpdateSceneContent();
 	UpdateEditorUi(isGameViewActive);
 	UpdateSceneTransition(isGameViewActive);
@@ -192,10 +212,16 @@ void TitleScene::UpdateSceneTransition(bool isGameViewActive)
 	}
 }
 
+// 初期化に失敗したFrameも共通Pipelineを閉じ、未登録Textureは描画しません。
 void TitleScene::Draw()
 {
 	// 共通PipelineがRenderTextureへの描画開始を行い、Titleは描画対象だけを並べます。
 	SceneRenderPipeline::Begin(DirectXCommon::GetInstance());
+	if (!isInitialized_) {
+		// 失敗はログへ記録済みです。未生成の描画物を使わず、このFrameを閉じます。
+		SceneRenderPipeline::End(DirectXCommon::GetInstance(), nullptr, false);
+		return;
+	}
 
 	SceneRenderPipeline::DrawObjects(object3dCommon, titleObjects_.GetNormalObjects());
 	SceneRenderPipeline::DrawObjects(object3dCommon, titleObjects_.GetAnimationObjects());
@@ -212,6 +238,7 @@ void TitleScene::Draw()
 		cameraManager ? cameraManager->GetActiveCamera() : nullptr);
 }
 
+// 成功・途中失敗のどちらでも、Titleが所有した資源を同じ順番で解放します。
 void TitleScene::Finalize()
 {
 	//GPUの完了待ち
@@ -222,5 +249,6 @@ void TitleScene::Finalize()
 	mainCamera.reset();
 	cameraManager.reset();
 	isFinished_ = false;
+	isInitialized_ = false;
 
 }

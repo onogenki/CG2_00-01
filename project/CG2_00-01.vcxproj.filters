@@ -452,6 +452,9 @@
     <ClCompile Include="engine\level\MapChipField.cpp">
       <Filter>04_Level\Data</Filter>
     </ClCompile>
+	<ClCompile Include="engine\level\MapChipRegistry.cpp">
+		<Filter>04_Level\Data</Filter>
+	</ClCompile>
 	<ClCompile Include="engine\level\StageMapObjectIndex.cpp">
       <Filter>04_Level\Runtime</Filter>
     </ClCompile>
@@ -524,6 +527,9 @@
 	<ClCompile Include="engine\debug\DebugUiSmoke.cpp">
       <Filter>07_Debug\SmokeTests</Filter>
     </ClCompile>
+	<ClCompile Include="game\StartupRouteSmoke.cpp">
+	  <Filter>07_Debug\SmokeTests</Filter>
+	</ClCompile>
     <ClCompile Include="game\stage1\debug\StagePuzzleDebugUi.cpp">
       <Filter>08_Game\Stage1</Filter>
     </ClCompile>
@@ -551,6 +557,9 @@
 	<ClCompile Include="game\stage1\Stage1MapLoading.cpp">
       <Filter>08_Game\Stage1</Filter>
     </ClCompile>
+	<ClCompile Include="game\stage1\StageMapChipFactory.cpp">
+		<Filter>08_Game\Stage1</Filter>
+	</ClCompile>
 	<ClCompile Include="game\stage1\Stage1Lighting.cpp">
       <Filter>08_Game\Stage1</Filter>
     </ClCompile>
@@ -811,6 +820,9 @@
     <ClInclude Include="engine\level\MapChipField.h">
       <Filter>04_Level\Data</Filter>
     </ClInclude>
+	<ClInclude Include="engine\level\MapChipRegistry.h">
+		<Filter>04_Level\Data</Filter>
+	</ClInclude>
 	<ClInclude Include="engine\level\StageMapObjectIndex.h">
       <Filter>04_Level\Runtime</Filter>
     </ClInclude>
@@ -901,6 +913,9 @@
 	<ClInclude Include="engine\debug\DebugUiSmoke.h">
       <Filter>07_Debug\SmokeTests</Filter>
     </ClInclude>
+	<ClInclude Include="game\StartupRouteSmoke.h">
+	  <Filter>07_Debug\SmokeTests</Filter>
+	</ClInclude>
 	<ClInclude Include="game\stage1\debug\StagePuzzleDebugUi.h">
 	  <Filter>08_Game\Stage1</Filter>
     </ClInclude>
@@ -910,6 +925,9 @@
     <ClInclude Include="game\stage1\Stage1.h">
       <Filter>08_Game\Stage1</Filter>
     </ClInclude>
+	<ClInclude Include="game\stage1\StageMapChipFactory.h">
+		<Filter>08_Game\Stage1</Filter>
+	</ClInclude>
 	<ClInclude Include="game\stage1\StageCollisionWorld.h">
       <Filter>08_Game\Stage1</Filter>
     </ClInclude>

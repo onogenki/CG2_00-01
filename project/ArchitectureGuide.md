@@ -31,12 +31,22 @@ Object3dの完全な型を知る場所で生成・破棄します。
 `SceneFactory`
 
 `"TITLE"`、`"DEBUG"`、`"STAGE1"`という名前から、対応するSceneを一体生成します。
-Scene追加時は、SceneFactoryへ名前と生成関数を一行登録します。
+ゲームのScene追加は`game/GameSceneRegistration.cpp`の`RegisterGameScenes()`へ、名前と生成関数を登録します。
+その登録を`GameSceneRegistry`経由で`SceneFactory`へ渡すため、Stage追加だけでengine側へStageのヘッダを増やす必要はありません。
 
 `SceneManager`
 
 現在のSceneを所有し、切替時に`Finalize → Initialize`の順で呼びます。
 各Sceneは`SceneManager::ChangeScene()`で次のScene名を予約するだけで、古いSceneの解放を自分で行いません。
+
+通常起動は`Game::Initialize()`が`LOADING`を予約し、白い`LoadingScene`が`TITLE`を予約します。
+Titleから本編に入ると`ChangeSceneWithLoading("STAGE1")`で再びLoadingを経由します。
+`StartupRouteSmoke`は環境変数を指定したテスト時だけ`Game`に呼ばれ、この順番と各SceneのDraw回数を確認します。Sceneの生成や所有はしません。
+
+### 入力を読む順番
+
+`Framework::Update()`はScene更新より先に`Input::Update()`を呼びます。`Input`は前フレームの状態を保存した後、`UpdateKeyboard()`→`UpdateMouse()`→`UpdateGamepads()`→`UpdateCurrentDevice()`の順に更新します。`TriggerKey()`や`TriggerMouseButton()`は、保存した前フレームと現在値の差から「押した瞬間」を返します。
+`TitleScene`のEnter判定と`Stage1::UpdateMirrorGameplay()`のEキー・マウス判定は、同じ`Input`から読みます。ReleaseでマウスのDirectInput取得に失敗した時だけWindows入力へ切り替えます。キーボードの取得失敗はログに残しますが、現在はWindows入力への切替処理を持ちません。
 
 `Stage1`
 
@@ -139,6 +149,21 @@ Stage1は`B0`を`block.obj`の1x1x1ブロック、`P0`をPlayer開始位置へ�
 CSVの1マスは`MapChipField::GetPosition()`で3D座標へ変換されるため、
 MapChipFieldへモデル名や当たり判定の処理を混ぜません。
 
+`MapChipRegistry`は「種類＋番号」と実行する処理を結びます。`Stage1::ApplyStageMapData()`で`P0`と`B0`を登録し、CSVで読んだ各マスを渡します。
+未登録の番号は何も作りません。`StageMapChipFactory::CreateBlockData()`が`B0`を`block.obj`と1×1×1のBOX Colliderへ変換します。
+
+| CSVに書くもの | 現在の結果 | 処理を追加する場所 |
+| --- | --- | --- |
+| `P0` | Playerの開始位置。JSONのPlayerStartより優先 | `Stage1::ApplyStageMapData()`のP0登録 |
+| `B0` | `block.obj`とBOX Collider | 同関数のB0登録、外観・判定値は`StageMapChipFactory` |
+| `E0/G0/C0/L0` | 種類として認識するが、まだ生成しない | 各ゲーム機能を作った後、同関数へ番号と処理を登録 |
+| `B1`などの未登録番号 | 生成しない | 同関数へ別番号で登録 |
+| `,`で区切った空欄 | 何も生成しない。列位置だけ一マス進む | 登録不要 |
+
+CSVファイル自体は任意です。`resources/maps/stage1.csv`がなければJSONだけでStage1を開始できます。
+番号別処理を追加する時は、`Stage1::ApplyStageMapData()`のP0/B0登録を見て、同じ場所に種類・番号・処理を一組登録します。
+今はEnemyやGoalの実体がないため、対応表だけでそれらがゲームに出るわけではありません。
+
 `StageMapRuntime`
 
 JSON/CSVから渡された通常モデルを実行中の`Object3d`として管理します。
@@ -162,13 +187,14 @@ Stage1は`Object3dRenderContext`を一度作り、`StageMapRuntime::UpdateRender
 `Stage1`が所有する`stage1.json`と`stage1.csv`の、保存時刻監視・再読込・JSON保存だけを置く実装ファイルです。
 読込後に実行中のObjectへ反映する判断は引き続き`Stage1::ApplyStageMapData()`が行います。
 つまり、ファイルを読む責任と、読んだデータを本編の床・鏡・Cameraへ使う責任を、読み手が別々に追えます。
-CSVのチップ種別や配置ルールは変更していません。
+CSVの読込と座標変換は`MapChipField`、番号ごとの処理選択は`MapChipRegistry`、Stage1専用ブロックの見た目とCollider値は`StageMapChipFactory`が担当します。
 
 `Stage1EditorUi.cpp`
 
 Edit ViewのLevel編集UIと、鏡・Light Puzzle用のDebug UIを置く実装ファイルです。
 Object、Player、Mirror、Light Puzzleの所有者は引き続き`Stage1`で、UIはContextに借りたデータを表示・編集するだけです。
 本編の更新順を読みたい時は`Stage1.cpp`、Edit Viewを直したい時はこのファイルを開きます。
+`Reload Now`はStage1所有のLevelDataを入れ替えるため、そのフレームのUIは古いContextを使わず終了し、次フレームに新しい参照を受け取ります。
 
 `Stage1MirrorGameplay.cpp`
 
@@ -177,12 +203,14 @@ DoorやSwitchの進行規則は`StageLightPuzzle`、いつMirror処理を呼ぶ�
 
 ### 固定鏡の配置を変えたい時
 
-`StageMirrorFactory`は、Levelの配置データを固定鏡へ変換するゲーム側の窓口です。
+`StageMirrorFactory`は、携帯鏡・鏡床の生成と、Levelの配置データを固定鏡へ変換するゲーム側の窓口です。
 既存の`FixedMirror`へJSON依存を持ち込まず、汎用の`Object3dFactory`へ鏡専用の反射設定も混ぜません。
 
 | 責任 | 担当 |
 | --- | --- |
 | JSONを読み、Mirrorタグを分類する | `LevelLoader` → `StageMapObjectIndex` |
+| 未所持の携帯鏡を作る | `StageMirrorFactory::CreateCarryableMirror()` |
+| 水平・両面反射の鏡床を作る | `StageMirrorFactory::CreateMirrorFloor()` |
 | 生成と編集反映を選び、鏡一覧を所有する | `Stage1::ApplyStageMapData()` |
 | 配置データから鏡を生成する | `StageMirrorFactory::CreateFixedMirrors()` |
 | 既存の鏡へ位置・Y回転・幅・高さ・BOX設定を反映する | `StageMirrorFactory::ApplyFixedMirrorEdits()` |
@@ -196,6 +224,25 @@ Editorの位置変更では既存の鏡を更新し、反射Textureを作り直�
 `plane.obj`の元サイズが幅・高さともに2なので、`scaling.x/y × 2`が鏡の幅・高さです。
 BOXの`collider.size`はローカル全辺長で、Factoryが半辺長へ変換し、`FixedMirror`がモデルのTransformに合わせます。
 表示・衝突の仕組みを変える時だけ`FixedMirror`を読み、配置調整のために描画基盤を書き換えないようにします。
+
+携帯鏡と鏡床は、Factoryが作った`unique_ptr`をSceneが受け取って所有します。
+Factoryは生成だけで、毎フレームの更新・描画やSceneの切替はしません。
+
+```cpp
+// Stage1の初期化例です。位置・幅・高さは直接数値で指定できます。
+carryableMirror_ = StageMirrorFactory::CreateCarryableMirror(
+	object3dCommon, "plane.obj", { -2.5f, -0.8f, 4.5f }, 3.6f, 3.6f);
+// 必須の携帯鏡を作れなかった場合、見えないままゲームを続行しません。
+if (!carryableMirror_) {
+	return false;
+}
+```
+
+これは`Stage1::InitializeStageGimmicks()`内の初期値です。その後のJSON読込で携帯鏡の位置を上書きするので、
+実際の開始位置は`stage1.json`の`CarryableMirrorStart`を編集します。
+鏡床の位置・幅・高さは`Stage1.h`の`mirrorFloorPosition_`／`mirrorFloorWidth_`／`mirrorFloorHeight_`です。
+鏡床の水平化・Collider同期・両面反射設定は`CreateMirrorFloor()`にそろえ、Stage側で個別に設定し忘れない形にしています。
+Stage1では従来通り、携帯鏡の生成失敗は初期化中断、鏡床の失敗はその部品なしで続行します。
 
 `Stage1Lighting.cpp`
 
@@ -211,6 +258,8 @@ JSONで置いたキー・フィル・バックライトを先に残し、空い�
 3. `UpdateCameraTransform()`：壁回避した位置と走行中のFOVをCameraへ反映する。
 
 開始演出のCamera移動は`StageStart`、通常追従と壁回避は`CameraController`です。二つを混ぜず、Stage1はどちらを優先するかだけを決めます。
+
+壁越し表示はCameraの壁回避とは別の機能です。`Object3d::DrawOccludedSilhouette()`を明示的に呼んだObjectだけ、壁の奥へ半透明の形を重ねます。Stage1のLaser発射装置には現在呼んでいないため、通常の深度判定で壁に隠れます。Cameraの位置を変えるだけで壁越し表示は有効になりません。
 
 `StageCollisionWorld`
 
@@ -276,6 +325,14 @@ if (player.CheckCollision(enemy.GetCollider()).isCollision) {
 
 `Check()`は重なり情報だけを返します。床や壁へ押し戻す時だけ`ResolveSolidObbs()`を使うため、判定の目的がコードから分かります。
 
+Colliderをメンバーへ追加するだけでは、移動や判定は自動実行されません。
+ゲーム物体のUpdateで「移動→Colliderへ位置を同期→必要な判定・押し戻し→モデルへ最終位置を反映」を行います。
+具体例は`Player::UpdateWithControl()`です。Sceneへ同じ処理をもう一度書く必要はありません。
+
+`SetTrigger(true)`は「通り抜ける判定」の目印です。`Check()`では重なりを検出します。
+`SphereCollider::ResolveSolidObbs()`は自分がTriggerなら押し戻しませんが、引数は生のOBB一覧なので、相手のEnabled／Trigger情報は含まれません。
+一覧を作る側で床・壁だけを選びます。`StageCollisionWorld`が本編の一覧作成の入口です。
+
 Colliderを持つPlayer、Enemy、Mirror、JSON配置物は、同じ名前の規則を使います。
 
 ```cpp
@@ -289,6 +346,58 @@ const MyMath::OBB& mirrorObb = mirror.GetObb();
 
 `CheckCollision()`はPlayer・Enemyを扱うScene用の短い窓口です。
 `GetCollider()`は汎用Collider処理を直接使う時だけ、`GetSphere()`と`GetObb()`は形状データが必要な時だけ使います。
+
+## Audio：読む・鳴らす・止める担当
+
+| 部品 | 所有するもの | ゲーム側で使う入口 |
+| --- | --- | --- |
+| `Audio` | 読込済み音源、再生中Voice、XAudio2 | 共通基盤。通常は下の再生部品から使う |
+| `BgmPlayer` | 一曲分のVoiceIdとフェード状態。Audioは借りる | `Initialize`、`Play`、`Update`、`Stop` |
+| `SoundEffectPlayer` | 効果音名とファイルの対応表。Audioは借りる | `Register("Jump", パス)`、`Play("Jump")` |
+| `AudioMixer` | BGM用とSE用の音量倍率 | `SetBgmVolume`、`SetSoundEffectVolume` |
+
+`Framework::Initialize()`がAudioを初期化します。各Sceneはもう一度Audioを初期化せず、共有Audioを借ります。
+毎フレームは`Framework::Update()`のAudio更新（終了済みVoiceの回収）→Scene更新→Scene描画の順です。
+Sceneが持つBgmPlayerは、SceneのUpdateから一度だけ更新します。
+
+```cpp
+// Sceneのメンバーとして所有します。毎フレーム作り直しません。
+BgmPlayer bgm_;
+SoundEffectPlayer soundEffects_;
+
+// Sceneの初期化で、Frameworkが準備したAudioを借ります。
+bgm_.Initialize(Audio::GetInstance());
+soundEffects_.Initialize(Audio::GetInstance());
+
+// 登録は読込までで、まだ音は出ません。失敗した場合はゲーム側でログなどへ報告します。
+if (!soundEffects_.Register("Notice", "resources/Alarm01.wav")) {
+	// 音源の配置・ファイル名を確認するためのエラー処理をここへ書きます。
+}
+
+// 必要なイベントが起きた時だけ鳴らします。Updateで無条件に呼ばないでください。
+soundEffects_.Play("Notice");
+
+// Sceneの終了時は即停止します。フェード停止には、その後もUpdateが必要です。
+bgm_.Stop();
+soundEffects_.Clear();
+```
+
+上は配置場所ごとの抜粋です。全行を一つの関数へ入れる例ではありません。
+`BgmPlayer::Play()`は呼んだ時に再生開始します。画面表示まで待つ機能はBgmPlayer自身にはありません。
+本編の例は`Stage1::UpdateStageBgm()`です。`Stage1::Draw()`を通った後のUpdateで、一度だけPlayします。
+`Audio::LoadFile()`は再生せず事前読込だけを行えます。
+
+`IsPlaying()`は「未終了のVoiceを保持している」という意味で、一時停止中もtrueです。停止中かは`IsPaused()`と併せて判断します。
+`SoundEffectPlayer::Clear()`は名前の登録だけを消し、再生済みSEを止めたり共有音源を解放したりしません。
+`BgmPlayer`の破棄だけでは停止しないので、SceneのFinalizeで`Stop()`を呼びます。`Audio::Unload()`は全Sceneで共有する音源を消すため、通常はFrameworkの終了処理だけで使います。
+
+### Mixerの現在の制限
+
+現在のAudioMixerは音量の保存先であり、再生中のVoiceを管理するミキサーバスではありません。
+SE音量は次に`SoundEffectPlayer::Play()`した音へ適用されます。
+BGM音量はPlay・SetVolume・フェード更新時に適用されます。フェードが終わった後は、Mixerの値だけを変えても自動反映されません。
+設定変更直後に`bgm_.SetVolume(曲自体の音量)`を呼ぶと合成音量を反映できますが、進行中のフェードを終える点に注意してください。
+この制限の解消は動作変更になるため、構造整理とは分けて検証します。
 
 ## Camera
 
@@ -367,6 +476,8 @@ Transform・Animation・Model描画を担当します。
 `Object3d`一体がGPUへ渡す行列、Light、Camera、鏡反射用のConstant Bufferを担当します。
 GPU Resourceを作る・値を更新する・Root Parameterへ結び付ける処理だけを持ち、
 PlayerやStageのルールは持ちません。
+通常モデルとAnimationモデルの描画では、鏡CameraとGame Cameraが同じフレームで値を上書きしないよう、
+`BindForObjectDraw`が描画一回分の行列とCamera位置をSwapChain枠ごとのBufferへ固定します。
 
 この分離により、モデルの動きやAnimationを追いたい時は`Object3d`、
 DirectXのConstant Bufferを追いたい時は`Object3dGpuData`だけを読めばよくなります。
@@ -680,6 +791,7 @@ Stage1本編はPlayer・Mirror・Door・Cameraを更新し、Smoke Testの記録
 Title画面のModel Shelf、Inspector、3D/2D Edit Viewの選択状態を担当します。
 TitleSceneはCamera・Light・Scene切替を担当し、モデル・Spriteは`TitleObjectManager`が所有します。
 `TitleEditor`へ一覧と「追加・削除する操作窓口」だけを渡します。
+初期モデル・初期画像・SkyBox DDSのどれかが読めない場合、`TitleScene::Initialize()`がログを残し、未生成物の更新・描画を止めます。Scene切替入力だけは受け付けます。
 
 初期配置の通常モデル・Animationモデル・Spriteの数はそれぞれ保持します。
 `Clear Title Added`は、この境界より後に追加したものだけを消すため、将来のTitle演出用Animationを消しません。
@@ -690,6 +802,7 @@ TitleEditorは`BaseScene`を継承しません。画面全体ではなく、Titl
 
 `TitleObjectManager`は、Title用の通常モデル・Animationモデル・Spriteと、初期配置の件数をまとめて所有します。
 汎用の`Object3dCollection`にはTitleだけの画像配置ルールを追加せず、3Dモデルの生成には既存の`Object3dFactory`を使います。
+追加画像が読めない時は`AddTexture()`が`false`を返し、画像の寸法参照やSprite登録を行いません。`TitleEditor`はその失敗を受け取り、未作成の画像を選択しません。
 
 | 変更したいこと | 読む関数 |
 | --- | --- |
@@ -710,8 +823,17 @@ Editorから追加した物は次フレームの描画準備でCamera・Lightを
 `StageEditor`
 
 Stage1のEdit View全体の窓口です。Collider確認、JSONの追加・削除・保存、Lighting編集、Viewport操作を順番に表示します。
+発射装置モデルは`Stage1`の`sceneObjects_`が所有し、`StageSceneRenderer`ではほかの通常Objectと同じ一覧から描きます。Rendererへ発射装置を個別に渡す必要はありません。
+`Stage Lighting`で照明を変えた時は`Stage1::ApplyStageLighting()`だけを呼びます。床・鏡・PlayerStartなどの配置は再反映しないため、遊びながら明るさを調整しても、置いた携帯鏡の位置は戻しません。設定を次回も使うには`Stage Map Editor`の`Save Map`でJSONを保存します。
+`Stage Lighting`と`Stage Player`はInspector内の別タブです。片方を開いても、もう片方の操作欄を覆いません。
 Stage1はJSON・Player・鏡・実行中Objectを所有し続け、`StageEditor`には再構築・保存・再読込の操作だけを渡します。
 このクラスは画面全体ではないため、`BaseScene`を継承しません。
+
+`Stage Player`の`Player Position`は、今動いているPlayerだけを移動します。`PlayerStart Position`は次回開始位置として`stage1.json`の元データを編集します。現在地を開始位置にしたい時は`Copy Current Player to PlayerStart`を押し、Stage Map Editorの`Save Map`で保存してからStage1を再起動します。`stage1.csv`に`P0`がある時はCSVが優先されるため、JSONの開始位置編集は表示しません。
+
+`Game Camera Yaw (deg)`は通常Cameraの目標角度を度数で指定します。例えば`-135`を入力してGame Viewへ戻ると、Playerの斜め後方へCameraが回ります。Edit View中はCamera更新が止まるため、表示には現在角度ではなく`CameraController::GetTargetOrbitYaw()`の目標角度を使います。この値は実行中だけで、JSONには保存しません。Releaseには編集UIがないため、この欄も表示されません。
+
+同じ`Stage Player`の`Carried Mirror`は、鏡を持っている間の位置を実行中に調整します。`Vertical Distance`／`Horizontal Distance`はPlayerから前方への距離、`Vertical Side`は縦持ち時の左右、各`Height`は高さです。数値をダブルクリックして直接入力できます。値は再起動で戻るため、決まったら`Copy Mirror C++ Defaults`で設定文をコピーし、`CarryableMirror.h`の`HoldSettings`へ貼り付けます。反射方向と当たり判定は、`CarryableMirror::Update()`が同じ位置・角度から更新します。
 
 `StageEditViewport`
 
@@ -756,10 +878,11 @@ Title再起動確認は終了コード0で成功です。どの確認もゲー�
 | Stage1の携帯Mirror操作・反射対象一覧・危険Light反射 | Stage1MirrorGameplay |
 | Stage1のLaser・危険LightをSpotLightへ変換 | Stage1Lighting |
 | JSON/CSVから通常モデルを作る | StageMapRuntime |
-| Levelの固定鏡データを生成・編集反映する | StageMirrorFactory |
+| 携帯鏡・鏡床を生成し、Levelの固定鏡データを生成・編集反映する | StageMirrorFactory |
 | Playerを追従する通常Camera | CameraController |
 | TriggerでCameraを変える | StageCameraEvents |
 | 時間で動く危険Light | StageHazardLights |
+| 一回のLaser描画用の頂点・Camera定数を保持する | LaserRenderer |
 | Stage1だけの鏡パズルの規則 | StageLightPuzzle（呼び出す順番はStage1） |
 | Stage全体のColliderを用途別一覧へまとめる | StageCollisionWorld |
 | Stage1のEdit View全体 | StageEditor |

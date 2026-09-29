@@ -70,6 +70,8 @@ private:
 	BYTE key[256] = {};
 	//前回の全キーの状態
 	BYTE keyPre[256] = {};
+	// 前面表示中にキーボード取得が失敗した時だけ、一度ログへ知らせます。
+	bool keyboardUnavailableLogged_ = false;
 
 	// マウス
 	ComPtr<IDirectInputDevice8> mouse = nullptr;
@@ -77,6 +79,9 @@ private:
 	DIMOUSESTATE mouseState{}; // マウスの状態
 	int mouseScreenX = 0; // マウスのスクリーン座標X
 	int mouseScreenY = 0; // マウスのスクリーン座標Y
+	POINT previousMousePosition_{};
+	bool hasPreviousMousePosition_ = false;
+	bool mouseFallbackLogged_ = false;
 
 	// ゲームパッド
 	std::vector<ComPtr<IDirectInputDevice8>> gamepads;
@@ -87,6 +92,10 @@ private:
 	//現在の操作機種を記憶する変数を追加(初期値はキーボード)
 	InputDevice currentDevice_ = InputDevice::Keyboard;
 
+	void UpdateKeyboard();
+	void UpdateMouse();
+	void UpdateGamepads();
+	void UpdateCurrentDevice();
 	void SearchGamepads();   // コントローラーを検索する関数を独立させる
 	int reSearchTimer_ = 0;  // 再検索までのフレームを数えるタイマー
 

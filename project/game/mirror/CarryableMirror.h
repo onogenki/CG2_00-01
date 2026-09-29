@@ -12,6 +12,20 @@ class Object3dCommon;
 class CarryableMirror
 {
 public:
+	// 持った時の位置だけをまとめます。ここに書いた初期値がゲーム開始時の配置です。
+	struct HoldSettings
+	{
+		float verticalDistance = 2.5f;
+		float horizontalDistance = 4.0f;
+		float verticalSide = 0.0f;
+		float verticalHeight = 0.5f;
+		float horizontalHeight = 0.35f;
+	};
+	// Editorの調整値を次のUpdateから使います。鏡の大きさや反射判定は変えません。
+	void SetHoldSettings(const HoldSettings& settings) { holdSettings_ = settings; }
+	// Editorが現在の持ち位置を読み、画面へ表示します。
+	const HoldSettings& GetHoldSettings() const { return holdSettings_; }
+
 	// ModelとColliderの初期化に成功した時だけtrueを返します。
 	// falseならStageは鏡なしで続行せず、原因を初期化時に止められます。
 	bool Initialize(
@@ -56,12 +70,7 @@ private:
 	float yaw_ = 0.0f;
 	// 横持ちから置いた直後の鏡も、同じ位置から拾い直せる距離です。
 	float pickupDistance_ = 4.0f;
-	float holdDistance_ = 1.8f;
-	// 0ならPlayerの正面です。左右へずらしたい場合だけ、この値を変更します。
-	float verticalHoldSideOffset_ = 0.0f;
-	// 水平MirrorはPlayerから離して、前方の上下Lightを受けやすくします。
-	float horizontalHoldDistance_ = 3.40f;
-	float holdHeight_ = 0.5f;
+	HoldSettings holdSettings_{};
 	// Playerが旋回した時に、鏡が目標方向へ追従する速さです。
 	float holdTurnFollowSpeed_ = 9.0f;
 	// 左クリック中にMouseを動かした時、MirrorをPlayerの前方で横へ回す速さです。

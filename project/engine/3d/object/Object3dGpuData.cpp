@@ -5,12 +5,14 @@
 #include "MyMath.h"
 #include <cmath>
 #include <numbers>
+#include <utility>
 
 using namespace MyMath;
 
 // Object3d一体分のConstant Bufferを作成し、安全な初期値を書き込みます。
 void Object3dGpuData::Initialize(DirectXCommon* dxCommon)
 {
+	dxCommon_ = dxCommon;
 	CreateTransformationMatrixData(dxCommon);
 	CreateCameraData(dxCommon);
 	CreateOccludedSilhouetteData(dxCommon);
@@ -36,28 +38,66 @@ void Object3dGpuData::UpdateTransform(const Matrix4x4& worldMatrix, const Camera
 	cameraData_->worldPosition = camera->GetTranslate();
 }
 
-// 通常モデル描画で使う各Constant BufferをRoot Parameterへ設定します。
-void Object3dGpuData::BindForObjectDraw(ID3D12GraphicsCommandList* commandList) const
+// 鏡と通常画面を同じFrameで描いても行列が上書きされないよう、描画ごとに値を固定します。
+bool Object3dGpuData::BindForObjectDraw(ID3D12GraphicsCommandList* commandList)
 {
-	if (!commandList || !transformationMatrixResource_ || !directionalLightResource_ ||
-		!cameraResource_ || !pointLightResource_ || !spotLightResource_) {
-		return;
+	if (!commandList || !dxCommon_ || !transformationMatrixData_ || !cameraData_ ||
+		!directionalLightResource_ || !pointLightResource_ || !spotLightResource_) {
+		return false;
 	}
+	const UINT frameIndex = dxCommon_->GetFrameIndex();
+	if (frameIndex >= kFrameSlotCount) {
+		return false;
+	}
+	FrameMatrices& frame = frameMatrices_[frameIndex];
+	const uint64_t serial = dxCommon_->GetFrameSerial();
+	if (frame.serial != serial) {
+		frame.serial = serial;
+		frame.nextDraw = 0;
+	}
+	if (frame.nextDraw == frame.draws.size()) {
+		DrawMatrices matrices;
+		if (!CreateDrawMatrices(matrices)) {
+			return false;
+		}
+		frame.draws.push_back(std::move(matrices));
+	}
+	DrawMatrices& matrices = frame.draws[frame.nextDraw++];
+	*matrices.transformData = *transformationMatrixData_;
+	*matrices.cameraData = *cameraData_;
 	commandList->SetGraphicsRootConstantBufferView(
 		1,
-		transformationMatrixResource_->GetGPUVirtualAddress());
+		matrices.transformResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(
 		3,
 		directionalLightResource_->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(
 		4,
-		cameraResource_->GetGPUVirtualAddress());
+		matrices.cameraResource->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(
 		5,
 		pointLightResource_->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(
 		6,
 		spotLightResource_->GetGPUVirtualAddress());
+	return true;
+}
+
+// 一回の描画専用Upload領域を確保し、Map失敗時は描画しないように知らせます。
+bool Object3dGpuData::CreateDrawMatrices(DrawMatrices& matrices)
+{
+	matrices.transformResource = dxCommon_->CreateBufferResource(sizeof(Object3d::TransformationMatrix));
+	matrices.cameraResource = dxCommon_->CreateBufferResource(sizeof(Object3d::CameraForGPU));
+	if (!matrices.transformResource || !matrices.cameraResource) {
+		return false;
+	}
+	if (FAILED(matrices.transformResource->Map(
+		0, nullptr, reinterpret_cast<void**>(&matrices.transformData))) ||
+		FAILED(matrices.cameraResource->Map(
+			0, nullptr, reinterpret_cast<void**>(&matrices.cameraData)))) {
+		return false;
+	}
+	return true;
 }
 
 // 壁越し表示では通常Lightを使わず、Objectの行列と指定色だけをGPUへ渡します。

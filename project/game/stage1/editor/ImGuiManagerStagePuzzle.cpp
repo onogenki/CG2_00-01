@@ -11,7 +11,8 @@ bool ImGuiManager::StageLightingWindow(LevelLoader::LightingData& lighting)
 	bool isChanged = false;
 #ifdef USE_IMGUI
 	if (inspectorDockId_ != 0) {
-		ImGui::SetNextWindowDockID(inspectorDockId_, ImGuiCond_FirstUseEver);
+		// 古いレイアウトに浮動位置が残っていても、ほかのStage編集タブを覆わないようにします。
+		ImGui::SetNextWindowDockID(inspectorDockId_, ImGuiCond_Always);
 	}
 	if (!ImGui::Begin("Stage Lighting")) {
 		ImGui::End();

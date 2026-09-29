@@ -35,8 +35,8 @@ private:
 	void InitializeDefaultLighting();
 	// 背景の平面モデルと初期Spriteを作成します。
 	bool InitializeTitleObjects();
-	// Titleを明示的に開いた時だけ、SkyBox TextureとEditor用Resource一覧を準備します。
-	void InitializeSkyBoxAndEditorResources();
+	// SkyBox Textureが読めた時だけ、SkyBoxとEditor用Resource一覧を準備します。
+	bool InitializeSkyBoxAndEditorResources();
 	// Camera・Light・3Dモデル・Sprite・SkyBoxを、このフレームの状態へ更新します。
 	void UpdateSceneContent();
 	// Title専用の編集UIを更新します。
@@ -68,4 +68,6 @@ private:
 	// ---------- Titleの進行状態 ----------
 	// trueになると、SceneManagerがTitleSceneを終了できます。
 	bool isFinished_ = false;
+	// 必須モデル・画像・SkyBoxがそろわない時は、未生成の描画物を更新しません。
+	bool isInitialized_ = false;
 };
