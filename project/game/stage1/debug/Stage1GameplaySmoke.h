@@ -91,6 +91,16 @@ private:
 	bool gameplaySmokeCarryMirrorReflectedLaser_ = false;
 	// 携帯Mirrorの裏面がLaserを反射しないかを記録します。
 	bool gameplaySmokeCarryMirrorBackfaceIgnored_ = false;
+	// Playerが横を向いた時、携帯Mirrorの位置と反射面も同じ向きへ追従するかを記録します。
+	bool gameplaySmokeCarryMirrorFollowsPlayerFacing_ = false;
+	// Stage1からPlayerの向きを渡した後も、携帯Mirrorが横向きへ追従するかを記録します。
+	bool gameplaySmokeStageMirrorFollowsPlayerFacing_ = false;
+	// Stage1経由の追従確認で、鏡を一時的に持ち上げたかを記録します。
+	bool gameplaySmokeStageMirrorProbeStarted_ = false;
+	// Stage1経由の追従確認を終え、鏡を元の床位置へ戻したかを記録します。
+	bool gameplaySmokeStageMirrorProbeFinished_ = false;
+	// Stage1経由の追従確認後に戻す、床に置いた鏡の位置です。
+	Vector3 gameplaySmokeStageMirrorDropPosition_{};
 	// 水平に持つMirrorの操作が正しく切り替わるかを記録します。
 	bool gameplaySmokeCarryMirrorHorizontalControl_ = false;
 	// 傾けた水平MirrorがLaserの進行方向を変えるかを記録します。

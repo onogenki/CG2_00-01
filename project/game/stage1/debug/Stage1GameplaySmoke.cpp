@@ -196,6 +196,17 @@ void Stage1GameplaySmoke::Initialize(const InitializeContext& context)
 			carryMirrorBackfaceProbe.GetSegments().front().end.z - carryMirrorBackfaceProbe.GetSegments().front().start.z,
 		}) < 3.10f;
 
+	// Playerが右を向いた後は、鏡の中心と反射面がともに右前方へ移ることを確認します。
+	carryableMirror_->Update(1.0f, mirrorPosition, 1.57079633f, false);
+	const Vector3 turnedMirrorCenter = carryableMirror_->GetMirror().GetCenter();
+	const Vector3 turnedMirrorNormal = carryableMirror_->GetMirror().GetNormal();
+	gameplaySmokeCarryMirrorFollowsPlayerFacing_ =
+		turnedMirrorCenter.x - mirrorPosition.x > 2.49f &&
+		std::abs(turnedMirrorCenter.z - mirrorPosition.z) < 0.02f &&
+		turnedMirrorNormal.x > 0.99f;
+	// 後続の水平持ちテストは従来と同じ前方向から始めます。
+	carryableMirror_->Update(1.0f, mirrorPosition, 0.0f, false);
+
 	// 短い右クリックを離す操作を二回行い、上向き・下向きの水平Mirrorになることを確認します。
 	carryableMirror_->Update(0.05f, mirrorPosition, 0.0f, false, false, 0.0f, true, 0.0f);
 	carryableMirror_->Update(0.05f, mirrorPosition, 0.0f, false, false, 0.0f, false, 0.0f);
@@ -550,6 +561,35 @@ void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
 				return Length(centerDifference) < 0.001f && Length(sizeDifference) < 0.001f;
 			});
 	}
+	// 本編のStage1::UpdateMirrorGameplayを通し、横向きのPlayerへ鏡面と持ち位置が追従するかを確認します。
+	// 確認後は元の床位置へ戻し、後続の落下確認へ影響させません。
+	if (carryableMirror_ && !gameplaySmokeStageMirrorProbeStarted_ &&
+		gameplaySmokeDroppedMirrorIsSolid_ && gameplaySmokeElapsedTime_ < 6.0f &&
+		player_->GetFacingYaw() > 1.3f) {
+		gameplaySmokeStageMirrorDropPosition_ = carryableMirror_->GetMirror().GetCenter();
+		carryableMirror_->SetCarried(true);
+		gameplaySmokeStageMirrorProbeStarted_ = true;
+	} else if (carryableMirror_ && gameplaySmokeStageMirrorProbeStarted_ &&
+		!gameplaySmokeStageMirrorProbeFinished_) {
+		const float facingYaw = player_->GetFacingYaw();
+		const Vector3 playerForward{ std::sin(facingYaw), 0.0f, std::cos(facingYaw) };
+		const Mirror& heldMirror = carryableMirror_->GetMirror();
+		const Vector3 heldOffset{
+			heldMirror.GetCenter().x - player_->GetPosition().x,
+			0.0f,
+			heldMirror.GetCenter().z - player_->GetPosition().z,
+		};
+		const float heldDistance = Length(heldOffset);
+		gameplaySmokeStageMirrorFollowsPlayerFacing_ =
+			heldDistance > 0.001f &&
+			Dot(heldOffset, playerForward) / heldDistance > 0.95f &&
+			Dot(heldMirror.GetNormal(), playerForward) > 0.95f;
+		if (gameplaySmokeStageMirrorFollowsPlayerFacing_ || gameplaySmokeElapsedTime_ >= 6.5f) {
+			carryableMirror_->SetCarried(false);
+			carryableMirror_->SetDroppedPosition(gameplaySmokeStageMirrorDropPosition_);
+			gameplaySmokeStageMirrorProbeFinished_ = true;
+		}
+	}
 	// 床の端へ歩かせる検証は、Stageの床形状が変わると成立しません。
 	// 開始演出後に床から離れた位置へ一度だけ移し、重力と落下だけを独立して確認します。
 	if (gameplaySmokeSawGrounded_ &&
@@ -587,6 +627,8 @@ void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
 		gameplaySmokeDroppedMirrorIsSolid_ &&
 		gameplaySmokeCarryMirrorReflectedLaser_ &&
 		gameplaySmokeCarryMirrorBackfaceIgnored_ &&
+		gameplaySmokeCarryMirrorFollowsPlayerFacing_ &&
+		gameplaySmokeStageMirrorFollowsPlayerFacing_ &&
 		gameplaySmokeCarryMirrorHorizontalControl_ &&
 		gameplaySmokeCarryMirrorTiltRedirectsLaser_ &&
 		gameplaySmokeCarriedMirrorBlocksPlayer_ &&
@@ -615,6 +657,8 @@ void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
 			<< " droppedMirrorSolid=" << gameplaySmokeDroppedMirrorIsSolid_
 			<< " carryLaser=" << gameplaySmokeCarryMirrorReflectedLaser_
 			<< " carryBackface=" << gameplaySmokeCarryMirrorBackfaceIgnored_
+			<< " carryFollowsPlayerFacing=" << gameplaySmokeCarryMirrorFollowsPlayerFacing_
+			<< " stageMirrorFollowsPlayerFacing=" << gameplaySmokeStageMirrorFollowsPlayerFacing_
 			<< " carryHorizontal=" << gameplaySmokeCarryMirrorHorizontalControl_
 			<< " carryTiltLaser=" << gameplaySmokeCarryMirrorTiltRedirectsLaser_
 			<< " carriedMirrorBlocksPlayer=" << gameplaySmokeCarriedMirrorBlocksPlayer_

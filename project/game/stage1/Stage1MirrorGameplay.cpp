@@ -1,18 +1,16 @@
 #include "Stage1.h"
 
 #include "CarryableMirror.h"
-#include "Camera.h"
 #include "DirectXCommon.h"
 #include "FixedMirror.h"
 #include "ImGuiManager.h"
 #include "Input.h"
 #include "Player.h"
 #include <dinput.h>
-#include <cmath>
 
 using namespace MyMath;
 
-// Playerによる携帯鏡の操作と、Puzzle Laserの反射・Player接触を更新します。
+// Player自身の向きを携帯鏡へ渡し、操作・Puzzle Laserの反射・Player接触を更新します。
 void Stage1::UpdateMirrorGameplay()
 {
 	// Eキー・Mouse入力をCarryableMirrorへ渡し、鏡のTransformとLaser反射経路を同じフレームで更新します。
@@ -45,18 +43,11 @@ void Stage1::UpdateMirrorGameplay()
 	const float mirrorAimMouseY = isHorizontalMirrorHeld
 		? static_cast<float>(input->GetMouseY())
 		: 0.0f;
-	// Playerの移動方向とCameraの向きが違っても、携帯鏡は画面から見たPlayer正面へ置きます。
-	float mirrorFacingYaw = player_->GetFacingYaw();
-	if (cameraManager && cameraManager->GetActiveCamera()) {
-		const Vector3 cameraForward = GetCameraForward(*cameraManager->GetActiveCamera());
-		if (cameraForward.x * cameraForward.x + cameraForward.z * cameraForward.z > 0.0001f) {
-			mirrorFacingYaw = std::atan2(cameraForward.x, cameraForward.z);
-		}
-	}
+	// Cameraが別の方向を向いていても、鏡はPlayerが向く正面へ追従させます。
 	carryableMirror_->Update(
 		DirectXCommon::GetInstance()->GetDeltaTime(),
 		player_->GetPosition(),
-		mirrorFacingYaw,
+		player_->GetFacingYaw(),
 		interactPressed,
 		isMirrorAiming,
 		mirrorAimMouseX,
