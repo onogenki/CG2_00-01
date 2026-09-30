@@ -200,6 +200,7 @@ Object、Player、Mirror、Light Puzzleの所有者は引き続き`Stage1`で、
 
 Playerの入力を携帯Mirrorへ渡す処理、固定Mirror・鏡床・携帯Mirrorを反射対象として集める処理、危険LightをMirrorで反射する処理を置く実装ファイルです。
 DoorやSwitchの進行規則は`StageLightPuzzle`、いつMirror処理を呼ぶかは`Stage1::Update()`が担当します。
+持っている鏡の向きはCameraではなく`Player::GetFacingYaw()`から決めます。`Stage1::UpdateMirrorGameplay()`がこの角度を渡し、`CarryableMirror::Update()`が位置・見た目・反射面・Colliderを同じ角度へ追従させます。
 
 ### 固定鏡の配置を変えたい時
 
@@ -240,6 +241,7 @@ if (!carryableMirror_) {
 
 これは`Stage1::InitializeStageGimmicks()`内の初期値です。その後のJSON読込で携帯鏡の位置を上書きするので、
 実際の開始位置は`stage1.json`の`CarryableMirrorStart`を編集します。
+現在はPlayerStartより前方の`(20, -0.8, 30)`に置いています。持った後の距離はJSONではなく`CarryableMirror.h`の`HoldSettings`で調整します。
 鏡床の位置・幅・高さは`Stage1.h`の`mirrorFloorPosition_`／`mirrorFloorWidth_`／`mirrorFloorHeight_`です。
 鏡床の水平化・Collider同期・両面反射設定は`CreateMirrorFloor()`にそろえ、Stage側で個別に設定し忘れない形にしています。
 Stage1では従来通り、携帯鏡の生成失敗は初期化中断、鏡床の失敗はその部品なしで続行します。
