@@ -23,12 +23,10 @@ namespace {
 // 演出の秒数と終点はここだけを調整すれば変更できます。
 constexpr float kFrameSeconds = 0.1f;
 constexpr float kNoiseCoverSeconds = 0.1f;
-constexpr float kFastPullSeconds = 4.35f;
-constexpr float kSlowPullSeconds = 2.5f;
+constexpr float kPullBackSeconds = 5.1f;
 constexpr float kNoiseFadeSeconds = 0.4f;
 constexpr float kTiltDownSeconds = 1.25f;
 const Vector3 kCameraStart{ 0.0f, 0.0f, -10.0f };
-const Vector3 kCameraFastBack{ 0.0f, 0.0f, -46.0f };
 const Vector3 kCameraPulledBack{ 0.0f, 0.0f, -52.0f };
 const Vector3 kCameraLookDown{ 0.68f, 0.35f, 0.0f };
 }
@@ -315,29 +313,21 @@ void TitleScene::UpdateTitlePresentation(float deltaTime)
 		}
 	}
 	if (presentationStep_ == PresentationStep::kPullBack) {
-		// 後退速度はそのままに、ノイズだけ先に消します。板の実寸は変えません。
+		// 途中で止まらず遠くの停止位置まで後退し、ノイズだけ先に消します。
 		presentationTimer_ += deltaTime;
-		if (presentationTimer_ < kFastPullSeconds) {
-			const float t = std::clamp(presentationTimer_ / kFastPullSeconds, 0.0f, 1.0f);
-			const float eased = 1.0f - (1.0f - t) * (1.0f - t);
-			mainCamera->SetTranslate(Lerp(kCameraStart, kCameraFastBack, eased));
-			const float noiseFade = std::clamp(
-				(kNoiseFadeSeconds - presentationTimer_) / kNoiseFadeSeconds, 0.0f, 1.0f);
-			PostEffect::GetInstance()->SetRandomNoiseIntensity(noiseFade);
-			if (noiseFade <= 0.0f) {
-				PostEffect::GetInstance()->SetRandomNoise(false);
-			}
-		} else {
+		const float t = std::clamp(presentationTimer_ / kPullBackSeconds, 0.0f, 1.0f);
+		const float eased = 1.0f - (1.0f - t) * (1.0f - t);
+		mainCamera->SetTranslate(Lerp(kCameraStart, kCameraPulledBack, eased));
+		const float noiseFade = std::clamp(
+			(kNoiseFadeSeconds - presentationTimer_) / kNoiseFadeSeconds, 0.0f, 1.0f);
+		PostEffect::GetInstance()->SetRandomNoiseIntensity(noiseFade);
+		if (noiseFade <= 0.0f) {
 			PostEffect::GetInstance()->SetRandomNoise(false);
-			const float t = std::clamp(
-				(presentationTimer_ - kFastPullSeconds) / kSlowPullSeconds, 0.0f, 1.0f);
-			const float eased = t * t * (3.0f - 2.0f * t);
-			mainCamera->SetTranslate(Lerp(kCameraFastBack, kCameraPulledBack, eased));
-			if (t >= 1.0f) {
-				presentationStep_ = PresentationStep::kTiltDown;
-				presentationTimer_ = 0.0f;
-				Logger::Log("Title presentation: downward camera turn started.");
-			}
+		}
+		if (t >= 1.0f) {
+			presentationStep_ = PresentationStep::kTiltDown;
+			presentationTimer_ = 0.0f;
+			Logger::Log("Title presentation: downward camera turn started.");
 		}
 	} else if (presentationStep_ == PresentationStep::kTiltDown) {
 		// 停止位置を固定したまま斜め下へ回し、画面の板を視野から外します。
