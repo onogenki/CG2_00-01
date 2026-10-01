@@ -18,12 +18,21 @@ class SpriteCommon;
 class TitleObjectManager
 {
 public:
+	// 仮画像のコマ数を、ManagerとSceneで同じ値として使います。
+	static constexpr std::size_t kTitleFrameCount = 12;
+
 	// 所有するObject3dとSpriteの完全な型を知るcpp側で生成・破棄します。
 	TitleObjectManager();
 	~TitleObjectManager();
 
-	// 従来どおり、背景モデル→Sprite共通設定→初期画像の順に準備します。
+	// 既存の一括初期化経路を残し、モデルとSpriteを順に準備します。
 	bool Initialize(Object3dCommon* object3dCommon, SpriteCommon* spriteCommon, DirectXCommon* directXCommon);
+	// Titleの最初の画面用に、白背景と仮画像Spriteだけを先に作ります。
+	bool InitializeSprites(SpriteCommon* spriteCommon, DirectXCommon* directXCommon);
+	// Spriteを一度描いた後で、監視画面の板と視点移動先の仮床を作ります。
+	bool InitializeModel(Object3dCommon* object3dCommon);
+	// ウィンドウの大きさが変わっても、背景と仮画像を全画面に保ちます。
+	void ResizeTitleSprites();
 	// Factoryでモデルを作り、Titleの配置規則で通常／Animation一覧へ追加します。
 	bool AddModel(Object3dCommon* object3dCommon, const std::string& fileName);
 	// Shelfの仮配置です。画像の縦横比を保ち、同じ数値位置へ追加します。
@@ -31,6 +40,8 @@ public:
 	// 本番用は位置とサイズを直接指定します。InspectorのPos/Sizeをそのまま渡せます。
 	bool AddTexture(SpriteCommon* spriteCommon, const std::string& textureFilePath,
 		const Vector2& position, const Vector2& size);
+	// Titleの導入Spriteと3D監視画面を、同じ番号の仮画像に切り替えます。
+	bool SetTitleFrame(std::size_t frameIndex);
 	// 初期配置は残し、Editorから追加した要素だけを解放します。
 	void ClearAdded();
 	// Scene側でGPU完了を待ってから呼び、Spriteとモデルを全て解放します。

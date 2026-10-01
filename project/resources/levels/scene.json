@@ -63,7 +63,7 @@
                     1.3626524209976196
                 ]
             },
-            "file_name": "AnimatedCube.gltf",
+            "file_name": "debug/AnimatedCube.gltf",
             "object_type": "ITEM",
             "tag": "",
             "collider": {
@@ -100,7 +100,7 @@
                     1.0
                 ]
             },
-            "file_name": "sphere.obj",
+            "file_name": "debug/sphere.obj",
             "object_type": "ITEM",
             "tag": "",
             "collider": {

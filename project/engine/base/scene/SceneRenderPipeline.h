@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <vector>
 
@@ -34,10 +35,11 @@ public:
 		Object3dCommon* object3dCommon,
 		const std::vector<std::unique_ptr<Object3d>>& objects,
 		ObjectDrawFilter filter = ObjectDrawFilter::kAll);
-	// Spriteの共通Pipelineを設定してから、空要素を飛ばして一覧を描画します。
+	// Spriteの共通Pipelineを設定し、指定位置以降の空でない要素だけ描画します。
 	static void DrawSprites(
 		SpriteCommon* spriteCommon,
-		const std::vector<std::unique_ptr<Sprite>>& sprites);
+		const std::vector<std::unique_ptr<Sprite>>& sprites,
+		size_t firstSpriteIndex = 0);
 	// Sceneのモデル描画後に、PostEffect・SwapChain・必要ならImGui・Presentまでを順番に実行します。
 	static void End(DirectXCommon* directXCommon, const Camera* activeCamera, bool drawImGui = true);
 };

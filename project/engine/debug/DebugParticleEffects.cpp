@@ -14,21 +14,21 @@
 void DebugParticleEffects::InitializeResources()
 {
 	TextureManager* textureManager = TextureManager::GetInstance();
-	textureManager->LoadTexture("Resources/uvChecker.png");
-	textureManager->LoadTexture("Resources/circle.png");
-	textureManager->LoadTexture("Resources/circle2.png");
-	textureManager->LoadTexture("Resources/gradationLine.png");
+	textureManager->LoadTexture("Resources/debug/uvChecker.png");
+	textureManager->LoadTexture("Resources/debug/circle.png");
+	textureManager->LoadTexture("Resources/debug/circle2.png");
+	textureManager->LoadTexture("Resources/debug/gradationLine.png");
 
 	ParticleManager* particleManager = ParticleManager::GetInstance();
-	particleManager->CreateParticleGroup("Circle", "Resources/circle.png");
-	particleManager->CreateParticleGroup("Plane", "Resources/uvChecker.png");
-	particleManager->CreateParticleGroup("Hit", "Resources/circle2.png");
-	particleManager->CreateRingParticleGroup("Ring", "Resources/gradationLine.png");
-	particleManager->CreateCylinderParticleGroup("Cylinder", "Resources/gradationLine.png");
-	particleManager->CreateParticleGroup("PillarSparkle", "Resources/circle2.png");
-	particleManager->CreateParticleGroup("LightCore", "Resources/circle2.png");
-	particleManager->CreateParticleGroup("LightRain", "Resources/gradationLine.png");
-	particleManager->CreateParticleGroup("LightSpiral", "Resources/circle2.png");
+	particleManager->CreateParticleGroup("Circle", "Resources/debug/circle.png");
+	particleManager->CreateParticleGroup("Plane", "Resources/debug/uvChecker.png");
+	particleManager->CreateParticleGroup("Hit", "Resources/debug/circle2.png");
+	particleManager->CreateRingParticleGroup("Ring", "Resources/debug/gradationLine.png");
+	particleManager->CreateCylinderParticleGroup("Cylinder", "Resources/debug/gradationLine.png");
+	particleManager->CreateParticleGroup("PillarSparkle", "Resources/debug/circle2.png");
+	particleManager->CreateParticleGroup("LightCore", "Resources/debug/circle2.png");
+	particleManager->CreateParticleGroup("LightRain", "Resources/debug/gradationLine.png");
+	particleManager->CreateParticleGroup("LightSpiral", "Resources/debug/circle2.png");
 
 	GPUParticle* gpuParticle = GPUParticle::GetInstance();
 	gpuParticle->SetEmitterType(0, GPUParticle::EmitterType::Mix);

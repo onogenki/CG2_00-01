@@ -12,7 +12,7 @@
 # ゲーム本体とは別にテストをビルドします。
 MSBuild project/tests/AudioApiSmoke.vcxproj /m /p:Configuration=Debug /p:Platform=x64
 # リポジトリ内の音源を使い、無音でAPIの戻り値と状態を確認します。
-./generated/tests/Debug/AudioApiSmoke.exe project/resources/Alarm01.wav
+./generated/tests/Debug/AudioApiSmoke.exe project/resources/debug/Alarm01.wav
 ```
 
 合格範囲はAPIの戻り値・保持状態です。Mixer変更後の再生中Voiceの実音量、欠損音源、音声デバイス切断、全コーデック、BGMと画面表示の同期を保証するテストではありません。

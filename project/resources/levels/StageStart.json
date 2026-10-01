@@ -7,7 +7,7 @@
             "name": "StartFloor",
             "object_type": "STATIC",
             "tag": "Floor",
-            "file_name": "floor.obj",
+            "file_name": "debug/floor.obj",
             "transform": {
                 "translation": [
                     20.0,

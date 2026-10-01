@@ -29,12 +29,12 @@ void PostEffect::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 	randomNoiseData_->time = 0.0f;
 	randomNoiseData_->intensity = 1.0f;
 
-	const std::string dissolveMaskFilePath = "Resources/noise0.png";
+	const std::string dissolveMaskFilePath = "Resources/debug/noise0.png";
 	const bool isLoaded = TextureManager::GetInstance()->LoadTexture(dissolveMaskFilePath);
 	assert(isLoaded);
 	dissolveMaskSrvIndex_ = TextureManager::GetInstance()->GetSrvIndex(dissolveMaskFilePath);
 
-	const std::string dissolveMaskNoise1FilePath = "Resources/noise1.png";
+	const std::string dissolveMaskNoise1FilePath = "Resources/debug/noise1.png";
 	const bool isNoise1Loaded = TextureManager::GetInstance()->LoadTexture(dissolveMaskNoise1FilePath);
 	assert(isNoise1Loaded);
 	dissolveMaskNoise1SrvIndex_ = TextureManager::GetInstance()->GetSrvIndex(dissolveMaskNoise1FilePath);

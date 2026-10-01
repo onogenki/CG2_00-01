@@ -55,7 +55,7 @@ void DebugUiSmoke::Update(State& state, const Context& context)
 			[&state](const SceneEditor::ShelfEntry& entry)
 			{
 				if (state.isAnimationPreviewTest || state.isAnimationSceneTest) {
-					return entry.canLoad && entry.hasAnimation && entry.fileName == "walk.gltf";
+					return entry.canLoad && entry.hasAnimation && entry.fileName == "debug/walk.gltf";
 				}
 				return entry.canLoad && !entry.hasAnimation && !entry.isTexture;
 			});

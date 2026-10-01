@@ -31,7 +31,7 @@ void LoadingScene::InitializeLoadingSprite()
 	spriteCommon->Initialize(DirectXCommon::GetInstance());
 
 	loadingSprite_ = std::make_unique<Sprite>();
-	loadingSprite_->Initialize(spriteCommon, "resources/white.png");
+	loadingSprite_->Initialize(spriteCommon, "resources/debug/white.png");
 	loadingSprite_->SetPosition({ 0.0f, 0.0f });
 	loadingSprite_->SetAnchorPoint({ 0.0f, 0.0f });
 	// 最初のDrawまでUpdateが呼ばれなくても、その時点の画面サイズで白く覆います。

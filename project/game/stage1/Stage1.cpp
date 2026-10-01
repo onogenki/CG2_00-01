@@ -16,6 +16,7 @@
 #include "Player.h"
 #include "PostEffect.h"
 #include "SceneRenderPipeline.h"
+#include "SceneManager.h"
 #include "SrvManager.h"
 #include "StageMapObjectIndex.h"
 #include "MapChipRegistry.h"
@@ -111,7 +112,7 @@ bool Stage1::InitializeStageGimmicks()
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
 
 	// 床はJSON読込後に配置を上書きするため、ここでは読込失敗時用の初期値を置きます。
-	floor_ = sceneObjects_.Create("floor.obj");
+	floor_ = sceneObjects_.Create("debug/floor.obj");
 	if (!floor_) {
 		return false;
 	}
@@ -124,7 +125,7 @@ bool Stage1::InitializeStageGimmicks()
 	carryableMirror_ = StageMirrorFactory::CreateCarryableMirror(
 		object3dCommon,
 		// 以前から携帯Mirrorに使っていた白い板Modelを使います。
-		"plane.obj",
+		"debug/plane.obj",
 		{ -2.5f, -0.8f, 4.5f },
 		3.6f,
 		3.6f);
@@ -136,33 +137,33 @@ bool Stage1::InitializeStageGimmicks()
 	// 鏡床は従来通り任意の部品です。生成失敗ならnullptrのまま、ほかの部品を準備します。
 	mirrorFloor_ = StageMirrorFactory::CreateMirrorFloor(
 		object3dCommon,
-		"plane.obj",
+		"debug/plane.obj",
 		mirrorFloorPosition_,
 		mirrorFloorWidth_,
 		mirrorFloorHeight_);
 
 	// 白い小球をLaserの発射装置として置き、光がどこから出るかを見えるようにします。
-	laserEmitter_ = sceneObjects_.Create("sphere.obj");
+	laserEmitter_ = sceneObjects_.Create("debug/sphere.obj");
 	if (!laserEmitter_) {
 		return false;
 	}
 	laserEmitter_->SetTranslate(puzzleSettings.laserOrigin);
 	laserEmitter_->SetScale({ 0.9f, 0.9f, 0.9f });
-	laserEmitter_->SetTextureOverride("resources/white.png");
+	laserEmitter_->SetTextureOverride("resources/debug/white.png");
 
-	doorLaserEmitter_ = sceneObjects_.Create("sphere.obj");
+	doorLaserEmitter_ = sceneObjects_.Create("debug/sphere.obj");
 	if (!doorLaserEmitter_) {
 		return false;
 	}
 	doorLaserEmitter_->SetTranslate(puzzleSettings.doorLaserOrigin);
 	doorLaserEmitter_->SetScale({ 0.65f, 0.65f, 0.65f });
-	doorLaserEmitter_->SetTextureOverride("resources/white.png");
+	doorLaserEmitter_->SetTextureOverride("resources/debug/white.png");
 
 	// 危険Lightの色・太さ・描画用Rendererは、軌道と同じギミック部品が所有します。
 	hazardLights_.Initialize(dxCommon);
 
 	// 二つのSwitchはSphere、Doorは厚みのあるfloor.objを縮小して表現します。
-	chargeSwitch_ = sceneObjects_.Create("sphere.obj");
+	chargeSwitch_ = sceneObjects_.Create("debug/sphere.obj");
 	if (!chargeSwitch_) {
 		return false;
 	}
@@ -172,9 +173,9 @@ bool Stage1::InitializeStageGimmicks()
 		puzzleSettings.chargeSwitchRadius * 2.0f,
 		puzzleSettings.chargeSwitchRadius * 2.0f,
 	});
-	chargeSwitch_->SetTextureOverride("resources/white.png");
+	chargeSwitch_->SetTextureOverride("resources/debug/white.png");
 
-	doorSwitch_ = sceneObjects_.Create("sphere.obj");
+	doorSwitch_ = sceneObjects_.Create("debug/sphere.obj");
 	if (!doorSwitch_) {
 		return false;
 	}
@@ -184,9 +185,9 @@ bool Stage1::InitializeStageGimmicks()
 		puzzleSettings.doorSwitchRadius * 2.0f,
 		puzzleSettings.doorSwitchRadius * 2.0f,
 	});
-	doorSwitch_->SetTextureOverride("resources/white.png");
+	doorSwitch_->SetTextureOverride("resources/debug/white.png");
 
-	lightDoor_ = sceneObjects_.Create("floor.obj");
+	lightDoor_ = sceneObjects_.Create("debug/floor.obj");
 	if (!lightDoor_) {
 		return false;
 	}
@@ -225,13 +226,13 @@ bool Stage1::InitializePlayerAndCamera()
 		? stagePlayerStartPosition_
 		: Vector3{ 0.0f, -0.8f, 5.0f };
 	player_ = std::make_unique<Player>();
-	if (!player_->Initialize(object3dCommon, "sphere.obj", playerStartPosition, 1.2f)) {
+	if (!player_->Initialize(object3dCommon, "debug/sphere.obj", playerStartPosition, 1.2f)) {
 		// Playerモデルを作れない状態で、Cameraや開始演出がnullptrを参照しないよう中断します。
 		player_.reset();
 		return false;
 	}
 	// sphere.obj本来のUVチェッカーを使わず、Playerだけへモンスターボール画像を明示します。
-	player_->GetObject().SetTextureOverride("resources/monsterBall.png");
+	player_->GetObject().SetTextureOverride("resources/debug/monsterBall.png");
 
 	// Camera本体とは別のControllerに、Playerを追従する規則を任せます。
 	cameraController_ = std::make_unique<CameraController>();
@@ -374,6 +375,11 @@ void Stage1::Update()
 	}
 	if (player_) {
 		renderContext.UpdateObject(player_->GetObject());
+	}
+	// Game ViewのBackSpaceだけで戻り、Stage1の解放中は共通Loading画面を表示します。
+	if (ImGuiManager::GetInstance()->IsGameViewActive() &&
+		Input::GetInstance()->TriggerKey(DIK_BACK)) {
+		SceneManager::GetInstance()->ChangeSceneWithLoading("TITLE");
 	}
 }
 
@@ -562,7 +568,7 @@ void Stage1::UpdateStageBgm(float deltaTime)
 
 	if (!hasStageBgmStarted_) {
 		// 現在ある短い音源を動作確認用にループします。曲を追加したらこのパスだけ差し替えます。
-		hasStageBgmStarted_ = stageBgm_.Play("resources/Alarm01.wav", 0.20f, 0.80f);
+		hasStageBgmStarted_ = stageBgm_.Play("resources/debug/Alarm01.wav", 0.20f, 0.80f);
 	}
 	stageBgm_.Update(deltaTime);
 }

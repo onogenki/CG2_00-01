@@ -5,8 +5,11 @@
 #include "Sprite.h"
 #include "SpriteCommon.h"
 #include "TextureManager.h"
+#include "DirectXCommon.h"
 #include <algorithm>
 #include <utility>
+#include <array>
+#include <numbers>
 
 // 前方宣言した所有型を、完全な型が分かる場所で生成します。
 TitleObjectManager::TitleObjectManager() = default;
@@ -14,34 +17,121 @@ TitleObjectManager::TitleObjectManager() = default;
 // 所有するモデル・Spriteを、完全な型が分かる場所で破棄します。
 TitleObjectManager::~TitleObjectManager() = default;
 
-// 初期背景と画像を作り、Editorの一括削除から保護する件数を記録します。
+// 従来の一括初期化経路では、モデルとSpriteの両方を準備します。
 bool TitleObjectManager::Initialize(
 	Object3dCommon* object3dCommon,
 	SpriteCommon* spriteCommon,
 	DirectXCommon* directXCommon)
 {
-	auto terrain = Object3dFactory::Create(object3dCommon, "plane.obj");
-	if (!terrain) {
+	return InitializeModel(object3dCommon) && InitializeSprites(spriteCommon, directXCommon);
+}
+
+// 導入映像の板と視点を下げた後の仮床を作り、Editorの初期配置件数を記録します。
+bool TitleObjectManager::InitializeModel(Object3dCommon* object3dCommon)
+{
+	auto monitorScreen = Object3dFactory::Create(object3dCommon, "debug/plane.obj");
+	auto floor = Object3dFactory::Create(object3dCommon, "debug/plane.obj");
+	if (!monitorScreen || !floor ||
+		!TextureManager::GetInstance()->LoadTexture("Resources/debug/grass.png")) {
 		return false;
 	}
-	// Camera・LightはSceneのRenderContextへ任せ、ここでは従来の配置だけを設定します。
-	terrain->GetTransform().translate = { 1.0f, -2.0f, 10.0f };
-	normalObjects_.push_back(std::move(terrain));
+	// Spriteを隠した後も同じ絵が見えるよう、正面に仮の監視画面を置きます。
+	monitorScreen->SetTranslate({ 0.0f, 0.0f, 0.0f });
+	// モデル読込時にXが反転するため、正面をCameraへ向けてSpriteと同じ左右にします。
+	monitorScreen->SetRotate({ 0.0f, std::numbers::pi_v<float>, 0.0f });
+	monitorScreen->SetScale({ 4.0f, 2.25f, 1.0f });
+	monitorScreen->SetTextureOverride("Resources/Title/2dTitle/2DTitle1.png");
+	// 遠くなったCameraから下を向いても見える位置へ、仮床だけ移します。
+	floor->SetTranslate({ 0.0f, -3.0f, -40.0f });
+	floor->SetRotate({ -std::numbers::pi_v<float> / 2.0f, 0.0f, 0.0f });
+	floor->SetScale({ 20.0f, 20.0f, 1.0f });
+	floor->SetTextureOverride("Resources/debug/grass.png");
+	normalObjects_.push_back(std::move(monitorScreen));
+	normalObjects_.push_back(std::move(floor));
 	baseNormalObjectCount_ = normalObjects_.size();
 	baseAnimationObjectCount_ = animationObjects_.size();
+	return true;
+}
 
-	spriteCommon->Initialize(directXCommon);
-	// 初期画像が読めなければ、未登録Textureを参照するSpriteを作らず失敗を伝えます。
-	if (!TextureManager::GetInstance()->LoadTexture("Resources/uvChecker.png")) {
+// 白背景を下、仮画像を上の順で作り、モデルの準備前から描画できるようにします。
+bool TitleObjectManager::InitializeSprites(SpriteCommon* spriteCommon, DirectXCommon* directXCommon)
+{
+	if (!spriteCommon || !directXCommon) {
 		return false;
 	}
+	spriteCommon->Initialize(directXCommon);
+	// どちらかの画像が欠けた場合は、半端なSpriteを一覧へ追加しません。
+	if (!TextureManager::GetInstance()->LoadTexture("Resources/debug/white.png") ||
+		!TextureManager::GetInstance()->LoadTexture("Resources/Title/2dTitle/2DTitle1.png")) {
+		return false;
+	}
+	auto backgroundSprite = std::make_unique<Sprite>();
+	backgroundSprite->Initialize(spriteCommon, "Resources/debug/white.png");
+	backgroundSprite->SetPosition({ 0.0f, 0.0f });
+	backgroundSprite->SetAnchorPoint({ 0.0f, 0.0f });
+	sprites_.push_back(std::move(backgroundSprite));
+
 	auto titleSprite = std::make_unique<Sprite>();
-	titleSprite->Initialize(spriteCommon, "Resources/uvChecker.png");
+	titleSprite->Initialize(spriteCommon, "Resources/Title/2dTitle/2DTitle1.png");
 	titleSprite->SetPosition({ 0.0f, 0.0f });
-	// InspectorのPos/Sizeと同じピクセル値です。画面幅からの計算ではなく、ここへ直接記入します。
-	titleSprite->SetSize({ 512.0f, 512.0f });
+	titleSprite->SetAnchorPoint({ 0.0f, 0.0f });
 	sprites_.push_back(std::move(titleSprite));
+	ResizeTitleSprites();
 	baseSpriteCount_ = sprites_.size();
+	return true;
+}
+
+// Spriteの画像を切り替えた後も、白背景と仮画像を現在の画面サイズへ合わせます。
+void TitleObjectManager::ResizeTitleSprites()
+{
+	if (sprites_.size() < 2) {
+		return;
+	}
+	const DirectXCommon* directXCommon = DirectXCommon::GetInstance();
+	const Vector2 screenSize{
+		static_cast<float>(directXCommon->GetClientWidth()),
+		static_cast<float>(directXCommon->GetClientHeight()),
+	};
+	sprites_[0]->SetSize(screenSize);
+	sprites_[1]->SetSize(screenSize);
+}
+
+// 読み込みに成功した画像を、導入Spriteと仮の3D監視画面へ同時に設定します。
+bool TitleObjectManager::SetTitleFrame(std::size_t frameIndex)
+{
+	static constexpr std::array<const char*, kTitleFrameCount> kFramePaths =
+	{
+		"Resources/Title/2dTitle/2DTitle1.png",
+		"Resources/Title/2dTitle/2DTitle2.png",
+		"Resources/Title/2dTitle/2DTitle3.png",
+		"Resources/Title/2dTitle/2DTitle4.png",
+		"Resources/Title/2dTitle/2DTitle5.png",
+		"Resources/Title/2dTitle/2DTitle6.png",
+		"Resources/Title/2dTitle/2DTitle7.png",
+		"Resources/Title/2dTitle/2DTitle8.png",
+		"Resources/Title/2dTitle/2DTitle9.png",
+		"Resources/Title/2dTitle/2DTitle10.png",
+		"Resources/Title/2dTitle/2DTitle11.png",
+		"Resources/Title/2dTitle/2DTitle12.png",
+	};
+
+	if (sprites_.size() < 2 || frameIndex >= kFramePaths.size())
+	{
+		return false;
+	}
+
+	const std::string texturePath = kFramePaths[frameIndex];
+	if (!TextureManager::GetInstance()->LoadTexture(texturePath))
+	{
+		return false;
+	}
+
+	Sprite* titleSprite = sprites_[1].get();
+	titleSprite->SetTexture(texturePath);
+	if (!normalObjects_.empty() && normalObjects_[0]) {
+		normalObjects_[0]->SetTextureOverride(texturePath);
+	}
+	ResizeTitleSprites();
 	return true;
 }
 

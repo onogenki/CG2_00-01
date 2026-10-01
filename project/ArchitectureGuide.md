@@ -145,17 +145,17 @@ Sceneは「部品を所有し、呼ぶ順番を決める」場所です。個別
 `MapChipField`
 
 `stage1.csv`の`B0`、`P0`などを読むクラスです。モデルやPlayerは作りません。
-Stage1は`B0`を`block.obj`の1x1x1ブロック、`P0`をPlayer開始位置へ変換します。
+Stage1は`B0`を`debug/block.obj`の1x1x1ブロック、`P0`をPlayer開始位置へ変換します。
 CSVの1マスは`MapChipField::GetPosition()`で3D座標へ変換されるため、
 MapChipFieldへモデル名や当たり判定の処理を混ぜません。
 
 `MapChipRegistry`は「種類＋番号」と実行する処理を結びます。`Stage1::ApplyStageMapData()`で`P0`と`B0`を登録し、CSVで読んだ各マスを渡します。
-未登録の番号は何も作りません。`StageMapChipFactory::CreateBlockData()`が`B0`を`block.obj`と1×1×1のBOX Colliderへ変換します。
+未登録の番号は何も作りません。`StageMapChipFactory::CreateBlockData()`が`B0`を`debug/block.obj`と1×1×1のBOX Colliderへ変換します。
 
 | CSVに書くもの | 現在の結果 | 処理を追加する場所 |
 | --- | --- | --- |
 | `P0` | Playerの開始位置。JSONのPlayerStartより優先 | `Stage1::ApplyStageMapData()`のP0登録 |
-| `B0` | `block.obj`とBOX Collider | 同関数のB0登録、外観・判定値は`StageMapChipFactory` |
+| `B0` | `debug/block.obj`とBOX Collider | 同関数のB0登録、外観・判定値は`StageMapChipFactory` |
 | `E0/G0/C0/L0` | 種類として認識するが、まだ生成しない | 各ゲーム機能を作った後、同関数へ番号と処理を登録 |
 | `B1`などの未登録番号 | 生成しない | 同関数へ別番号で登録 |
 | `,`で区切った空欄 | 何も生成しない。列位置だけ一マス進む | 登録不要 |
@@ -232,7 +232,7 @@ Factoryは生成だけで、毎フレームの更新・描画やSceneの切替�
 ```cpp
 // Stage1の初期化例です。位置・幅・高さは直接数値で指定できます。
 carryableMirror_ = StageMirrorFactory::CreateCarryableMirror(
-	object3dCommon, "plane.obj", { -2.5f, -0.8f, 4.5f }, 3.6f, 3.6f);
+	object3dCommon, "debug/plane.obj", { -2.5f, -0.8f, 4.5f }, 3.6f, 3.6f);
 // 必須の携帯鏡を作れなかった場合、見えないままゲームを続行しません。
 if (!carryableMirror_) {
 	return false;
@@ -372,7 +372,7 @@ bgm_.Initialize(Audio::GetInstance());
 soundEffects_.Initialize(Audio::GetInstance());
 
 // 登録は読込までで、まだ音は出ません。失敗した場合はゲーム側でログなどへ報告します。
-if (!soundEffects_.Register("Notice", "resources/Alarm01.wav")) {
+if (!soundEffects_.Register("Notice", "resources/debug/Alarm01.wav")) {
 	// 音源の配置・ファイル名を確認するためのエラー処理をここへ書きます。
 }
 
@@ -533,11 +533,11 @@ Scene側でCamera・Light設定のループを書き直しません。
 `Object3dCollection`
 
 一つのSceneが所有する通常3D Objectの生成・一覧・解放だけを担当します。
-`Create("floor.obj")`はFactory経由でObjectを作り、Collectionが所有します。
+`Create("debug/floor.obj")`はFactory経由でObjectを作り、Collectionが所有します。
 Sceneは返された非所有ポインタで位置・拡縮・Textureだけを設定するため、`unique_ptr`を作ってから`push_back`する重複を避けられます。
 
 ```cpp
-floor_ = sceneObjects_.Create("floor.obj");
+floor_ = sceneObjects_.Create("debug/floor.obj");
 if (!floor_) {
 	return;
 }

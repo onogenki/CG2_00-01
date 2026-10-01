@@ -87,7 +87,7 @@ bool StageMirrorFactory::CreateFixedMirrors(
 			object3dCommon,
 			DirectXCommon::GetInstance(),
 			SrvManager::GetInstance(),
-			mirrorData->fileName.empty() ? "plane.obj" : mirrorData->fileName,
+			mirrorData->fileName.empty() ? "debug/plane.obj" : mirrorData->fileName,
 			mirrorData->translation,
 			mirrorData->rotation.y,
 			std::abs(mirrorData->scaling.x) * 2.0f,

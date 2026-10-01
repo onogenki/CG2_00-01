@@ -57,7 +57,7 @@ bool Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPat
 			material.textureFilePath.front() == '*' ||
 			!std::filesystem::exists(texturePath))
 		{
-			material.textureFilePath = "Resources/uvChecker.png";
+			material.textureFilePath = "Resources/debug/uvChecker.png";
 		}
 		TextureManager::GetInstance()->LoadTexture(material.textureFilePath);
 	}

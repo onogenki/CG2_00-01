@@ -14,7 +14,7 @@ LevelLoader::ObjectData StageMapChipFactory::CreateBlockData(
 		"MapChip_B0_" + std::to_string(chip.column) + "_" + std::to_string(chip.row);
 	blockData.tag = "MapChip";
 	blockData.objectType = "MAP_CHIP";
-	blockData.fileName = "block.obj";
+	blockData.fileName = "debug/block.obj";
 	blockData.translation = field.GetPosition(chip, origin, cellSize);
 	blockData.translation.y = floorY;
 	blockData.scaling = { 1.0f, 1.0f, 1.0f };
