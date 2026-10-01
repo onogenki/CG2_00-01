@@ -38,7 +38,7 @@ int main()
 			++block0;
 			const auto block = StageMapChipFactory::CreateBlockData(
 				field, chip, { 22.0f, 0.0f, 33.0f }, 1.0f, -2.5f);
-			check(block.fileName == "block.obj" && block.hasCollider &&
+			check(block.fileName == "debug/block.obj" && block.hasCollider &&
 				block.collider.type == "BOX" && block.collider.size.x == 1.0f &&
 				block.collider.size.y == 1.0f && block.collider.size.z == 1.0f &&
 				block.translation.x == 22.0f + chip.column &&

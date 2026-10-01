@@ -117,14 +117,14 @@ void Stage1GameplaySmoke::Initialize(const InitializeContext& context)
 	EnemyManager enemyManager;
 	enemyManager.Initialize(context.object3dCommon);
 	const std::vector<Enemy::SpawnData> enemySpawnDataList{
-		{ "sphere.obj", { -2.0f, 0.0f, 0.0f }, 0.5f, false },
-		{ "sphere.obj", { 2.0f, 0.0f, 0.0f }, 0.5f, false },
+		{ "debug/sphere.obj", { -2.0f, 0.0f, 0.0f }, 0.5f, false },
+		{ "debug/sphere.obj", { 2.0f, 0.0f, 0.0f }, 0.5f, false },
 	};
 	const std::vector<Enemy*> spawnedEnemies =
 		enemyManager.SpawnAll(enemySpawnDataList);
 	// よく使う一体生成は、SpawnDataを組み立てずに短い引数だけで呼べます。
 	Enemy* simpleSpawnedEnemy =
-		enemyManager.Spawn("sphere.obj", { 0.0f, 0.0f, 0.0f }, 0.5f);
+		enemyManager.Spawn("debug/sphere.obj", { 0.0f, 0.0f, 0.0f }, 0.5f);
 	const bool hasExpectedSpawnedEnemies =
 		spawnedEnemies.size() == 2 && simpleSpawnedEnemy != nullptr && enemyManager.GetCount() == 3 &&
 		enemyManager.GetEnemy(0) == spawnedEnemies[0] &&

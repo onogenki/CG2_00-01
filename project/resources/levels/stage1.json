@@ -143,7 +143,7 @@
             "type": "EMPTY"
         },
         {
-            "file_name": "plane.obj",
+            "file_name": "debug/plane.obj",
             "name": "CarryableMirrorStart",
             "object_type": "CARRYABLE_MIRROR",
             "tag": "CarryableMirror",
@@ -180,7 +180,7 @@
                 ],
                 "type": "BOX"
             },
-            "file_name": "floor.obj",
+            "file_name": "debug/floor.obj",
             "name": "StartFloor",
             "object_type": "STATIC",
             "tag": "StartFloor",
@@ -217,7 +217,7 @@
                 ],
                 "type": "BOX"
             },
-            "file_name": "floor.obj",
+            "file_name": "debug/floor.obj",
             "name": "LightingTestLeftWall",
             "object_type": "STATIC",
             "tag": "CameraBoundary",
@@ -254,7 +254,7 @@
                 ],
                 "type": "BOX"
             },
-            "file_name": "floor.obj",
+            "file_name": "debug/floor.obj",
             "name": "LightingTestRightWall",
             "object_type": "STATIC",
             "tag": "CameraBoundary",
@@ -291,7 +291,7 @@
                 ],
                 "type": "BOX"
             },
-            "file_name": "floor.obj",
+            "file_name": "debug/floor.obj",
             "name": "LightingTestCeiling",
             "object_type": "STATIC",
             "tag": "CameraBoundary",
@@ -328,7 +328,7 @@
                 ],
                 "type": "BOX"
             },
-            "file_name": "floor.obj",
+            "file_name": "debug/floor.obj",
             "name": "LightingTestEntranceWall",
             "object_type": "STATIC",
             "tag": "CameraBoundary",
@@ -365,7 +365,7 @@
                 ],
                 "type": "BOX"
             },
-            "file_name": "floor.obj",
+            "file_name": "debug/floor.obj",
             "name": "LightingTestExitWall",
             "object_type": "STATIC",
             "tag": "CameraBoundary",
@@ -402,7 +402,7 @@
                 ],
                 "type": "BOX"
             },
-            "file_name": "floor.obj",
+            "file_name": "debug/floor.obj",
             "name": "StageFloor",
             "object_type": "STATIC",
             "tag": "Floor",
@@ -480,7 +480,7 @@
                 ],
                 "type": "BOX"
             },
-            "file_name": "plane.obj",
+            "file_name": "debug/plane.obj",
             "name": "StageMirror",
             "object_type": "STATIC",
             "tag": "Mirror",
@@ -517,7 +517,7 @@
                 ],
                 "type": "BOX"
             },
-            "file_name": "sphere.obj",
+            "file_name": "debug/sphere.obj",
             "name": "MapSphere1",
             "object_type": "STATIC",
             "tag": "MapObject",
@@ -604,7 +604,7 @@
                     6.0
                 ]
             ],
-            "file_name": "sphere.obj",
+            "file_name": "debug/sphere.obj",
             "name": "PathSphere1",
             "object_type": "PATH_OBJECT",
             "path_loop": true,

@@ -14,7 +14,7 @@ public:
 	TitleScene();
 	// unique_ptrが前方宣言したTitle用型を安全に解放できるよう、実装はTitleScene.cppに置きます。
 	~TitleScene() override;
-	// Title画面へ入った一度だけ、Camera・モデル・UI用データを作成します。
+	// Title画面へ入った時はSpriteだけを準備し、3Dは表示後に作ります。
 	void Initialize() override;
 	// Title画面を抜ける時に、TitleSceneが所有するデータを解放します。
 	void Finalize() override;
@@ -33,8 +33,14 @@ private:
 	void InitializeRenderSystems();
 	// JSONを使わないTitle画面用の標準照明を設定します。
 	void InitializeDefaultLighting();
-	// 背景の平面モデルと初期Spriteを作成します。
-	bool InitializeTitleObjects();
+	// 白背景と仮画像Spriteだけを先に作ります。
+	bool InitializeTitleSprites();
+	// Spriteを描いた後、3Dの準備を一段階ずつ進めます。
+	void PrepareNextTitleStep();
+	// 12コマ目と3D描画の準備がそろった時だけ、切替を隠すノイズを開始します。
+	void StartTitleNoise();
+	// ノイズでの切替、後退、斜め下への向き変更を順番に進めます。
+	void UpdateTitlePresentation(float deltaTime);
 	// SkyBox Textureが読めた時だけ、SkyBoxとEditor用Resource一覧を準備します。
 	bool InitializeSkyBoxAndEditorResources();
 	// Camera・Light・3Dモデル・Sprite・SkyBoxを、このフレームの状態へ更新します。
@@ -66,8 +72,40 @@ private:
 	Object3d::SpotLight spotLight_{};
 
 	// ---------- Titleの進行状態 ----------
+	enum class PreparationStep
+	{
+		kRenderSystems,
+		kModel,
+		kSkyBoxAndEditor,
+		kComplete,
+		kFailed,
+	};
+	PreparationStep preparationStep_ = PreparationStep::kRenderSystems;
+	// 先にSpriteを描き、その後で3Dの準備を開始します。
+	bool isSpriteReady_ = false;
+	bool hasDrawnTitleSprite_ = false;
+	// モデルを一度描画してからノイズへ進みます。
+	bool hasDrawnPreparedScene_ = false;
+	// 導入画像を繰り返し、準備完了後はノイズ・後退・下向きの順に進めます。
+	enum class PresentationStep
+	{
+		kFrames,
+		kNoiseCover,
+		kPullBack,
+		kTiltDown,
+		kReady,
+		kFailed,
+	};
+	PresentationStep presentationStep_ = PresentationStep::kFrames;
 	// trueになると、SceneManagerがTitleSceneを終了できます。
 	bool isFinished_ = false;
 	// 必須モデル・画像・SkyBoxがそろわない時は、未生成の描画物を更新しません。
 	bool isInitialized_ = false;
+	// ノイズ・Camera移動の各段階での経過時間です。
+	float presentationTimer_ = 0.0f;
+
+	// 仮画像を0.1秒ごとに進めるための時間です。
+	float titleFrameTimer_ = 0.0f;
+	//現在の画像番号
+	std::size_t titleFrameIndex_ = 0;
 };

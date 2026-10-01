@@ -50,14 +50,17 @@ void SceneRenderPipeline::DrawObjects(
 // Sceneごとの重複したSprite描画ループをなくし、共通設定漏れを防ぎます。
 void SceneRenderPipeline::DrawSprites(
 	SpriteCommon* spriteCommon,
-	const std::vector<std::unique_ptr<Sprite>>& sprites)
+	const std::vector<std::unique_ptr<Sprite>>& sprites,
+	size_t firstSpriteIndex)
 {
 	if (!spriteCommon) {
 		return;
 	}
 
 	spriteCommon->SetCommonDrawSetting();
-	for (const std::unique_ptr<Sprite>& sprite : sprites) {
+	// Titleの導入Spriteだけを除外できるよう、指定位置から描画します。
+	for (size_t index = firstSpriteIndex; index < sprites.size(); ++index) {
+		const std::unique_ptr<Sprite>& sprite = sprites[index];
 		if (sprite) {
 			sprite->Draw();
 		}

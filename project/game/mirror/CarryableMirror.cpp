@@ -23,7 +23,7 @@ bool CarryableMirror::Initialize(
 		return false;
 	}
 	// 持てるMirrorは景色を映さないLaser用の鏡です。UVチェッカーではなく、反射前の鏡らしい明るい板を表示します。
-	object_.SetTextureOverride("resources/white.png");
+	object_.SetTextureOverride("resources/debug/white.png");
 	// Laserを反射しない裏側だけを少し暗くし、持ち方にかかわらず表裏を区別します。
 	object_.SetBackFaceBrightness(0.35f);
 	// 小型Mirrorも表側だけLaserを反射します。

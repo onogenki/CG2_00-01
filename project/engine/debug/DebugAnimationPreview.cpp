@@ -21,12 +21,12 @@ bool DebugAnimationPreview::Initialize(
 		return false;
 	}
 
-	walkAnimation_ = Model::LoadAnimationFile("./resources", "walk.gltf");
-	humanAnimation_ = Model::LoadAnimationFile("./resources", "human.gltf");
+	walkAnimation_ = Model::LoadAnimationFile("./resources", "debug/walk.gltf");
+	humanAnimation_ = Model::LoadAnimationFile("./resources", "debug/human.gltf");
 
-	auto humanObject = Object3dFactory::Create(object3dCommon, "human.gltf", true);
-	auto handWeapon = Object3dFactory::Create(object3dCommon, "sphere.obj");
-	auto walkObject = Object3dFactory::Create(object3dCommon, "walk.gltf", true);
+	auto humanObject = Object3dFactory::Create(object3dCommon, "debug/human.gltf", true);
+	auto handWeapon = Object3dFactory::Create(object3dCommon, "debug/sphere.obj");
+	auto walkObject = Object3dFactory::Create(object3dCommon, "debug/walk.gltf", true);
 	if (!humanObject || !handWeapon || !walkObject) {
 		return false;
 	}
@@ -38,7 +38,7 @@ bool DebugAnimationPreview::Initialize(
 	humanObject->PlayAnimation(humanAnimation_);
 	humanObject->SetIsLoop(false);
 
-	handWeapon->GetModel()->SetTexture("Resources/monsterBall.png");
+	handWeapon->GetModel()->SetTexture("Resources/debug/monsterBall.png");
 	handWeapon->GetTransform().scale = { 1.5f, 1.5f, 1.5f };
 	handWeapon->GetTransform().translate = { 0.0f, 0.25f, 0.0f };
 

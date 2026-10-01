@@ -99,7 +99,7 @@ bool StageLevelEditor::AddSphere(const Context& context)
 	objectData.name = MakeUniqueName(*context.levelData, "MapSphere");
 	objectData.tag = "MapObject";
 	objectData.objectType = "STATIC";
-	objectData.fileName = "sphere.obj";
+	objectData.fileName = "debug/sphere.obj";
 	objectData.translation = context.playerPosition;
 	objectData.translation.y += 1.5f;
 	objectData.translation.z += 3.0f;
@@ -217,7 +217,7 @@ bool StageLevelEditor::AddPathSphere(const Context& context)
 	objectData.name = MakeUniqueName(*context.levelData, "PathSphere");
 	objectData.tag = "MapObject";
 	objectData.objectType = "PATH_OBJECT";
-	objectData.fileName = "sphere.obj";
+	objectData.fileName = "debug/sphere.obj";
 	objectData.translation = context.playerPosition;
 	objectData.translation.x -= 4.0f;
 	objectData.translation.y += 1.5f;

@@ -315,7 +315,7 @@ void GPUParticle::Draw(const Camera* camera)
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
 	commandList->SetGraphicsRootConstantBufferView(kGraphicsRootParameterPerView, perViewResource_->GetGPUVirtualAddress());
 	srvManager_->SetGraphicsRootDescriptorTable(kGraphicsRootParameterParticle, particleSrvIndex_);
-	commandList->SetGraphicsRootDescriptorTable(kGraphicsRootParameterTexture, TextureManager::GetInstance()->GetSrvHandleGPU("Resources/circle2.png"));
+	commandList->SetGraphicsRootDescriptorTable(kGraphicsRootParameterTexture, TextureManager::GetInstance()->GetSrvHandleGPU("Resources/debug/circle2.png"));
 	commandList->SetGraphicsRootConstantBufferView(kGraphicsRootParameterDirectionalLight, directionalLightResource_->GetGPUVirtualAddress());
 	commandList->ExecuteIndirect(drawCommandSignature_.Get(), 1, drawArgumentsResource_.Get(), 0, nullptr, 0);
 }

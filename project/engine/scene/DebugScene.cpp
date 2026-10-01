@@ -92,23 +92,23 @@ void DebugScene::InitializeCameras()
 void DebugScene::InitializeSceneResources()
 {
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
-	TextureManager::GetInstance()->LoadTexture("Resources/monsterBall.png");//2枚目
-	TextureManager::GetInstance()->LoadTexture("Resources/grass.png");//terrainのpng
+	TextureManager::GetInstance()->LoadTexture("Resources/debug/monsterBall.png");//2枚目
+	TextureManager::GetInstance()->LoadTexture("Resources/debug/grass.png");//terrainのpng
 
 	// Debug用Particleの素材と発生Groupは、種類ごとの設定を持つ部品へ準備を任せます。
 	debugParticleEffects_.InitializeResources();
 
 	// skyBoxの背景
-	TextureManager::GetInstance()->LoadTexture("Resources/qwantani_moon_noon_puresky_1k.dds");
+	TextureManager::GetInstance()->LoadTexture("Resources/debug/qwantani_moon_noon_puresky_1k.dds");
 
 	// SkyBoxによるモデルへの環境反射
-	object3dCommon->SetEnvironmentTexturePath("Resources/qwantani_moon_noon_puresky_1k.dds");
+	object3dCommon->SetEnvironmentTexturePath("Resources/debug/qwantani_moon_noon_puresky_1k.dds");
 
 	//Skybox
 	skyBox_ = std::make_unique<SkyBox>();
 	skyBox_->Initialize(dxCommon, cameraManager->GetActiveCamera());
 	// 添付されているDDSテクスチャのパスを指定する
-	skyBox_->SetTexture("Resources/qwantani_moon_noon_puresky_1k.dds");
+	skyBox_->SetTexture("Resources/debug/qwantani_moon_noon_puresky_1k.dds");
 
 	// Debug Sceneは音を即時再生せず、Game View表示後にStage1がBGMを開始します。
 }
@@ -118,7 +118,7 @@ void DebugScene::InitializeSceneResources()
 bool DebugScene::InitializeInitialContent()
 {
 	// Factoryでモデル読込とObject3d初期化を済ませ、Debug固有の配置だけをここで決めます。
-	auto objPlane = Object3dFactory::Create(object3dCommon, "terrain.obj");
+	auto objPlane = Object3dFactory::Create(object3dCommon, "debug/terrain.obj");
 	if (!objPlane) {
 		return false;
 	}
@@ -142,11 +142,11 @@ bool DebugScene::InitializeInitialContent()
 	for (uint32_t i = 0; i < 1; ++i)
 	{
 		auto sprite = std::make_unique<Sprite>();
-		sprite->Initialize(spriteCommon, "Resources/monsterBall.png");
+		sprite->Initialize(spriteCommon, "Resources/debug/monsterBall.png");
 
 		if (i % 2 == 0) {
 			// 偶数番目にはUVチェッカーのPNGを設定
-			sprite->SetTexture("Resources/uvChecker.png");
+			sprite->SetTexture("Resources/debug/uvChecker.png");
 		}
 		Vector2 pos = { 0.0f + i * 0.0f, 0.0f + i * 50.0f };
 		sprite->SetPosition(pos);
@@ -287,6 +287,11 @@ void DebugScene::Update()
 	UpdateSceneContent();
 	UpdateEditorUi();
 	UpdateAutomation();
+	// 編集欄のBackSpaceと混同しないよう、Game View操作中だけTitleへ戻ります。
+	if (ImGuiManager::GetInstance()->IsGameViewActive() &&
+		Input::GetInstance()->TriggerKey(DIK_BACK)) {
+		SceneManager::GetInstance()->ChangeSceneWithLoading("TITLE");
+	}
 }
 
 // Camera・Particle・3D/2Dモデルを、現在のScene設定で更新します。

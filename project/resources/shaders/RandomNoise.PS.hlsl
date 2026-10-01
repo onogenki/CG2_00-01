@@ -25,11 +25,13 @@ float32_t rand2Dto1d(float32_t2 value)
 
 PixelShaderOutput main(VertexShaderOutput input)
 {
-    float32_t random = rand2Dto1d(input.texcoord + gRandomNoiseData.time);
+    // ピクセル単位の白黒ノイズにし、強度1では元の画面を完全に覆う。
+    float32_t2 noiseCell = floor(input.texcoord * float32_t2(640.0f, 360.0f));
+    float32_t random = rand2Dto1d(noiseCell + floor(gRandomNoiseData.time * 30.0f));
     float32_t4 sourceColor = gTexture.Sample(gSampler, input.texcoord);
 
     PixelShaderOutput output;
-    output.color.rgb = sourceColor.rgb * lerp(1.0f, random, gRandomNoiseData.intensity);
+    output.color.rgb = lerp(sourceColor.rgb, float32_t3(random, random, random), saturate(gRandomNoiseData.intensity));
     output.color.a = sourceColor.a;
     return output;
 }
